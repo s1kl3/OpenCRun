@@ -21,5 +21,6 @@ include $(LLVM_SRC_ROOT)/unittests/Makefile.unittest
 export LLVM_LIB_SEARCH_PATH := $(LibDir)
 
 # Define CXX.Flags after including rules.
-CXX.Flags := $(CXX.Flags) -Wno-cast-qual -lOpenCRun \
-             $(RPATH) -Wl,$(SharedLibDir)
+CXX.Flags += -Wno-cast-qual $(RPATH) -Wl,$(SharedLibDir)
+
+LIBS += -lOpenCRun

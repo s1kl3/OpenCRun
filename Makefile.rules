@@ -1,0 +1,42 @@
+# Setup clang default paths
+CLANG_SRC_ROOT = $(LLVM_SRC_ROOT)/tools/clang
+CLANG_OBJ_ROOT = $(LLVM_OBJ_ROOT)/tools/clang
+
+IncDir      := $(PROJ_OBJ_ROOT)/$(BuildMode)/include
+
+# Add include path for clang
+CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
+
+OCLGENTool = $(ToolDir)/oclgen
+
+OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_DIR)) \
+         -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+
+BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
+                $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
+                -I$(IncDir) -include "ocldef.h"
+
+$(IncDir):
+	$(Verb) mkdir -p $@
+
+$(IncDir)/ocldef.h: $(PROJ_SRC_ROOT)/include/opencrun/Device/GenLib/OCLDef.td $(IncDir)
+	$(Verb) $(OCLGen) -gen-ocldef -o $(call SYSPATH, $@) $<
+
+# Provide rule sets for when dependency generation is enabled.
+ifndef DISABLE_AUTO_DEPENDENCIES
+
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(IncDir)/ocldef.h
+	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
+	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
+                                    $(LLVMCC_EMITIR_FLAG) \
+                                    $< -o $(ObjDir)/$*.ll -S; \
+                  $(BC_DEPEND_MOVEFILE)
+
+# Provide alternate rule sets if dependencies are disabled.
+else
+
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(IncDir)/ocldef.h
+	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
+	$(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
+
+endif
