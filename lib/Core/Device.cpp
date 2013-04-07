@@ -29,7 +29,6 @@ Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
   this->Name = Name;
 
   // Initialize the device.
-  InitDiagnostic();
   InitLibrary();
   InitCompiler();
 }
@@ -42,16 +41,13 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
 
   // Create the compiler.
   clang::CompilerInstance Compiler;
-
-  // Install custom diagnostic.
-  CompilerDiag->setClient(&Diag, false);
-
-  // Set it as current invocation diagnostic.
-  Compiler.setDiagnostics(&*CompilerDiag);
+ 
+  // Create default DiagnosticsEngine and setup client.
+  Compiler.createDiagnostics(&Diag, false, false);
 
   // Configure compiler invocation.
   clang::CompilerInvocation *Invocation = new clang::CompilerInvocation();
-  BuildCompilerInvocation(Opts, Src, *Invocation);
+  BuildCompilerInvocation(Opts, Src, *Invocation, Compiler.getDiagnostics());
   Compiler.setInvocation(Invocation);
 
   // Launch compiler.
@@ -61,17 +57,7 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   Mod = ToBitCode.takeModule();
   Success = Success && !Mod->MaterializeAll();
 
-  // Remove diagnostic.
-  CompilerDiag->takeClient();
-
   return Success;
-}
-
-void Device::InitDiagnostic() {
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DiagIDs;
-
-  DiagIDs = new clang::DiagnosticIDs();
-  CompilerDiag = new clang::DiagnosticsEngine(DiagIDs);
 }
 
 void Device::InitLibrary() {
@@ -101,14 +87,7 @@ void Device::InitLibrary() {
     llvm::report_fatal_error("Unable to find class library " + LibName +
                              " for device " + Name);
 
-  // Setup include paths.
-  llvm::SmallString<32> Path;
-  llvm::sys::path::append(Path, LLVM_PREFIX);
-  llvm::sys::path::append(Path,
-                          "lib",
-                          "clang",
-                          CLANG_VERSION_STRING);
-  SystemResourcePath = Path.str();
+
 }
 
 void Device::InitCompiler() {
@@ -126,7 +105,8 @@ void Device::InitCompiler() {
 
 void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
                                      llvm::MemoryBuffer &Src,
-                                     clang::CompilerInvocation &Invocation) {
+                                     clang::CompilerInvocation &Invocation,
+                                     clang::DiagnosticsEngine &Diags) {
   std::istringstream ISS(EnvCompilerOpts + UserOpts.str());
   std::string Token;
   llvm::SmallVector<const char *, 16> Argv;
@@ -144,17 +124,37 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   clang::CompilerInvocation::CreateFromArgs(Invocation,
                                             Argv.data(),
                                             Argv.data() + Argv.size(),
-                                            *CompilerDiag);
-  Invocation.setLangDefaults(clang::IK_OpenCL);
+                                            Diags);
+  clang::CompilerInvocation::setLangDefaults(*Invocation.getLangOpts(),
+                                             clang::IK_OpenCL,
+                                            clang::LangStandard::lang_opencl11);
+
+  // Force usage of fake address space map, see clang/lib/AST/ASTContext.cpp
+  clang::LangOptions &LangOpts = *Invocation.getLangOpts();
+  LangOpts.FakeAddressSpaceMap = true;
 
   // Remap file to in-memory buffer.
   clang::PreprocessorOptions &PreprocOpts = Invocation.getPreprocessorOpts();
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
   PreprocOpts.RetainRemappedFileBuffers = true;
 
+  // Implicit include of 'ocldef.h'
+  PreprocOpts.Includes.push_back("ocldef.h");
+
   // Add include paths.
   clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();
-  HdrSearchOpts.ResourceDir = SystemResourcePath;
+  
+  llvm::SmallString<32> Path;
+  if (sys::HasEnv("OPENCRUN_LLVM_ROOT"))
+    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_LLVM_ROOT"));
+  else
+    llvm::sys::path::append(Path, LLVM_PREFIX);
+  llvm::sys::path::append(Path, "lib", "clang", CLANG_VERSION_STRING, "include");
+  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
+
+  if (sys::HasEnv("OPENCRUN_INCLUDE_PATH"))
+    HdrSearchOpts.AddPath(sys::GetEnv("OPENCRUN_INCLUDE_PATH"), 
+                          clang::frontend::Quoted, false, false);
 
   // Set triple.
   clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();

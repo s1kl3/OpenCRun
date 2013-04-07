@@ -354,13 +354,13 @@ public:
   virtual void UnregisterKernel(Kernel &Kern) { }
 
 private:
-  void InitDiagnostic();
   void InitLibrary();
   void InitCompiler();
 
   void BuildCompilerInvocation(llvm::StringRef UserOpts,
                                llvm::MemoryBuffer &Src,
-                               clang::CompilerInvocation &Invocation);
+                               clang::CompilerInvocation &Invocation,
+                               clang::DiagnosticsEngine &Diags);
 
 protected:
   llvm::sys::Mutex ThisLock;
@@ -370,10 +370,6 @@ protected:
 
 private:
   std::string EnvCompilerOpts;
-
-  // CompilerDiag is shared with clang::CompilerInstance objects, so we need
-  // reference counting.
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> CompilerDiag;
 
   std::string Triple;
   std::string SystemResourcePath;
