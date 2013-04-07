@@ -9,10 +9,31 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/system_error.h"
+
+#include <fstream>
+#include <string>
+#include <unistd.h>
 
 using namespace opencrun::sys;
 
 namespace {
+
+llvm::error_code getFileSafe(llvm::StringRef Filename, std::string &result) {
+  std::ifstream fs(Filename.str().c_str(), std::fstream::in);
+  if (!fs.is_open()) return llvm::make_error_code(llvm::errc::io_error);
+
+
+  std::string cnt((std::istreambuf_iterator<char>(fs)), 
+                      std::istreambuf_iterator<char>());
+
+  fs.close();
+
+  result.swap(cnt);
+
+  return llvm::error_code::success();
+}
 
 class LinuxHardwareParser {
 public:
@@ -195,10 +216,9 @@ private:
     llvm::SmallString<32> MemInfoPath;
     llvm::sys::path::append(MemInfoPath, Path, "meminfo");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    // Force using a 2K file size; this allows to memory mapping /proc files.
-    if(llvm::MemoryBuffer::getFile(MemInfoPath, Buf, 2 * 1024))
+    if(getFileSafe(MemInfoPath, Buf))
       llvm::report_fatal_error("Cannot read meminfo file");
 
     // Check if node has already been built.
@@ -210,7 +230,7 @@ private:
       Node = new HardwareNode(0);
       Nodes.InsertNode(Node, InsertPoint);
 
-      llvm::StringRef Input = Buf->getBuffer();
+      llvm::StringRef Input(Buf);
 
       llvm::SmallVector<llvm::StringRef, 64> Lines;
       Input.split(Lines, "\n");
@@ -271,12 +291,12 @@ private:
     llvm::SmallString<32> LevelPath;
     llvm::sys::path::append(LevelPath, CachePath, "level");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    if(llvm::MemoryBuffer::getFile(LevelPath, Buf))
+    if(getFileSafe(LevelPath, Buf))
       llvm::report_fatal_error("Cannot read cache level file");
 
-    llvm::StringRef Input(Buf->getBufferStart(), Buf->getBufferSize() - 1);
+    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
 
     if(Input.getAsInteger(0, Level))
       llvm::report_fatal_error("Cannot parse cache level file");
@@ -286,12 +306,12 @@ private:
     llvm::SmallString<32> TypePath;
     llvm::sys::path::append(TypePath, CachePath, "type");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    if(llvm::MemoryBuffer::getFile(TypePath, Buf))
+    if(getFileSafe(TypePath, Buf))
       llvm::report_fatal_error("Cannot read cache type file");
 
-    llvm::StringRef Input(Buf->getBufferStart(), Buf->getBufferSize() - 1);
+    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
 
     Kind = llvm::StringSwitch<HardwareCache::Kind>(Input)
            .Case("Instruction", HardwareCache::Instruction)
@@ -305,37 +325,48 @@ private:
     llvm::SmallString<32> SharedCPUPath;
     llvm::sys::path::append(SharedCPUPath, CachePath, "shared_cpu_list");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    if(llvm::MemoryBuffer::getFile(SharedCPUPath, Buf))
+    if(getFileSafe(SharedCPUPath, Buf))
       llvm::report_fatal_error("Cannot read cache shared CPUs file");
 
-    llvm::StringRef Input(Buf->getBufferStart(), Buf->getBufferSize() - 1);
+    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
 
     llvm::SmallVector<llvm::StringRef, 4> SharedIDs;
     Input.split(SharedIDs, ",");
+
+    if (SharedIDs.back().size() == 0) SharedIDs.pop_back();
 
     for(llvm::SmallVector<llvm::StringRef, 4>::iterator I = SharedIDs.begin(),
                                                         E = SharedIDs.end();
                                                         I != E;
                                                         ++I) {
-      llvm::FoldingSetNodeID ID;
-      void *InsertPoint;
+      llvm::SmallVector<llvm::StringRef, 2> RangeIDs;
+      I->split(RangeIDs, "-");
+      if (RangeIDs.back().size() == 0) RangeIDs.pop_back();
 
-      unsigned CoreID;
+      assert(RangeIDs.size() <= 2 && !RangeIDs.empty());
 
-      if(I->getAsInteger(0, CoreID))
+      unsigned BeginCoreID, EndCoreID;
+      if(RangeIDs.front().getAsInteger(0, BeginCoreID))
+        llvm::report_fatal_error("Cannot parse cache shared CPUs file");
+      if(RangeIDs.back().getAsInteger(0, EndCoreID))
         llvm::report_fatal_error("Cannot parse cache shared CPUs file");
 
-      ID.AddInteger(CoreID);
-      HardwareCPU *CPU = CPUs.FindNodeOrInsertPos(ID, InsertPoint);
+      for (unsigned CoreID = BeginCoreID; CoreID <= EndCoreID; ++CoreID) {
+        llvm::FoldingSetNodeID ID;
+        void *InsertPoint;
 
-      if(!CPU) {
-        CPU = new HardwareCPU(CoreID);
-        CPUs.InsertNode(CPU, InsertPoint);
+        ID.AddInteger(CoreID);
+        HardwareCPU *CPU = CPUs.FindNodeOrInsertPos(ID, InsertPoint);
+
+        if(!CPU) {
+          CPU = new HardwareCPU(CoreID);
+          CPUs.InsertNode(CPU, InsertPoint);
+        }
+
+        SharedCPUs.insert(CPU);
       }
-
-      SharedCPUs.insert(CPU);
     }
   }
 
@@ -345,13 +376,13 @@ private:
     llvm::SmallString<32> SizePath;
     llvm::sys::path::append(SizePath, CachePath, "size");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    if(llvm::MemoryBuffer::getFile(SizePath, Buf))
+    if(getFileSafe(SizePath, Buf))
       llvm::report_fatal_error("Cannot read cache size file");
 
-    const char *S = Buf->getBufferStart(),
-               *E = Buf->getBufferEnd(),
+    const char *S = Buf.data(),
+               *E = Buf.data() + Buf.size(),
                *J;
 
     // Look for multiplier start.
@@ -379,12 +410,12 @@ private:
     llvm::SmallString<32> LineSizePath;
     llvm::sys::path::append(LineSizePath, CachePath, "coherency_line_size");
 
-    llvm::OwningPtr<llvm::MemoryBuffer> Buf;
+    std::string Buf;
 
-    if(llvm::MemoryBuffer::getFile(LineSizePath, Buf))
+    if(getFileSafe(LineSizePath, Buf))
       llvm::report_fatal_error("Cannot read cache line size file");
 
-    llvm::StringRef Input(Buf->getBufferStart(), Buf->getBufferSize() - 1);
+    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
 
     if(Input.getAsInteger(0, N))
       llvm::report_fatal_error("Cannot parse cache line size file");
