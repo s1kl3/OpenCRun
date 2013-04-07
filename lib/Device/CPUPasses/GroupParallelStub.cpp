@@ -149,7 +149,7 @@ bool GroupParallelStub::BuildStub(llvm::Function &Kern) {
   llvm::CallInst::Create(&Kern, KernArgs, "", Entry);
 
   // Call the implicit barrier.
-  llvm::Value *Flag = llvm::ConstantInt::get(llvm::Type::getInt64Ty(Ctx), 0);
+  llvm::Value *Flag = llvm::ConstantInt::get(Barrier->arg_begin()->getType(), 0);
   llvm::CallInst *BarrierCall;
   BarrierCall = llvm::CallInst::Create(Barrier,
                                        Flag,
