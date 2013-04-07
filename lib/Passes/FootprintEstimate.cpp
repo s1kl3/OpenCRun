@@ -1,12 +1,11 @@
 
+#define DEBUG_TYPE "footprint-estimate"
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Passes/FootprintEstimate.h"
 #include "opencrun/Util/OpenCLMetadataHandler.h"
 
-#define DEBUG_TYPE "footprint-estimate"
-
-#include "llvm/Constants.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/InstIterator.h"

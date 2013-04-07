@@ -4,7 +4,7 @@
 
 #include "opencrun/Util/PassOptions.h"
 
-#include "llvm/Instruction.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/Pass.h"
 
 #include <map>

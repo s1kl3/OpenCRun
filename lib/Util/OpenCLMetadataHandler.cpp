@@ -5,7 +5,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/TargetOptions.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Constants.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace opencrun;

@@ -8,7 +8,7 @@
 #include "opencrun/Util/MTRefCounted.h"
 
 #include "clang/Basic/Diagnostic.h"
-#include "clang/Frontend/DiagnosticOptions.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Mutex.h"
