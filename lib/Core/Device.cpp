@@ -156,12 +156,13 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
     HdrSearchOpts.AddPath(sys::GetEnv("OPENCRUN_INCLUDE_PATH"), 
                           clang::frontend::Quoted, false, false);
 
-  // Set triple.
+  // Set target triple.
   clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();
   TargetOpts.Triple = Triple;
 
-  // Disable optimizations.
+  // Code generation options: emit kernel arg metadata + no optimizations
   clang::CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
+  CodeGenOpts.EmitOpenCLArgMetadata = true;
   CodeGenOpts.DisableLLVMOpts = true;
 }
 

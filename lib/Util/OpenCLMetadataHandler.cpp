@@ -166,37 +166,48 @@ OpenCLMetadataHandler::GetKernel(llvm::StringRef KernName) const {
 
 clang::LangAS::ID
 OpenCLMetadataHandler::GetArgAddressSpace(llvm::Function &Kern, unsigned I) {
-  llvm::NamedMDNode *OpenCLMetadata = Mod.getNamedMetadata("opencl.kernels");
-  if(!OpenCLMetadata)
-    return clang::LangAS::Last;
+  llvm::Module &Mod = *Kern.getParent();
 
-  llvm::MDNode *AddrSpacesMD = NULL;
+  llvm::NamedMDNode *OCLMetadata = Mod.getNamedMetadata("opencl.kernels");
 
-  for(unsigned K = 0, E = OpenCLMetadata->getNumOperands(); K != E; ++K) {
-    llvm::MDNode *KernMD = OpenCLMetadata->getOperand(K);
+  if (!OCLMetadata) return clang::LangAS::Last;
 
-    // Not enough metadata.
-    if(KernMD->getNumOperands() < KernelArgAddressSpacesMD + 1)
-      continue;
+  for (unsigned k = 0, ke = OCLMetadata->getNumOperands(); k != ke; ++k) {
+    llvm::MDNode *KernMD = OCLMetadata->getOperand(k);
 
-    // Kernel found.
-    if(KernMD->getOperand(KernelSignatureMID) == &Kern) {
-      llvm::Value *RawVal;
-      RawVal = KernMD->getOperand(KernelArgAddressSpacesMD);
+    assert(KernMD->getNumOperands() > 0 && 
+           llvm::isa<llvm::Function>(KernMD->getOperand(0)) && 
+           "Bad kernel metadata!");
 
-      AddrSpacesMD = llvm::dyn_cast<llvm::MDNode>(RawVal);
-      break;
+    
+    if (KernMD->getOperand(0) != &Kern) continue;
+
+    for (unsigned i = 1, e = KernMD->getNumOperands(); i != e; ++i) {
+      llvm::MDNode *ArgsMD = llvm::cast<llvm::MDNode>(KernMD->getOperand(i));
+
+      assert(ArgsMD->getNumOperands() > I + 1 && 
+             llvm::isa<llvm::MDString>(ArgsMD->getOperand(0)) && 
+             "Bad arg metadata!");
+
+      llvm::MDString *InfoKind = 
+        llvm::cast<llvm::MDString>(ArgsMD->getOperand(0));
+
+      if (InfoKind->getString() != "kernel_arg_addr_space") continue;
+
+      // The translation is based on the FakeAddressSpaceMap defined in 
+      // clang/lib/AST/ASTContext.cpp
+      llvm::ConstantInt *AS =
+        llvm::cast<llvm::ConstantInt>(ArgsMD->getOperand(I + 1));
+      switch (AS->getZExtValue()) {
+      case 1: return clang::LangAS::opencl_global;
+      case 2: return clang::LangAS::opencl_local;
+      case 3: return clang::LangAS::opencl_constant;
+      default: return clang::LangAS::Last;
+      }
     }
   }
 
-  if(!AddrSpacesMD || AddrSpacesMD->getNumOperands() < I + 1)
-    return clang::LangAS::Last;
-
-  llvm::Value *RawConst = AddrSpacesMD->getOperand(I);
-  if(llvm::ConstantInt *AddrSpace = llvm::dyn_cast<llvm::ConstantInt>(RawConst))
-    return static_cast<clang::LangAS::ID>(AddrSpace->getZExtValue());
-  else
-    return clang::LangAS::Last;
+  return clang::LangAS::Last;
 }
 
 llvm::Function *OpenCLMetadataHandler::GetBuiltin(llvm::StringRef Name) {
