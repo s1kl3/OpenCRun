@@ -27,13 +27,13 @@ Context::Context(Platform &Plat,
     
     DiagOptions.ShowColors = true;
 
-    DiagClient = new clang::TextDiagnosticPrinter(llvm::errs(), DiagOptions);
+    DiagClient = new clang::TextDiagnosticPrinter(llvm::errs(), &DiagOptions);
     DiagClient->setPrefix("opencrun");
 
     llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DiagIDs;
 
     DiagIDs = new clang::DiagnosticIDs();
-    Diag.reset(new clang::DiagnosticsEngine(DiagIDs, DiagClient));
+    Diag.reset(new clang::DiagnosticsEngine(DiagIDs, &DiagOptions, DiagClient));
   }
 }
 

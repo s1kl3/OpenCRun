@@ -158,7 +158,7 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
   // Needed to log compilation results into the program structure.
   llvm::raw_string_ostream Log(Info.GetBuildLog());
   clang::TextDiagnosticPrinter *ToLog;
-  ToLog = new clang::TextDiagnosticPrinter(Log, DiagOptions);
+  ToLog = new clang::TextDiagnosticPrinter(Log, &DiagOptions);
 
   // Needed to log compilation results for internal diagnostic.
   clang::TextDiagnosticBuffer *ToCtx = new clang::TextDiagnosticBuffer();
@@ -187,7 +187,6 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
   // Dump log for debug purposes, only if needed.
   Ctx->ReportDiagnostic(*ToCtx);
 
-  delete Diag;
 
   return Success ? CL_SUCCESS : CL_BUILD_PROGRAM_FAILURE;
 }

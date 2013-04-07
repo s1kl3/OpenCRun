@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include <unistd.h>
+
 using namespace opencrun;
 
 Profiler::Profiler() : ProfileStream(STDERR_FILENO, false, true),

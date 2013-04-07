@@ -26,7 +26,7 @@ void SignalJITCallEnd();
 //
 
 CPUDevice::CPUDevice(sys::HardwareNode &Node) :
-  Device("CPU", llvm::sys::getHostTriple()),
+  Device("CPU", llvm::sys::getDefaultTargetTriple()),
   Global(Node.GetMemorySize()) {
   InitDeviceInfo(Node);
   InitMultiprocessors(Node);

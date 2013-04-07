@@ -81,16 +81,14 @@ private:
   }
 
   void InitTargetInfo() {
-    clang::TargetOptions TargetOpts;
-    TargetOpts.Triple = Mod.getTargetTriple();
+    TargetOpts = new clang::TargetOptions();
+    TargetOpts->Triple = Mod.getTargetTriple();
 
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DiagIDs;
     DiagIDs = new clang::DiagnosticIDs();
 
-    clang::DiagnosticsEngine *Diag;
     Diag = new clang::DiagnosticsEngine(DiagIDs, NULL);
 
-    TargetInfo.reset(clang::TargetInfo::CreateTargetInfo(*Diag, TargetOpts));
+    TargetInfo.reset(clang::TargetInfo::CreateTargetInfo(*Diag, &*TargetOpts));
 
     delete Diag;
   }
@@ -123,7 +121,10 @@ private:
 
   TypesContainer Types;
 
+  clang::DiagnosticsEngine *Diag;
   llvm::OwningPtr<clang::TargetInfo> TargetInfo;
+  llvm::IntrusiveRefCntPtr<clang::TargetOptions> TargetOpts;
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DiagIDs;
 };
 
 } // End anonymous namespace.

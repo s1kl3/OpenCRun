@@ -18,7 +18,7 @@ public:
 
 public:
   AggressiveInliner(llvm::StringRef Kernel = "") :
-    llvm::Inliner(ID, INT_MIN),
+    llvm::Inliner(ID, INT_MIN, false),
     Kernel(GetKernelOption(Kernel)),
     AllInlined(true) { }
 
@@ -45,6 +45,9 @@ public:
 
   virtual void growCachedCostInfo(llvm::Function *Caller,
                                   llvm::Function *Callee) { }
+
+  using Pass::doInitialization;
+  using Pass::doFinalization;
 
   virtual bool doInitialization(llvm::CallGraph &CG);
   virtual bool doFinalization(llvm::CallGraph &CG);

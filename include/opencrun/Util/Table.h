@@ -21,6 +21,20 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <cstdio>
+
+namespace llvm {
+
+static inline std::string ftostr(double V) {
+  char Buffer[200];
+  ::sprintf(Buffer, "%20.6e", V);
+  char *B = Buffer;
+  while (*B == ' ') ++B;
+  return B;
+}
+
+}
+
 namespace opencrun {
 namespace util {
 

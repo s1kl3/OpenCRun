@@ -159,6 +159,8 @@ protected:
   HardwareComponent(Type Ty) : ComponentTy(Ty) { }
 
 public:
+  virtual ~HardwareComponent() {}
+
   Type GetType() const { return ComponentTy; }
 
   void AddLink(HardwareComponent *Comp) { Links.insert(Comp); }
