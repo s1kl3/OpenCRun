@@ -33,6 +33,14 @@ unsigned DimensionInfo::DimensionInfoIterator::GetWorkDim() const {
   return DimInfo->GetDimensions();
 }
 
+size_t DimensionInfo::DimensionInfoIterator::GetGlobalSize() const {
+  return DimInfo->GetGlobalWorkItems();
+}
+
+size_t DimensionInfo::DimensionInfoIterator::GetLocalSize() const {
+  return DimInfo->GetLocalWorkItems();
+}
+
 size_t DimensionInfo::DimensionInfoIterator::GetGlobalSize(unsigned I) const {
   return DimInfo->GetGlobalWorkItems(I);
 }
@@ -97,7 +105,7 @@ void DimensionInfo::DimensionInfoIterator::Advance(unsigned N) {
     Locals.assign(Locals.size(), 0);
 
     WorkGroups.assign(WorkGroupsCount, 0);
-    WorkGroups[0] = DimInfo->GetWorkGroupsCount(WorkGroupsCount - 1);
+    WorkGroups[0] = DimInfo->GetWorkGroupsCount(0);
   }
 }
 

@@ -124,7 +124,9 @@ public:
     size_t GetWorkGroup(unsigned I) const;
 
     unsigned GetWorkDim() const;
-
+    size_t GetGlobalSize() const;
+    size_t GetLocalSize() const;
+    
     size_t GetGlobalSize(unsigned I) const;
     size_t GetGlobalId(unsigned I) const;
 
