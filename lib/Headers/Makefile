@@ -30,6 +30,8 @@ all-local:: $(HeaderDir)/ocldef.h
 
 PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
 
+HEADERS = ocldef.h
+
 INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
 
 $(PROJ_headers):
@@ -38,6 +40,8 @@ $(PROJ_headers):
 $(INSTHEADERS): $(PROJ_headers)/%.h: $(HeaderDir)/%.h | $(PROJ_headers)
 	$(Verb) $(DataInstall) $< $(PROJ_headers)
 	$(Echo) Installing compiler include file: $(notdir $<)
+
+install-local:: $(INSTHEADERS)
 
 ###
 
