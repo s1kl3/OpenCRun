@@ -132,3 +132,25 @@ clGetDeviceInfo(cl_device_id device,
     return CL_INVALID_VALUE;
   }
 }
+
+CL_API_ENTRY cl_int CL_API_CALL
+clCreateSubDevices(cl_device_id device,                        
+                   const cl_device_partition_property *properties,
+                   cl_uint num_devices,
+                   cl_device_id *out_devices,               
+                   cl_uint *) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clRetainDevice(cl_device_id device) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clReleaseDevice(cl_device_id device) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
+}

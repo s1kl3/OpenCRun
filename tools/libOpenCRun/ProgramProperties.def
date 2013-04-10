@@ -1,0 +1,15 @@
+
+PROPERTY(CL_PROGRAM_REFERENCE_COUNT, GetReferenceCount, cl_uint, unsigned)
+PROPERTY(CL_PROGRAM_CONTEXT, GetContext, cl_context, opencrun::Context &)
+// CL_PROGRAM_NUM_DEVICES manually implemented.
+// CL_PROGRAM_DEVICES manually implemented.
+PROPERTY(CL_PROGRAM_SOURCE, GetSource, char, llvm::StringRef)
+// CL_PROGRAM_BINARY_SIZES not yet implemented.
+// CL_PROGRAM_BINARIES not yet implemented.
+// CL_PROGRAM_NUM_KERNELS manually implemented.
+// CL_PROGRAM_KERNEL_NAMES manually implemented.
+
+DS_PROPERTY(CL_PROGRAM_BUILD_STATUS, GetBuildStatus, cl_build_status, cl_build_status)
+DS_PROPERTY(CL_PROGRAM_BUILD_OPTIONS, GetBuildOptions, char, llvm::StringRef)
+DS_PROPERTY(CL_PROGRAM_BUILD_LOG, GetBuildLog, char, llvm::StringRef)
+// CL_PROGRAM_BINARY_TYPE not yet implemented.
