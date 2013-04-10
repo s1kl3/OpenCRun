@@ -30,7 +30,7 @@ all-local:: $(HeaderDir)/ocldef.h
 
 PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
 
-HEADERS = ocldef.h
+HEADERS := ocldef.h
 
 INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
 

@@ -17,7 +17,7 @@ BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
 # Provide rule sets for when dependency generation is enabled.
 ifndef DISABLE_AUTO_DEPENDENCIES
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(IncDir)/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
                                     $(LLVMCC_EMITIR_FLAG) \
@@ -27,7 +27,7 @@ $(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(IncDir)/ocldef
 # Provide alternate rule sets if dependencies are disabled.
 else
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(IncDir)/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
 
