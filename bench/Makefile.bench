@@ -42,7 +42,8 @@ endif
 # Kernels are stored in separate files, put them in the search path.
 Run.BCL := BCL_PATH="$(PROJ_SRC_DIR)"
 
-Run.Shared := LLVM_LIB_SEARCH_PATH="$(LibDir)" OPENCRUN_LLVM_ROOT="$(LLVM_OBJ_ROOT)/$(BuildMode)" OPENCRUN_INCLUDE_PATH="$(IncDir)"
+Run.Shared := LLVM_LIB_SEARCH_PATH="$(LibDir)" OPENCRUN_LLVM_ROOT="$(LLVM_OBJ_ROOT)/$(BuildMode)" 
+Run.Shared += OPENCRUN_INCLUDE_PATH="$(LibDir)/opencrun/include"
 
 $(BenchExe): $(ObjectsO) $(ProjLibsPaths) $(LLVMLibsPaths)
 	$(Echo) Linking $(BuildMode) Benchmark $(BENCHNAME) $(StripWarnMsg)

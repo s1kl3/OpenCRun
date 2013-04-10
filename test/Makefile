@@ -129,7 +129,7 @@ Unit/lit.site.cfg: $(PROJ_OBJ_DIR)/Unit/.dir FORCE
 	@$(ECHOPATH) s=@PROJ_SOURCE_DIR@=$(PROJ_SRC_ROOT)=g >> unit.tmp
 	@$(ECHOPATH) s=@PROJ_BINARY_DIR@=$(PROJ_OBJ_ROOT)=g >> unit.tmp
 	@$(ECHOPATH) s=@PROJ_LIB_DIR@=$(LibDir)=g >> unit.tmp
-	@$(ECHOPATH) s=@PROJ_INC_DIR@=$(IncDir)=g >> unit.tmp
+	@$(ECHOPATH) s=@PROJ_INC_DIR@=$(LibDir)/opencrun/include=g >> unit.tmp
 	@$(ECHOPATH) s=@LLVM_DIR@=$(LLVM_OBJ_ROOT)/$(BuildMode)=g >> unit.tmp
 	@sed -f unit.tmp $(PROJ_SRC_DIR)/Unit/lit.site.cfg.in > $@
 	@-rm -f unit.tmp

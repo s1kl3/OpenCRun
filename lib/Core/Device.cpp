@@ -152,9 +152,12 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   llvm::sys::path::append(Path, "lib", "clang", CLANG_VERSION_STRING, "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 
+  Path.clear();
   if (sys::HasEnv("OPENCRUN_INCLUDE_PATH"))
-    HdrSearchOpts.AddPath(sys::GetEnv("OPENCRUN_INCLUDE_PATH"), 
-                          clang::frontend::Quoted, false, false);
+    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_INCLUDE_PATH"));
+  else
+    llvm::sys::path::append(Path, LLVM_PREFIX, "lib", "opencrun", "include");
+  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Quoted, false, false);
 
   // Set target triple.
   clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();
