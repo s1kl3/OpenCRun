@@ -3,6 +3,7 @@
 #include "opencrun/Core/Event.h"
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPUPasses/AllPasses.h"
+#include "opencrun/Passes/AsyncCopySpecialization.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
 
@@ -357,9 +358,13 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // The aggressive inliner cache info about call graph shape.
   AggressiveInliner *Inliner = CreateAggressiveInlinerPass(KernName);
 
+  // The asynchronous copy function specialization pass.
+  AsyncCopySpecialization *AsyncCopySpec = CreateAsyncCopySpecializationPass(KernName);
+
   // Build the entry point and optimize.
   llvm::PassManager PM;
   PM.add(Inliner);
+  PM.add(AsyncCopySpec);
   PM.add(CreateGroupParallelStubPass(KernName));
   PM.run(Mod);
 

@@ -295,7 +295,7 @@ void CPUThread::Run() {
     Execute(Cmd);
   }
 
-  //ResetCurrentThread();
+  // ResetCurrentThread();
 }
 
 float CPUThread::GetLoadIndicator() {
