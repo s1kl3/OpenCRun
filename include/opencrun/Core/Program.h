@@ -78,6 +78,10 @@ public:
 public:
   std::string &GetBuildLog() { return BuildLog; }
 
+  llvm::StringRef GetBuildOptions() { return BuildOpts.str(); }
+
+  cl_build_status GetBuildStatus() { return BuildStatus; }
+
   llvm::Function *GetKernel(llvm::StringRef KernName) {
     if(!BitCode)
       return NULL;
@@ -138,6 +142,12 @@ public:
 
   Context &GetContext() { return *Ctx; }
 
+  BuildInformation &GetBuildInformation(Device &Dev) { return *BuildInfo[&Dev]; }
+
+  llvm::StringRef GetSource() { return Src->getBuffer(); }
+
+  AttachedKernelsContainer &GetAttachedKernels() { return AttachedKernels; }
+  
 public:
   bool HasAttachedKernels() {
     llvm::sys::ScopedLock Lock(ThisLock);
