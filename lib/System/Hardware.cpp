@@ -333,7 +333,12 @@ private:
     llvm::StringRef Input(Buf.data(), Buf.size() - 1);
 
     llvm::SmallVector<llvm::StringRef, 4> SharedIDs;
-    Input.split(SharedIDs, ",");
+    if(Input.find(',') != llvm::StringRef::npos)
+      Input.split(SharedIDs, ",");
+    else if(Input.find('-') != llvm::StringRef::npos)
+      Input.split(SharedIDs, "-");
+    else
+      SharedIDs.assign(1, Input);
 
     if (SharedIDs.back().size() == 0) SharedIDs.pop_back();
 

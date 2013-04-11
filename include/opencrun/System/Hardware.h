@@ -159,7 +159,7 @@ protected:
   HardwareComponent(Type Ty) : ComponentTy(Ty) { }
 
 public:
-  virtual ~HardwareComponent() {}
+  virtual ~HardwareComponent() { }
 
   Type GetType() const { return ComponentTy; }
 
@@ -438,6 +438,7 @@ public:
 public:
   typedef FilteredComponentIterator<HardwareNode> node_iterator;
   typedef FilteredComponentIterator<HardwareCache> cache_iterator;
+  typedef FilteredComponentIterator<HardwareCPU> cpu_iterator;
 
 public:
   node_iterator node_begin() {
@@ -452,6 +453,13 @@ public:
   }
   cache_iterator cache_end() {
     return cache_iterator(component_end(), component_end());
+  }
+
+  cpu_iterator cpu_begin() {
+    return cpu_iterator(component_begin(), component_end());
+  }
+  cpu_iterator cpu_end() {
+    return cpu_iterator(component_end(), component_end());
   }
 };
 
