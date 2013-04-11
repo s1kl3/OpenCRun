@@ -106,16 +106,6 @@ clGetProgramInfo(cl_program program,
                  size_t param_value_size,
                  void *param_value,
                  size_t *param_value_size_ret) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
-}
-
-CL_API_ENTRY cl_int CL_API_CALL
-clGetProgramInfo(cl_program program,
-                 cl_program_info param_name,
-                 size_t param_value_size,
-                 void *param_value,
-                 size_t *param_value_size_ret) CL_API_SUFFIX__VERSION_1_0 {
   if(!program)
     return CL_INVALID_PROGRAM;
 
