@@ -139,44 +139,111 @@ std::string OCLVectType::BuildName(OCLScalarType &BaseType, int64_t Width) {
 // OCLLibBuiltin implementation.
 //
 
-OCLLibBuiltin::OCLLibBuiltin(llvm::Record &R) {
+OCLLibBuiltin::OCLLibBuiltin(llvm::Record &R) {  
+  if(R.isSubClassOf("CommonBuiltin"))
+    BuiltinTy = CommonBuiltin;
+  else if(R.isSubClassOf("IntegerBuiltin"))
+    BuiltinTy = IntegerBuiltin;
+  else if(R.isSubClassOf("MathBuiltin"))
+    BuiltinTy = MathBuiltin;
+  else if(R.isSubClassOf("Relational_1_Builtin"))
+    BuiltinTy = Relational_1_Builtin;
+  else if(R.isSubClassOf("Relational_2_Builtin"))
+    BuiltinTy = Relational_2_Builtin;
+  
   // Parse name.
   llvm::StringRef RawName = R.getName();
-  if(!RawName.startswith("blt_"))
-    llvm::PrintFatalError("Builtin name must starts with blt_: " +
+  if(RawName.startswith("blt_common_"))
+    Name.assign(RawName.begin() + 11, RawName.end());
+  else if(RawName.startswith("blt_integer_"))
+    Name.assign(RawName.begin() + 12, RawName.end());
+  else if(RawName.startswith("blt_math_"))
+    Name.assign(RawName.begin() + 9, RawName.end());
+  else if(RawName.startswith("blt_relational_"))
+    Name.assign(RawName.begin() + 15, RawName.end());
+  else
+    llvm::PrintFatalError("Builtin name must starts with blt_<libname>: " +
                           RawName.str());
-  Name.assign(RawName.begin() + 4, RawName.end());
 
-  // Parse return type.
-  llvm::Record *Return = R.getValueAsDef("RetType");
-  ReturnTy = TypeTable.GetType(*Return);
+  // Parse return types for each built-in form.
+  std::vector<llvm::Record *> Returns = R.getValueAsListOfDefs("RetTypes");
 
-  // Parse parameter list.
-  std::vector<llvm::Record *> Params = R.getValueAsListOfDefs("ParamTypes");
-  for(unsigned I = 0, E = Params.size(); I != E; ++I)
-    ParamTys.push_back(TypeTable.GetType(*Params[I]));
+  for(unsigned I = 0, E = Returns.size(); I != E; ++I)
+    ReturnTys.push_back(TypeTable.GetType(*Returns[I]));
 
-  // Parse gentype mappings.
-  llvm::ListInit *Mappings = R.getValueAsListInit("GentypeSubs");
-  for(unsigned I = 0, E = Mappings->size(); I != E; ++I) {
-    llvm::Init *CurElem = Mappings->getElement(I);
-    llvm::ListInit *CurMappings = llvm::dyn_cast<llvm::ListInit>(CurElem);
+  // Parse parameter list for each built-in form.
+  llvm::ListInit *ParamTypes = R.getValueAsListInit("ParamTypes");
+  
+  for(unsigned I = 0; I < GetAlternativesCount(); ++I) {
+    llvm::Init *CurElem = ParamTypes->getElement(I);
+    llvm::ListInit *CurParams = llvm::dyn_cast<llvm::ListInit>(CurElem);
 
-    if(!CurMappings)
-      llvm::PrintFatalError("Expected gentype mappings list. Found: " +
-                            CurElem->getAsString());
+    if(!CurParams)
+      llvm::PrintFatalError("Expected parameter types list for built-in alternative. Found: "
+                            + CurElem->getAsString());
 
-    // Get the generic type for this index.
-    OCLType *CurType = TypeTable.GetType("gentype" + llvm::utostr(I + 1));
-    OCLGenType *GenType = llvm::cast<OCLGenType>(CurType);
-
-    // Map each type specialization to the gentype. We cannot use a multimap
-    // because we need to preserve the order in which specialization have been
-    // declared by the user.
-    for(unsigned J = 0, F = CurMappings->size(); J != F; ++J) {
-      llvm::Record *CurSub = CurMappings->getElementAsRecord(J);
-      GenTypeSubs[GenType].push_back(TypeTable.GetType(*CurSub));
+    ParamTysEntry CurParamTys;
+    for(unsigned J = 0, F = CurParams->size(); J != F; ++J) {
+      llvm::Record *CurParamTy = CurParams->getElementAsRecord(J);
+      CurParamTys.push_back(TypeTable.GetType(*CurParamTy));
     }
+    ParamTys.push_back(CurParamTys);
+  }
+
+  // Parse gentype mappings for return type and parameter types for all
+  // built-in alternatives.
+  llvm::ListInit *Mappings = R.getValueAsListInit("GentypeSubs");
+  
+  for(unsigned I = 0; I < GetAlternativesCount(); ++I) {
+    
+    // Get return OCLType for built-in alternative I and check if it's an OCLGenType.
+    if(OCLGenType *GenType = llvm::dyn_cast<OCLGenType>(&GetReturnType(I))) {
+      unsigned N = static_cast<unsigned>(GenType->getN());
+
+      // Get the corresponding element from specialization list.
+      llvm::Init *CurElem = Mappings->getElement(N - 1);
+      llvm::ListInit *CurMappings = llvm::dyn_cast<llvm::ListInit>(CurElem);
+
+      if(!CurMappings)
+        llvm::PrintFatalError("Expected gentype mappings list. Found: " +
+                              CurElem->getAsString());
+
+      // Map each type specialization to the gentype. We cannot use a multimap
+      // because we need to preserve the order in which specialization have been
+      // declared by the user.
+      if(!GenTypeSubs.count(GenType))
+        for(unsigned J = 0, F = CurMappings->size(); J != F; ++J) {
+          llvm::Record *CurSub = CurMappings->getElementAsRecord(J);
+          GenTypeSubs[GenType].push_back(TypeTable.GetType(*CurSub));
+        }
+    }
+
+    for(unsigned J = 0; J < GetParametersCount(); ++J) {
+      // Get OCLType corresponding to parameter J for built-in alternative I and
+      // check if it's an OCLGenType.
+      OCLType &ParamTy = GetParameterType(I, J);
+      if(OCLGenType *GenType = llvm::dyn_cast<OCLGenType>(&ParamTy)) {
+        unsigned N = static_cast<unsigned>(GenType->getN());
+       
+        // Get the corresponding element from specialization list.
+        llvm::Init *CurElem = Mappings->getElement(N - 1);
+        llvm::ListInit *CurMappings = llvm::dyn_cast<llvm::ListInit>(CurElem);
+
+        if(!CurMappings)
+          llvm::PrintFatalError("Expected gentype mappings list. Found: " +
+                                CurElem->getAsString());
+
+        // Map each type specialization to the gentype. We cannot use a multimap
+        // because we need to preserve the order in which specialization have been
+        // declared by the user.
+        if(!GenTypeSubs.count(GenType))
+          for(unsigned K = 0, F = CurMappings->size(); K != F; ++K) {
+            llvm::Record *CurSub = CurMappings->getElementAsRecord(K);
+            GenTypeSubs[GenType].push_back(TypeTable.GetType(*CurSub));
+          }
+      }
+    }
+
   }
 
   // Parse attributes.

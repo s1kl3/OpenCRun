@@ -3,4 +3,6 @@
 // The Math library is auto-generated.
 //
 
-#include "Math.inc"
+#define __BUILTINS_MATH
+#include "Builtins.inc"
+#undef __BUILTINS_MATH

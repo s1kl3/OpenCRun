@@ -17,21 +17,25 @@ MODULE_NAME = opencrunCPULib
 TABLEGEN_INC_FILES_COMMON = 1
 
 #
-# Auto-generate some libraries.
+# Auto-generate library.
 #
-BUILT_SOURCES = Math.inc
+BUILT_SOURCES = Builtins.inc 
 
 #
 # The LLVM build system does not known recognize .cl files automatically.
 #
-SOURCES = WorkItem.cl Synchronization.cl Math.cl
+SOURCES = Async.cl Common.inc Geometric.cl Integer.cl Math.cl Relational.cl \
+		  Synchronization.cl WorkItem.cl
 
 #
 # Include Makefile.common so we know what to do.
 #
 include $(LEVEL)/Makefile.common
 
-$(ObjDir)/Math.inc.tmp: $(PROJ_SRC_ROOT)/include/opencrun/Device/GenLib/Math.td \
-                        $(OCLGEN) $(ObjDir)/.dir
-	$(Echo) "Building Math library with oclgen"
+# To avoid "option unknown" warnings caused by "-Wno-maybe-uninitialized".
+NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
+
+$(ObjDir)/Builtins.inc.tmp: $(PROJ_SRC_ROOT)/include/opencrun/Device/GenLib/OCLDef.td \
+							$(OCLGEN) $(ObjDir)/.dir
+	$(Echo) "Building Builtins library with oclgen"
 	$(Verb) $(OCLGen) -gen-ocl-lib-impl -o $(call SYSPATH, $@) $<

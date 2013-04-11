@@ -117,16 +117,33 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
 class OCLLibBuiltin {
 public:
+  enum Type {
+    CommonBuiltin,
+    IntegerBuiltin,
+    MathBuiltin,
+    Relational_1_Builtin,
+    Relational_2_Builtin
+  };
+
+public:
+  typedef llvm::SmallVector<OCLType *, 3> ReturnTysContainer;
+
+  typedef llvm::SmallVector<OCLType *, 4> ParamTysEntry;
+  typedef llvm::SmallVector<ParamTysEntry, 3> ParamTysContainer;
+
   typedef std::vector<OCLType *> GenTypeSubsEntry;
   typedef std::map<OCLGenType *, GenTypeSubsEntry> GenTypeSubsContainer;
+
+  typedef llvm::SmallVector<OCLAttribute *, 2> AttributesContainer;
 
 public:
   OCLLibBuiltin(llvm::Record &R);
 
-  OCLLibBuiltin() : ReturnTy(NULL) { }
+  OCLLibBuiltin() { }
 
-  OCLLibBuiltin(const OCLLibBuiltin &That) : Name(That.Name),
-                                             ReturnTy(That.ReturnTy),
+  OCLLibBuiltin(const OCLLibBuiltin &That) : BuiltinTy(That.BuiltinTy),
+                                             Name(That.Name),
+                                             ReturnTys(That.ReturnTys),
                                              ParamTys(That.ParamTys),
                                              GenTypeSubs(That.GenTypeSubs),
                                              Attributes(That.Attributes),
@@ -135,8 +152,9 @@ public:
 
   const OCLLibBuiltin &operator=(const OCLLibBuiltin &That) {
     if(this != &That) {
+      BuiltinTy = That.BuiltinTy;
       Name = That.Name;
-      ReturnTy = That.ReturnTy;
+      ReturnTys = That.ReturnTys;
       ParamTys = That.ParamTys;
       GenTypeSubs = That.GenTypeSubs;
       Attributes = That.Attributes;
@@ -148,7 +166,20 @@ public:
 
 public:
   size_t GetParametersCount() const {
-    return ParamTys.size();
+    // No parameters.
+    if(ParamTys.empty())
+      return 0;
+
+    // All ParamTys elements have the same length by construction.
+    ParamTysContainer::const_iterator I = ParamTys.begin();
+
+    return I->size();
+  }
+
+  size_t GetAlternativesCount() const {
+    // The number of built-in alternative forms corresponds to the
+    // number of elements in ReturnTys.
+    return ReturnTys.size();
   }
 
   size_t GetSpecializationsCount() const {
@@ -169,23 +200,29 @@ public:
 public:
   std::string &GetName() { return Name; }
 
-  OCLType &GetReturnType() {
-    return *ReturnTy;
+  OCLType &GetReturnType(unsigned AltID) {
+    if(AltID >= GetAlternativesCount())
+      llvm::PrintFatalError("Out of range alternative index: " + llvm::utostr(AltID));
+
+    return *ReturnTys[AltID];
   }
 
-  OCLType &GetReturnType(unsigned SpecID) {
-    return GetSpecializedType(GetReturnType(), SpecID);
+  OCLType &GetReturnType(unsigned AltID, unsigned SpecID) {
+    return GetSpecializedType(GetReturnType(AltID), SpecID);
   }
 
-  OCLType &GetParameterType(unsigned I) {
+  OCLType &GetParameterType(unsigned AltID, unsigned I) {
+    if(AltID >= GetAlternativesCount())
+      llvm::PrintFatalError("Out of range alternative index: " + llvm::utostr(AltID));
+
     if(I >= GetParametersCount())
       llvm::PrintFatalError("Out of range parameter index: " + llvm::utostr(I));
 
-    return *ParamTys[I];
+    return *(ParamTys[AltID])[I];
   }
 
-  OCLType &GetParameterType(unsigned I, unsigned SpecID) {
-    return GetSpecializedType(GetParameterType(I), SpecID);
+  OCLType &GetParameterType(unsigned AltID, unsigned I, unsigned SpecID) {
+    return GetSpecializedType(GetParameterType(AltID, I), SpecID);
   }
 
   OCLAttribute &GetAttribute(unsigned I) {
@@ -199,17 +236,21 @@ public:
     return BaseImpl;
   }
 
+  Type GetType() const { return BuiltinTy; }
+
 private:
   OCLType &GetSpecializedType(OCLType &Ty, unsigned SpecID);
 
 private:
+  Type BuiltinTy;
   std::string Name;
 
-  OCLType *ReturnTy;
-  llvm::SmallVector<OCLType *, 4> ParamTys;
+  ReturnTysContainer ReturnTys;
+  ParamTysContainer ParamTys;
+  
   GenTypeSubsContainer GenTypeSubs;
 
-  llvm::SmallVector<OCLAttribute *, 2> Attributes;
+  AttributesContainer Attributes;
 
   std::string BaseImpl;
 };
