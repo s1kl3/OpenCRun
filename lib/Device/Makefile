@@ -8,7 +8,7 @@ LEVEL = ../..
 #
 # List all of the subdirectories that we will compile.
 #
-DIRS = CPUPasses CPU CPULib
+DIRS = CPUPasses CPU
 
 #
 # Give the name of a library. This will build a dynamic version.

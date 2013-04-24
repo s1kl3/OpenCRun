@@ -138,8 +138,11 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
   PreprocOpts.RetainRemappedFileBuffers = true;
 
-  // Implicit include of 'ocldef.h'
-  PreprocOpts.Includes.push_back("ocldef.h");
+  // Implicit include of 'ocldef.%TARGET%.h'
+  llvm::SmallString<16> TargetHeader("ocldef.");
+  TargetHeader += Name;
+  TargetHeader += ".h";
+  PreprocOpts.Includes.push_back(TargetHeader.str());
 
   // Add include paths.
   clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();

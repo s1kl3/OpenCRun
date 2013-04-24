@@ -1,34 +1,78 @@
+#------------------------------------------------------------------------------#
 # Setup clang default paths
+#------------------------------------------------------------------------------#
+
 CLANG_SRC_ROOT = $(LLVM_SRC_ROOT)/tools/clang
 CLANG_OBJ_ROOT = $(LLVM_OBJ_ROOT)/tools/clang
 
+#------------------------------------------------------------------------------#
 # Add include path for clang
+#------------------------------------------------------------------------------#
+
 CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
+
+
+#------------------------------------------------------------------------------#
+# Builtins and OCLGen 
+#------------------------------------------------------------------------------#
+
+BUILTINS_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Builtins
 
 OCLGENTool = $(ToolDir)/oclgen
 
-OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_DIR)) \
-         -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+
+HeaderDir := $(LibDir)/opencrun/include
 
 BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
                 $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
-                -I$(LibDir)/opencrun/include -include "ocldef.h"
+                -I$(HeaderDir) -Wno-empty-translation-unit
 
-# Provide rule sets for when dependency generation is enabled.
 ifndef DISABLE_AUTO_DEPENDENCIES
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(HeaderDir)/ocldef.h $(TargetHeaders)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
                                     $(LLVMCC_EMITIR_FLAG) \
                                     $< -o $(ObjDir)/$*.ll -S; \
                   $(BC_DEPEND_MOVEFILE)
-
-# Provide alternate rule sets if dependencies are disabled.
 else
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(HeaderDir)/ocldef.h $(TargetHeaders)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
 
 endif
+
+ifdef TABLEGEN_INC_FILES_COMMON
+
+$(ObjDir)/Builtins.%.inc.tmp: %.td $(OCLGEN) $(ObjDir)/.dir
+	$(Echo) Generating OCL builtins library implementation for '$*' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-lib-impl -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocldef.%.h.inc.tmp: %.td $(OCLGEN) $(ObjDir)/.dir
+	$(Echo) Generating OCL types definition for '$*' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-types -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocldef.h.inc.tmp: $(BUILTINS_DIR)/OpenCL.td $(OCLGEN) $(ObjDir)/.dir
+	$(Echo) Generating OCL builtins library definition with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-lib-def -o $(call SYSPATH, $@) $<
+
+$(HeaderDir)/ocldef.%.h: ocldef.%.h.inc $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $@) to build dir
+
+endif
+
+#------------------------------------------------------------------------------#
+# Header file install path
+#------------------------------------------------------------------------------#
+
+PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
+
+$(PROJ_headers):
+	$(Verb) $(MKDIR) $@
+
+$(PROJ_headers)/%.h: $(HeaderDir)/%.h | $(PROJ_headers)
+	$(Verb) $(DataInstall) $< $(PROJ_headers)
+	$(Echo) Installing compiler include file: $(notdir $<)

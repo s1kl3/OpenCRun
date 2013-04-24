@@ -6,6 +6,11 @@
 LEVEL = ../../..
 
 #
+# List all of the subdirectories that we will compile.
+#
+DIRS = Library
+
+#
 # Give the name of a library. This will build a dynamic version.
 #
 LIBRARYNAME = opencrunCPUDevice
