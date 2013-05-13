@@ -17,14 +17,15 @@ MODULE_NAME = opencrunCPULib
 TABLEGEN_INC_FILES_COMMON = 1
 
 #
-# Auto-generate some libraries.
+# Auto-generate library.
 #
 BUILT_SOURCES = Builtins.CPU.inc ocldef.CPU.h.inc
 
 #
 # The LLVM build system does not known recognize .cl files automatically.
 #
-SOURCES = WorkItem.cl Synchronization.cl Math.cl
+SOURCES = Async.cl Common.cl Mfence.cl Geometric.cl Integer.cl Math.cl \
+		  Vmisc.cl Relational.cl Synchronization.cl Vloadstore.cl WorkItem.cl
 
 #
 # Define target headers

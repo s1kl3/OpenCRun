@@ -19,6 +19,7 @@ class OCLType {
 public:
   enum TypeKind {
     TK_Basic,
+    TK_Opaque,
     TK_Scalar,
     TK_Integer,
     TK_Real,
@@ -46,11 +47,14 @@ class OCLBasicType : public OCLType {
 public:
   static bool classof(const OCLType *Ty) {
     switch (Ty->getKind()) {
-    case TK_Basic: case TK_Scalar: 
-    case TK_Integer: case TK_Real: 
-    case TK_Vector: case  TK_Pointer:
+    case TK_Basic: 
+    case TK_Opaque:
+    case TK_Scalar: case TK_Integer: case TK_Real: 
+    case TK_Vector: 
+    case  TK_Pointer: 
       return true;
-    default: return false;
+    default: 
+      return false;
     }
   }
 
@@ -59,10 +63,24 @@ protected:
    : OCLType(SubType, name) {}
 };
 
+class OCLOpaqueType : public OCLBasicType {
+public:
+  static bool classof(const OCLBasicType *Ty) {
+    switch (Ty->getKind()) {
+    case TK_Basic: case TK_Opaque: return true;
+    default: return false;                               
+    }
+  }
+
+public:
+  OCLOpaqueType(llvm::StringRef name)
+    : OCLBasicType(TK_Opaque, name) {}
+};
+
 class OCLScalarType : public OCLBasicType {
 public:
   static bool classof(const OCLType *Ty) {
-    switch(Ty->getKind()) {
+    switch (Ty->getKind()) {
     case TK_Scalar: case TK_Integer: case TK_Real: return true;
     default: return false;
     }

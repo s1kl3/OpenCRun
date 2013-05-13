@@ -2,6 +2,13 @@ class OCLType;
 
 class OCLBasicType : OCLType;
 
+class OCLOpaqueType<string name> : OCLBasicType {
+  string Name = name;
+}
+
+def ocl_void : OCLOpaqueType<"void">;
+def ocl_size_t : OCLOpaqueType<"size_t">;
+
 class OCLAddressSpace<int value> {
   int Value = value;
 }
@@ -168,7 +175,6 @@ def ocl_vgentype_real : OCLGroupType<[
   ocl_vec_float, ocl_vec_double
 ]>;
 
-
 // Integer gentype
 
 def ocl_gentype_s_integer : OCLGroupType<[
@@ -197,23 +203,168 @@ def ocl_gentype_real : OCLGroupType<[
   ocl_gentype_float, ocl_gentype_double
 ]>;
 
-// Custom gentype
+// Global gentype
 
-def ocl_gentype_v_int : OCLGroupType<[
-  ocl_int_2, ocl_int_3, ocl_int_4, ocl_int_8, ocl_int_16,
-  ocl_uint_2, ocl_uint_3, ocl_uint_4, ocl_uint_8, ocl_uint_16
+def ocl_gentype : OCLGroupType<[
+  ocl_gentype_integer, ocl_gentype_real
 ]>;
 
-def ocl_gentype_geom_float : OCLGroupType<[
-  ocl_float, ocl_float_2, ocl_float_3, ocl_float_4
+// Scalar and vectorial integer types
+
+def ocl_s_char : OCLGroupType<[
+  ocl_char, ocl_vec_s_char
 ]>;
 
-def ocl_gentype_geom_double : OCLGroupType<[
-  ocl_double, ocl_double_2, ocl_double_3, ocl_double_4
+def ocl_u_char : OCLGroupType<[
+  ocl_uchar, ocl_vec_u_char
 ]>;
 
+def ocl_s_short : OCLGroupType<[
+  ocl_short, ocl_vec_s_short
+]>;
+
+def ocl_u_short : OCLGroupType<[
+  ocl_ushort, ocl_vec_u_short
+]>;
 
 def ocl_s_int : OCLGroupType<[
   ocl_int, ocl_vec_s_int
 ]>;
 
+def ocl_u_int : OCLGroupType<[
+  ocl_uint, ocl_vec_u_int
+]>;
+
+def ocl_s_long : OCLGroupType<[
+  ocl_long, ocl_vec_s_long
+]>;
+
+def ocl_u_long : OCLGroupType<[
+  ocl_ulong, ocl_vec_u_long
+]>;
+
+// Integer and real vectorial gentypes for each specific size
+
+def ocl_vgentype_2 : OCLGroupType<[
+  ocl_char_2, 
+  ocl_uchar_2, 
+  ocl_short_2, 
+  ocl_ushort_2,
+  ocl_int_2,
+  ocl_uint_2,
+  ocl_long_2,
+  ocl_ulong_2,
+  ocl_float_2,
+  ocl_double_2
+]>;
+
+def ocl_vgentype_3 : OCLGroupType<[
+  ocl_char_3, 
+  ocl_uchar_3, 
+  ocl_short_3, 
+  ocl_ushort_3,
+  ocl_int_3,
+  ocl_uint_3,
+  ocl_long_3,
+  ocl_ulong_3,
+  ocl_float_3,
+  ocl_double_3
+]>;
+
+def ocl_vgentype_4 : OCLGroupType<[
+  ocl_char_4, 
+  ocl_uchar_4, 
+  ocl_short_4, 
+  ocl_ushort_4,
+  ocl_int_4,
+  ocl_uint_4,
+  ocl_long_4,
+  ocl_ulong_4,
+  ocl_float_4,
+  ocl_double_4
+]>;
+
+def ocl_vgentype_8 : OCLGroupType<[
+  ocl_char_8, 
+  ocl_uchar_8, 
+  ocl_short_8, 
+  ocl_ushort_8,
+  ocl_int_8,
+  ocl_uint_8,
+  ocl_long_8,
+  ocl_ulong_8,
+  ocl_float_8,
+  ocl_double_8
+]>;
+
+def ocl_vgentype_16 : OCLGroupType<[
+  ocl_char_16, 
+  ocl_uchar_16, 
+  ocl_short_16, 
+  ocl_ushort_16,
+  ocl_int_16,
+  ocl_uint_16,
+  ocl_long_16,
+  ocl_ulong_16,
+  ocl_float_16,
+  ocl_double_16
+]>;
+
+// Geometric builtins custom types
+
+def ocl_gentype_float_geom : OCLGroupType<[
+  ocl_float, ocl_float_2, ocl_float_3, ocl_float_4
+]>;
+
+def ocl_gentype_double_geom : OCLGroupType<[
+  ocl_double, ocl_double_2, ocl_double_3, ocl_double_4
+]>;
+
+def ocl_vec_float_geom : OCLGroupType<[
+  ocl_float_3, ocl_float_4
+]>;
+
+def ocl_vec_double_geom : OCLGroupType<[
+  ocl_double_3, ocl_double_4
+]>;
+
+// Integer builtins custom types
+
+def ocl_gentype_integer_int : OCLGroupType<[
+  ocl_int, ocl_vec_s_int,
+  ocl_uint, ocl_vec_u_int
+]>;
+
+// Relational builtins custom types
+
+def ocl_s_long_rel : OCLGroupType<[
+  ocl_int, ocl_vec_s_long
+]>;
+
+// Misc. Vector builtins custom types
+
+def ocl_gentype_vmisc : OCLGroupType<[
+  ocl_char_2, ocl_char_4, ocl_char_8, ocl_char_16,
+  ocl_uchar_2, ocl_uchar_4, ocl_uchar_8, ocl_uchar_16,
+  ocl_short_2, ocl_short_4, ocl_short_8, ocl_short_16,
+  ocl_ushort_2, ocl_ushort_4, ocl_ushort_8, ocl_ushort_16,
+  ocl_int_2, ocl_int_4, ocl_int_8, ocl_int_16,
+  ocl_uint_2, ocl_uint_4, ocl_uint_8, ocl_uint_16,
+  ocl_long_2, ocl_long_4, ocl_long_8, ocl_long_16,
+  ocl_ulong_2, ocl_ulong_4, ocl_ulong_8, ocl_ulong_16,
+  ocl_float_2, ocl_float_4, ocl_float_8, ocl_float_16,
+  ocl_double_2, ocl_double_4, ocl_double_8, ocl_double_16
+]>;
+
+def ocl_gentype_uinteger_vmisc : OCLGroupType<[
+  ocl_uchar_2, ocl_uchar_4, ocl_uchar_8, ocl_uchar_16,
+  ocl_ushort_2, ocl_ushort_4, ocl_ushort_8, ocl_ushort_16,
+  ocl_uint_2, ocl_uint_4, ocl_uint_8, ocl_uint_16,
+  ocl_ulong_2, ocl_ulong_4, ocl_ulong_8, ocl_ulong_16
+]>;
+
+// Vector Data Load and Store builtins custom types
+
+def ocl_sgentype_vldst : OCLGroupType<[
+  ocl_sgentype_integer, ocl_sgentype_real
+]>;

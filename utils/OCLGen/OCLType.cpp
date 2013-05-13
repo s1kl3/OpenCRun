@@ -74,7 +74,12 @@ private:
   void BuildType(llvm::Record &R) {
     OCLType *Type = 0;
 
-    if (R.isSubClassOf("OCLIntegerType")) {
+    if (R.isSubClassOf("OCLOpaqueType")) {
+      llvm::StringRef OpaqueName = R.getName();
+      if (OpaqueName.equals("ocl_size_t") || OpaqueName.equals("ocl_void"))
+        Type = new OCLOpaqueType(R.getValueAsString("Name"));    
+    }
+    else if (R.isSubClassOf("OCLIntegerType")) {
       unsigned BitWidth = R.getValueAsInt("BitWidth");
       bool Unsigned = R.getValueAsBit("Unsigned");
       Type = new OCLIntegerType(R.getName(), BitWidth, Unsigned);
