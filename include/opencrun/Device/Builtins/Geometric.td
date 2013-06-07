@@ -25,12 +25,14 @@ class GeometricBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float_geom,
     ocl_gentype_float_geom
   ],
-  [isSameAs<Id<0>, Id<1>>]>,
+  [isSameAs<Id<0>, Id<1>>],
+  "ff">,
   OCLBuiltinVariant<[
    ocl_gentype_double_geom,
    ocl_gentype_double_geom
   ],
-  [isSameAs<Id<0>, Id<1>>]>
+  [isSameAs<Id<0>, Id<1>>],
+  "dd">
 ]>;
 
 class GeometricBuiltin_Cff_Cdd<string name> : OCLMultiBuiltin<name, [
@@ -38,12 +40,14 @@ class GeometricBuiltin_Cff_Cdd<string name> : OCLMultiBuiltin<name, [
     ocl_float,
     ocl_gentype_float_geom
   ],
-  []>,
+  [],
+  "Cff">,
   OCLBuiltinVariant<[
    ocl_double,
    ocl_gentype_double_geom
   ],
-  []>
+  [],
+  "Cdd">
 ]>;
 
 class GeometricBuiltin_Cfff_Cddd<string name> : OCLMultiBuiltin<name, [
@@ -52,13 +56,15 @@ class GeometricBuiltin_Cfff_Cddd<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float_geom,
     ocl_gentype_float_geom
   ],
-  [isSameAs<Id<1>, Id<2>>]>,
+  [isSameAs<Id<1>, Id<2>>],
+  "Cfff">,
   OCLBuiltinVariant<[
    ocl_double,
    ocl_gentype_double_geom,
    ocl_gentype_double_geom
   ],
-  [isSameAs<Id<1>, Id<2>>]>
+  [isSameAs<Id<1>, Id<2>>],
+  "Cddd">
 ]>;
 
 class GeometricBuiltin_VfVfVf_VdVdVd<string name> : OCLMultiBuiltin<name, [
@@ -67,13 +73,15 @@ class GeometricBuiltin_VfVfVf_VdVdVd<string name> : OCLMultiBuiltin<name, [
     ocl_vec_float_geom,
     ocl_vec_float_geom
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]>,
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
+  "VfVfVf">,
   OCLBuiltinVariant<[
    ocl_vec_double_geom,
    ocl_vec_double_geom,
    ocl_vec_double_geom
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]>
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
+  "VdVdVd">
 ]>;
 
 //===----------------------------------------------------------------------===//

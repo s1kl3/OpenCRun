@@ -92,3 +92,7 @@ def blt_all             : RelationalBuiltin_CnSi<"all">;
 def blt_bitselect       : RelationalBuiltin_gggg<"bitselect">;
 
 def blt_select          : RelationalBuiltin_gggSi_gggUi<"select">;
+
+//===----------------------------------------------------------------------===//
+// Common builtin implementations
+//===----------------------------------------------------------------------===//
