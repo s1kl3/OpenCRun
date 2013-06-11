@@ -57,34 +57,38 @@ class IntegerBuiltin_fast_iiii<string name> : OCLSimpleBuiltin<
 
 class IntegerBuiltin_UiUiUi_SiSiSi<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
-    ocl_gentype_s_integer,
-    ocl_gentype_s_integer,
-    ocl_gentype_s_integer
-  ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]>,
-  OCLBuiltinVariant<[
     ocl_gentype_u_integer,
     ocl_gentype_u_integer,
     ocl_gentype_u_integer
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]>
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
+  "UiUiUi">,
+  OCLBuiltinVariant<[
+    ocl_gentype_s_integer,
+    ocl_gentype_s_integer,
+    ocl_gentype_s_integer
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
+  "SiSiSi">
 ]>;
 
 class IntegerBuiltin_UiUiUiUi_SiSiSiSi<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
-    ocl_gentype_s_integer,
-    ocl_gentype_s_integer,
-    ocl_gentype_s_integer,
-    ocl_gentype_s_integer
-  ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]>,
-  OCLBuiltinVariant<[
     ocl_gentype_u_integer,
     ocl_gentype_u_integer,
     ocl_gentype_u_integer,
     ocl_gentype_u_integer
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]>
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
+  "UiUiUiUi">,
+  OCLBuiltinVariant<[
+    ocl_gentype_s_integer,
+    ocl_gentype_s_integer,
+    ocl_gentype_s_integer,
+    ocl_gentype_s_integer
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
+  "SiSiSiSi">
 ]>;
 
 class IntegerBuiltin_iii_ViViCi<string name> : OCLMultiBuiltin<name, [
@@ -93,13 +97,15 @@ class IntegerBuiltin_iii_ViViCi<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_integer,
     ocl_gentype_integer
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]>,
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
+  "iii">,
   OCLBuiltinVariant<[
    ocl_vgentype_integer,
    ocl_vgentype_integer,
    ocl_sgentype_integer
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameBaseAs<Id<1>, Id<2>>]>
+  [isSameAs<Id<0>, Id<1>>, isSameBaseAs<Id<1>, Id<2>>],
+  "ViViCi">
 ]>;
 
 class IntegerBuiltin_SsScUc_UsUcUc_SiSsUs_UiUsUs_SlSiUi_UlUiUi<string name> : 
@@ -112,7 +118,8 @@ OCLMultiBuiltin<name, [
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
     isSameBaseSizeAs<Id<1>, Id<2>>
-  ]>,
+  ],
+  "SsScUc">,
   OCLBuiltinVariant<[
    ocl_u_short,
    ocl_u_char,
@@ -121,7 +128,8 @@ OCLMultiBuiltin<name, [
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
     isSameAs<Id<1>, Id<2>>
-  ]>,
+  ],
+  "UsUcUc">,
   OCLBuiltinVariant<[
     ocl_s_int,
     ocl_s_short,
@@ -130,7 +138,8 @@ OCLMultiBuiltin<name, [
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
     isSameBaseSizeAs<Id<1>, Id<2>>
-  ]>,
+  ],
+  "SiSsUs">,
   OCLBuiltinVariant<[
    ocl_u_int,
    ocl_u_short,
@@ -138,7 +147,9 @@ OCLMultiBuiltin<name, [
   ],
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
-    isSameAs<Id<1>, Id<2>>]>,
+    isSameAs<Id<1>, Id<2>>
+  ],
+  "UiUsUs">,
   OCLBuiltinVariant<[
     ocl_s_long,
     ocl_s_int,
@@ -147,7 +158,8 @@ OCLMultiBuiltin<name, [
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
     isSameBaseSizeAs<Id<1>, Id<2>>
-  ]>,
+  ],
+  "SlSiUi">,
   OCLBuiltinVariant<[
    ocl_u_long,
    ocl_u_int,
@@ -156,7 +168,8 @@ OCLMultiBuiltin<name, [
   [
     isSameDimAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>, 
     isSameAs<Id<1>, Id<2>>
-  ]>
+  ],
+  "UlUiUi">
 ]>;
 
 class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
@@ -166,7 +179,8 @@ class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_integer,
     ocl_gentype_integer
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]>,
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
+  "iiii">,
   OCLBuiltinVariant<[
    ocl_vgentype_integer,
    ocl_vgentype_integer,
@@ -176,7 +190,8 @@ class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
   [
     isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, 
     isSameBaseAs<Id<1>, Id<2>>
-  ]>
+  ],
+  "ViViCiCi">
 ]>;
 
 //===----------------------------------------------------------------------===//

@@ -5,7 +5,7 @@
 class MathBuiltin_rr<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_real, ocl_gentype_real], 
-  [isSameAs<Id<0>, Id<1> >]
+  [isSameAs<Id<0>, Id<1>>]
 >;
 
 class MathBuiltin_rrr<string name> : OCLSimpleBuiltin<
@@ -20,93 +20,93 @@ class MathBuiltin_rrrr<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
 >;
 
-class MathBuiltin_rrPSn<string name> : OCLMultiBuiltin<name, [
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>]>,
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>]>,
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>]>
-]>;
-
-class MathBuiltin_rrrPSn<string name> : OCLMultiBuiltin<name, [
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
-      isSameDimAs<Id<2>, Pointee<3>>]>,
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
-      isSameDimAs<Id<2>, Pointee<3>>]>,
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
-      isSameDimAs<Id<2>, Pointee<3>>]>
-]>;
-
 class MathBuiltin_rrSn<string name> : OCLSimpleBuiltin<name,
   [ocl_gentype_real, ocl_gentype_real, ocl_s_int], 
   [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>]
 >;
-
-class MathBuiltin_VrVrCn_rrSn<string name> : OCLMultiBuiltin<name, [
-  OCLBuiltinVariant<[
-     ocl_vgentype_real, 
-     ocl_vgentype_real, 
-     ocl_int
-  ], [isSameAs<Id<0>,Id<1>>]>,
-  OCLBuiltinVariant<[
-     ocl_gentype_real, 
-     ocl_gentype_real, 
-     ocl_s_int
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>]>
-]>;
 
 class MathBuiltin_Snr<string name> : OCLSimpleBuiltin<name, 
   [ocl_s_int, ocl_gentype_real], 
   [isSameDimAs<Id<0>,Id<1>>]
 >;
 
-class MathBuiltin_rrPr<string name> : OCLMultiBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_real,
-    ocl_gentype_real,
-    OCLPointerType<ocl_gentype_real, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>]>,
-  OCLBuiltinVariant<[
-    ocl_gentype_real,
-    ocl_gentype_real,
-    OCLPointerType<ocl_gentype_real, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>]>,
-  OCLBuiltinVariant<[
-    ocl_gentype_real,
-    ocl_gentype_real,
-    OCLPointerType<ocl_gentype_real, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>]>
-]>;
-
 class MathBuiltin_rUi<string name> : OCLSimpleBuiltin<name, 
   [ocl_gentype_real, ocl_gentype_u_integer], 
   [isSameDimAs<Id<0>,Id<1>>, isSameBaseSizeAs<Id<0>,Id<1>>]
 >;
+
+class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_global, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP1Sn">,
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_local, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP2Sn">,
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_private, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP4Sn">
+]>;
+
+class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_global, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+      isSameDimAs<Id<2>, Pointee<3>>], "rrrP1Sn">,
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_local, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+      isSameDimAs<Id<2>, Pointee<3>>], "rrrP2Sn">,
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     OCLPointerType<ocl_s_int, ocl_as_private, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+      isSameDimAs<Id<2>, Pointee<3>>], "rrrP4Sn">
+]>;
+
+class MathBuiltin_VrVrCn_rrSn<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+     ocl_vgentype_real, 
+     ocl_vgentype_real, 
+     ocl_int
+  ], [isSameAs<Id<0>,Id<1>>], "VrVrCn">,
+  OCLBuiltinVariant<[
+     ocl_gentype_real, 
+     ocl_gentype_real, 
+     ocl_s_int
+  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>], "rrSn">
+]>;
+
+class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_gentype_real,
+    ocl_gentype_real,
+    OCLPointerType<ocl_gentype_real, ocl_as_global, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP1r">,
+  OCLBuiltinVariant<[
+    ocl_gentype_real,
+    ocl_gentype_real,
+    OCLPointerType<ocl_gentype_real, ocl_as_local, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP2r">,
+  OCLBuiltinVariant<[
+    ocl_gentype_real,
+    ocl_gentype_real,
+    OCLPointerType<ocl_gentype_real, ocl_as_private, []>
+  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP4r">
+]>;
 
 //===----------------------------------------------------------------------===//
 // Math builtin declarations
@@ -170,16 +170,16 @@ def blt_remainder   : MathBuiltin_rrr<"remainder">;
 def blt_pown        : MathBuiltin_rrSn<"pown">;
 def blt_rootn       : MathBuiltin_rrSn<"rootn">;
 
-def blt_frexp       : MathBuiltin_rrPSn<"frexp">;
-def blt_lgamma_r    : MathBuiltin_rrPSn<"lgamma_r">;
+def blt_frexp       : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"frexp">;
+def blt_lgamma_r    : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"lgamma_r">;
 
 def blt_fma         : MathBuiltin_rrrr<"fma">;
 def blt_mad         : MathBuiltin_rrrr<"mad">;
 
-def blt_remquo      : MathBuiltin_rrrPSn<"remquo">;
+def blt_remquo      : MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<"remquo">;
 
-def blt_modf        : MathBuiltin_rrPr<"modf">;
-def blt_sincos      : MathBuiltin_rrPr<"sincos">;
+def blt_modf        : MathBuiltin_rrP1r_rrP2r_rrP4r<"modf">;
+def blt_sincos      : MathBuiltin_rrP1r_rrP2r_rrP4r<"sincos">;
 
 def blt_ldexp       : MathBuiltin_VrVrCn_rrSn<"ldexp">;
 

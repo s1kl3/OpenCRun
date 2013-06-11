@@ -25,7 +25,7 @@ include "opencrun/Device/Builtins/Builtin.td"
 //      S       signed only OCLGroupType
 //      V       vectorial or vectorial only OCLGroupType
 //      C       scalar or scalar only OCLGroupType
-//      P       pointer
+//      Px      pointer (x = 1|2|3|4 => AS = global|local|constant|private)
 //
 //===----------------------------------------------------------------------===//
 

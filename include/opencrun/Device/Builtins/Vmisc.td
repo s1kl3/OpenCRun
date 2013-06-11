@@ -7,12 +7,12 @@ class VmiscBuiltin_Cng_CnVg<string name> : OCLMultiBuiltin<name, [
     ocl_int,
     ocl_gentype_vmisc
   ],
-  []>,
+  [], "Cng">,
   OCLBuiltinVariant<[
     ocl_int,
     ocl_vgentype_3
   ],
-  []>
+  [], "CnVg">
 ]>;
 
 class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
@@ -25,7 +25,7 @@ class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
      isSameBaseAs<Id<0>, Id<1>>, 
      isSameDimAs<Id<0>, Id<2>>, 
      isSameBaseSizeAs<Id<0>, Id<2>>
-  ]>,
+  ], "ggUi">,
   OCLBuiltinVariant<[
      ocl_gentype_vmisc,
      ocl_gentype_vmisc,
@@ -37,7 +37,7 @@ class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
      isSameBaseAs<Id<0>, Id<1>>, 
      isSameDimAs<Id<0>, Id<3>>,
      isSameBaseSizeAs<Id<0>, Id<3>>
-  ]>
+  ], "gggUi">
 ]>;
 
 //===----------------------------------------------------------------------===//

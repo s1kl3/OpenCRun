@@ -19,12 +19,12 @@ class RelationalBuiltin_Snf_Sid<string name> : OCLMultiBuiltin<name, [
     ocl_s_int,
     ocl_gentype_float
   ],
-  [isSameDimAs<Id<0>, Id<1>>]>,
+  [isSameDimAs<Id<0>, Id<1>>], "Snf">,
   OCLBuiltinVariant<[
    ocl_s_long_rel,
    ocl_gentype_double
   ],
-  [isSameDimAs<Id<0>, Id<1>>]>
+  [isSameDimAs<Id<0>, Id<1>>], "Sid">
 ]>;
 
 class RelationalBuiltin_Snff_Sidd<string name> : OCLMultiBuiltin<name, [
@@ -33,13 +33,13 @@ class RelationalBuiltin_Snff_Sidd<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float,
     ocl_gentype_float
   ],
-  [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>]>,
+  [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>], "Snff">,
   OCLBuiltinVariant<[
    ocl_s_long_rel,
    ocl_gentype_double,
    ocl_gentype_double
   ],
-  [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>]>
+  [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>], "Sidd">
 ]>;
 
 class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
@@ -53,7 +53,7 @@ class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
     isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
     isSameDimAs<Id<2>, Id<3>>, 
     isSameBaseSizeAs<Id<2>, Id<3>>
-  ]>,
+  ], "gggSi">,
   OCLBuiltinVariant<[
     ocl_gentype,
     ocl_gentype,
@@ -63,7 +63,7 @@ class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
   [
     isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
     isSameDimAs<Id<2>, Id<3>>,
-    isSameBaseSizeAs<Id<2>, Id<3>>]>
+    isSameBaseSizeAs<Id<2>, Id<3>>], "gggUi">
 ]>;
 
 //===----------------------------------------------------------------------===//
