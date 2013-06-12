@@ -1,6 +1,7 @@
 #ifndef OCLTYPES_H
 #define OCLTYPES_H
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -10,6 +11,15 @@
 #include <vector>
 
 namespace opencrun {
+
+enum OCLExtension {
+  Ext_InitValue,
+
+  Ext_cl_khr_fp16 = Ext_InitValue,
+  Ext_cl_khr_fp64,
+
+  Ext_MaxValue
+};
 
 //===----------------------------------------------------------------------===//
 // OCLType hierarchy
@@ -37,6 +47,8 @@ public:
   TypeKind getKind() const { return Kind; }
   std::string getName() const { return Name; }
 
+  virtual bool compareLess(const OCLType *T) const = 0;
+
 private:
   TypeKind Kind;
   std::string Name;
@@ -58,14 +70,22 @@ public:
     }
   }
 
+  const llvm::BitVector &getRequiredTypeExt() const { return RequiredTypeExt; }
+  llvm::BitVector &getRequiredTypeExt() { return RequiredTypeExt; }
+
+  virtual bool compareLess(const OCLType *T) const = 0;
+
 protected:
   OCLBasicType(TypeKind SubType, llvm::StringRef name) 
-   : OCLType(SubType, name) {}
+   : OCLType(SubType, name), RequiredTypeExt(Ext_MaxValue) {}
+
+private:
+  llvm::BitVector RequiredTypeExt;
 };
 
 class OCLOpaqueType : public OCLBasicType {
 public:
-  static bool classof(const OCLBasicType *Ty) {
+  static bool classof(const OCLType *Ty) {
     switch (Ty->getKind()) {
     case TK_Basic: case TK_Opaque: return true;
     default: return false;                               
@@ -75,6 +95,8 @@ public:
 public:
   OCLOpaqueType(llvm::StringRef name)
     : OCLBasicType(TK_Opaque, name) {}
+
+  virtual bool compareLess(const OCLType *T) const;
 };
 
 class OCLScalarType : public OCLBasicType {
@@ -92,6 +114,8 @@ protected:
 
 public:
   unsigned getBitWidth() const { return BitWidth; }
+
+  virtual bool compareLess(const OCLType *T) const = 0;
 
 private:
   std::string BuildName(llvm::StringRef);
@@ -113,6 +137,8 @@ public:
   bool isSigned() const { return !Unsigned; }
   bool isUnsigned() const { return Unsigned; }
 
+  virtual bool compareLess(const OCLType *T) const;
+
 private:
   bool Unsigned;
 };
@@ -126,6 +152,8 @@ public:
 public:
   OCLRealType(llvm::StringRef name, unsigned bits)
    : OCLScalarType(TK_Real, name, bits) {}
+
+  virtual bool compareLess(const OCLType *T) const;
 };
 
 class OCLVectorType : public OCLBasicType {
@@ -142,6 +170,8 @@ public:
   const OCLScalarType &getBaseType() const { return BaseType; }
   unsigned getWidth() const { return Width; }
 
+  virtual bool compareLess(const OCLType *T) const;
+
 private:
   std::string BuildName(const OCLScalarType &, unsigned);
 
@@ -156,6 +186,7 @@ public:
     M_Const = 1 << 0
   };
   enum AddressSpace {
+    AS_Unknown = -1,
     AS_Private = 0,
     AS_Global = 1,
     AS_Local = 2,
@@ -176,6 +207,7 @@ public:
   AddressSpace getAddressSpace() const { return AddrSpace; }
   unsigned getModifierFlags() const { return Modifiers; }
   bool hasModifier(Modifier m) const { return Modifiers & m; }
+  virtual bool compareLess(const OCLType *T) const;
 
 private:
   std::string BuildName(const OCLType &, AddressSpace, unsigned);
@@ -204,8 +236,8 @@ public:
   const_iterator end() const { return Elements.end(); }  
   iterator begin() { return Elements.begin(); }  
   iterator end() { return Elements.end(); }
-
   size_t size() const { return Elements.size(); }
+  virtual bool compareLess(const OCLType *T) const;
 
 private:
   ElementContainer Elements;

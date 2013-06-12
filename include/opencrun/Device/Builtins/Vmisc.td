@@ -2,6 +2,8 @@
 // Misc. Vector builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "VMISC" in {
+
 class VmiscBuiltin_Cng_CnVg<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_int,
@@ -39,6 +41,8 @@ class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
      isSameBaseSizeAs<Id<0>, Id<3>>
   ], "gggUi">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Misc. Vector builtin declarations

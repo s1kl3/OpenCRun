@@ -3,7 +3,7 @@
 // The Relational library is auto-generated.
 //
 
-#define OCL_RELATIONAL
+#define OPENCRUN_BUILTIN_RELATIONAL
 #include "Builtins.CPU.inc"
-#undef OCL_RELATIONAL
+#undef OPENCRUN_BUILTIN_RELATIONAL
 

@@ -2,6 +2,8 @@
 // Geometric builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "GEOMETRIC" in {
+
 class GeometricBuiltin_ff<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_float_geom, ocl_gentype_float_geom], 
@@ -83,6 +85,8 @@ class GeometricBuiltin_VfVfVf_VdVdVd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>],
   "VdVdVd">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Geometric builtin declarations

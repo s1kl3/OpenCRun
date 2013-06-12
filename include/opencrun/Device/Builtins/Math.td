@@ -2,6 +2,8 @@
 // Math builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "MATH" in {
+
 class MathBuiltin_rr<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_real, ocl_gentype_real], 
@@ -107,6 +109,8 @@ class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
     OCLPointerType<ocl_gentype_real, ocl_as_private, []>
   ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP4r">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Math builtin declarations

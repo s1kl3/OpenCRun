@@ -3,6 +3,6 @@
 // The Integer library is auto-generated.
 //
 
-#define OCL_INTEGER
+#define OPENCRUN_BUILTIN_INTEGER
 #include "Builtins.CPU.inc"
-#undef OCL_INTEGER
+#undef OPENCRUN_BUILTIN_INTEGER

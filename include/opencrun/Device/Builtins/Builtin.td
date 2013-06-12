@@ -74,6 +74,7 @@ class OCLBuiltinVariant<list<OCLType> ops,
 
 class OCLBuiltin<string name> {
   string Name = name;
+  string Group = ?;
 }
 
 class OCLSimpleBuiltin<string name, list<OCLType> ops, 

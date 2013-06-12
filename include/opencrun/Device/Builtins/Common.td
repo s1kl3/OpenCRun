@@ -2,6 +2,8 @@
 // Common builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "COMMON" in {
+
 class CommonBuiltin_rr<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_real, ocl_gentype_real], 
@@ -98,6 +100,8 @@ class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
   "VrVrCrCr">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Common builtin declarations

@@ -1,7 +1,9 @@
 #include "OCLBuiltinDefEmitter.h"
-#include "OCLType.h"
+#include "OCLEmitterUtils.h"
 #include "OCLBuiltin.h"
+#include "OCLType.h"
 
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
@@ -15,34 +17,6 @@ OCLBuiltinsContainer OCLBuiltins;
 
 }
 
-void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
-                          bool ShowNames, unsigned Index) {
-  if (llvm::isa<OCLGroupType>(&T)) 
-    llvm_unreachable("Illegal basic type!");
-
-  if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(&T)) {
-    // Modifiers
-    if (P->hasModifier(OCLPointerType::M_Const))
-      OS << "const ";
-
-    // Base type
-    EmitOCLTypeSignature(OS, P->getBaseType(), false, 0U);
-    OS << " ";
-
-    // Address Space
-    OS << "__opencrun_as(" << P->getAddressSpace() << ") ";
-
-    // Star
-    OS << "*";
-  } else {
-    // Typen name
-    OS << T;
-  }
-
-  if (ShowNames)
-    OS << " " << "param" << Index;
-}
-
 void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
   std::list<BuiltinSignature> Alts;
 
@@ -54,24 +28,40 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
   for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
     const OCLBuiltinVariant &BV = *BI;
 
-    Alts.clear();
     ExpandSignature(BV, Alts);
-
-    for (std::list<BuiltinSignature>::iterator 
-         I = Alts.begin(), E = Alts.end(); I != E; ++I) {
-      BuiltinSignature &S = *I;
-      OS << "__opencrun_overload\n";
-      EmitOCLTypeSignature(OS, *S[0], false, 0U);
-      OS << " ";
-      OS << "__builtin_ocl_" << B.getName();
-      OS << "(";
-      for (unsigned i = 1, e = S.size(); i != e; ++i) {
-        EmitOCLTypeSignature(OS, *S[i], true, i);
-        if (i + 1 != e) OS << ", ";
-      }
-      OS << ");\n\n";
-    }
   }
+
+  SortBuiltinSignatureList(Alts);
+
+  llvm::BitVector GroupReq;
+
+  for (std::list<BuiltinSignature>::iterator  
+       I = Alts.begin(), E = Alts.end(); I != E; ++I) {
+    BuiltinSignature &S = *I;
+
+    llvm::BitVector Req;
+    ComputeRequiredExt(S, Req);
+    if (Req != GroupReq) {
+      EmitRequiredExtEnd(OS, GroupReq);
+      GroupReq = Req;
+      EmitRequiredExtBegin(OS, GroupReq);
+      OS << "\n";
+    }
+
+    OS << "__opencrun_overload\n";
+    EmitOCLTypeSignature(OS, *S[0]);
+    OS << " ";
+    OS << "__builtin_ocl_" << B.getName();
+    OS << "(";
+    std::string ParamName = "param";
+    for (unsigned i = 1, e = S.size(); i != e; ++i) {
+      EmitOCLTypeSignature(OS, *S[i], ParamName + llvm::Twine(i).str());
+      if (i + 1 != e) OS << ", ";
+    }
+    OS << ");\n\n";
+  }
+  EmitRequiredExtEnd(OS, GroupReq);
+  OS << "\n";
 }
 
 bool opencrun::EmitOCLBuiltinDef(llvm::raw_ostream &OS,
@@ -84,15 +74,13 @@ bool opencrun::EmitOCLBuiltinDef(llvm::raw_ostream &OS,
   OS << "#ifndef OPENCRUN_OCLDEF_H\n";
   OS << "#define OPENCRUN_OCLDEF_H\n\n";
 
-  OS << "#define __opencrun_overload __attribute__((overloadable))\n";
-  OS << "#define __opencrun_as(n) __attribute__(( address_space(n) ))\n\n";
+  OS << "#define __opencrun_overload __attribute__((overloadable))\n\n";
 
   for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
     EmitOCLBuiltinPrototype(OS, *OCLBuiltins[i]);
   }
 
   OS << "#ifndef OPENCRUN_LIB_IMPL\n";
-  OS << "#undef __opencrun_as(n)\n";
   OS << "#undef __opencrun_overload\n";
   OS << "#endif\n";
 

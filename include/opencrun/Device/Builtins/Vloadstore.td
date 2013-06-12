@@ -2,6 +2,8 @@
 // Vector Data Load and Store builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "VLOADSTORE" in {
+
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_2<string name> 
 : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
@@ -231,6 +233,8 @@ class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_16<string name>
      OCLPointerType<ocl_sgentype_vldst, ocl_as_private, []>
   ], [isSameBaseAs<Id<1>,Pointee<3>>], "vVgzP4Sg">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Vector Data Load and Store builtin declarations

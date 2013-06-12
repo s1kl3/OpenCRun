@@ -4,6 +4,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Error.h"
 
+#include <algorithm>
 #include <map>
 
 using namespace opencrun;
@@ -122,6 +123,10 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
   return S1->getKind() == S2->getKind();
 }
 
+static bool CompareLess(const OCLBuiltin *B1, const OCLBuiltin *B2) {
+  return B1->getGroup() < B2->getGroup() ||
+         (B1->getGroup() == B2->getGroup() && B1->getName() < B2->getName());
+}
 
 void opencrun::LoadOCLBuiltins(const llvm::RecordKeeper &R, 
                                OCLBuiltinsContainer &B) {
@@ -130,6 +135,8 @@ void opencrun::LoadOCLBuiltins(const llvm::RecordKeeper &R,
 
   for(unsigned I = 0, E = RawVects.size(); I < E; ++I)
     B.push_back(&OCLBuiltinsTable::get(*RawVects[I]));
+
+  std::sort(B.begin(), B.end(), CompareLess);
 }
 
 //===----------------------------------------------------------------------===//
@@ -192,6 +199,7 @@ private:
     assert(R.isSubClassOf("OCLBuiltin") && "Not a builtin!");
 
     std::string Name = R.getValueAsString("Name");
+    std::string Group = R.getValueAsString("Group");
 
     std::vector<OCLBuiltinVariant> Variants;
     if (R.isSubClassOf("OCLMultiBuiltin")) {
@@ -206,7 +214,7 @@ private:
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
 
-    Builtin = new OCLBuiltin(Name, Variants);
+    Builtin = new OCLBuiltin(Name, Group, Variants);
 
     Builtins[&R] = Builtin;
   }
@@ -343,4 +351,19 @@ void opencrun::ExpandSignature(const OCLBuiltinVariant &B,
   ConstraintMap CMap = ComputeConstraintMap(B);
 
   EnumerateSignature(B, 0, CMap, Sign, R);
+}
+
+static bool CompareLessSignature(const BuiltinSignature &S1, 
+                                 const BuiltinSignature &S2) {
+  unsigned i;
+  unsigned e = std::min(S1.size(), S2.size());
+  for (i = 0; i != e; ++i)
+    if (S1[i]->compareLess(S2[i]) || S2[i]->compareLess(S1[i])) break;
+
+  if (i != e) return S1[i]->compareLess(S2[i]);
+  return S1.size() < S2.size();
+}
+
+void opencrun::SortBuiltinSignatureList(std::list<BuiltinSignature> &l) {
+  l.sort(CompareLessSignature);
 }

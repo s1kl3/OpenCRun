@@ -3,6 +3,6 @@
 // The Misc Vector library is auto-generated.
 //
 
-#define OCL_VMISC
+#define OPENCRUN_BUILTIN_VMISC
 #include "Builtins.CPU.inc"
-#undef OCL_VMISC
+#undef OPENCRUN_BUILTIN_VMISC

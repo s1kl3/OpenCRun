@@ -1,10 +1,12 @@
 #include "OCLType.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -36,6 +38,73 @@ std::string OCLPointerType::BuildName(const OCLType &Base,
                                       unsigned Modifiers) {
   return "@ptr<as:" + llvm::Twine(AS).str() +", m:" + 
          llvm::Twine(Modifiers).str() + ">{ " + Base.getName() + " }";
+}
+
+bool OCLIntegerType::compareLess(const OCLType *T) const {
+  if (const OCLIntegerType *I = llvm::dyn_cast<OCLIntegerType>(T))
+    return (isSigned() && I->isUnsigned()) ||
+           (isSigned() && isSigned() == I->isSigned() && 
+            getBitWidth() < I->getBitWidth()) || 
+           (isUnsigned() && isUnsigned() == I->isUnsigned() && 
+            getBitWidth() < I->getBitWidth());
+
+  // Integer < !Integer
+  return true;
+}
+
+bool OCLRealType::compareLess(const OCLType *T) const {
+  if (llvm::isa<OCLIntegerType>(T)) return false;
+  if (const OCLRealType *R = llvm::dyn_cast<OCLRealType>(T))
+    return getBitWidth() < R->getBitWidth();
+  if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(T))
+    return compareLess(&V->getBaseType());
+
+  // Real < !Integer && !Real
+  return true;
+}
+
+bool OCLVectorType::compareLess(const OCLType *T) const {
+  if (llvm::isa<OCLScalarType>(T))
+    return getBaseType().compareLess(T);
+  if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(T))
+    //return getWidth() < V->getWidth() ||
+    //       (getWidth() == V->getWidth() && 
+    //        getBaseType().compareLess(&(V->getBaseType())));
+    return getBaseType().compareLess(&(V->getBaseType())) ||
+           (&getBaseType() == &V->getBaseType() && getWidth() < V->getWidth());
+
+  // Vector < !Scalar && !Opaque && !Vector
+  return true;
+}
+
+bool OCLOpaqueType::compareLess(const OCLType *T) const {
+  if (llvm::isa<OCLScalarType>(T) || 
+      llvm::isa<OCLVectorType>(T)) return false;
+  if (const OCLOpaqueType *O = llvm::dyn_cast<OCLOpaqueType>(T))
+    return getName() < O->getName();
+
+  // Opaque < !Scalar && !Opaque
+  return true;
+}
+
+bool OCLPointerType::compareLess(const OCLType *T) const {
+  if (llvm::isa<OCLScalarType>(T) ||
+      llvm::isa<OCLOpaqueType>(T) ||
+      llvm::isa<OCLVectorType>(T)) return false;
+  if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(T))
+    return getBaseType().compareLess(&(P->getBaseType())) ||
+           (&getBaseType() == &P->getBaseType() && 
+            getAddressSpace() < P->getAddressSpace());
+
+  // Pointer < !Scalar && !Opaque && !Vector && !Pointer
+  return true;
+}
+
+bool OCLGroupType::compareLess(const OCLType *T) const {
+  if (const OCLGroupType *G = llvm::dyn_cast<OCLGroupType>(T))
+    return Elements < G->Elements;
+
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -71,6 +140,27 @@ public:
   }
 
 private:
+  void LoadRequiredTypeExt(OCLScalarType *B, llvm::Record &R) {
+    if (!R.getValue("Requires")) return;
+
+    std::vector<llvm::Record*> Requires = R.getValueAsListOfDefs("Requires");
+
+    for (unsigned i = 0, e = Requires.size(); i != e; ++i) {
+      llvm::StringRef Name = Requires[i]->getName();
+
+      OCLExtension Ext =
+        llvm::StringSwitch<OCLExtension>(Name)
+          .Case("ocl_ext_cl_khr_fp16", Ext_cl_khr_fp16)
+          .Case("ocl_ext_cl_khr_fp64", Ext_cl_khr_fp64)
+          .Default(Ext_MaxValue);
+
+      if (Ext == Ext_MaxValue)
+        llvm::PrintFatalError("Invalid opencl extension: " + Name.str());
+
+      B->getRequiredTypeExt().set(Ext);
+    }
+  }
+
   void BuildType(llvm::Record &R) {
     OCLType *Type = 0;
 
@@ -87,21 +177,36 @@ private:
     else if (R.isSubClassOf("OCLRealType")) {
       unsigned BitWidth = R.getValueAsInt("BitWidth");
       Type = new OCLRealType(R.getName(), BitWidth);
+      LoadRequiredTypeExt(static_cast<OCLScalarType*>(Type), R);
     }
     else if (R.isSubClassOf("OCLVectorType")) {
       unsigned Width = R.getValueAsInt("Width");
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
-      if (const OCLScalarType *B = llvm::dyn_cast<OCLScalarType>(&Base))
-        Type = new OCLVectorType(*B, Width);
-      else
+      if (const OCLScalarType *B = llvm::dyn_cast<OCLScalarType>(&Base)) {
+        OCLVectorType *V = new OCLVectorType(*B, Width);
+        V->getRequiredTypeExt() = B->getRequiredTypeExt();
+        Type = V;
+      } else
         llvm::PrintFatalError("Invalid base type: " + 
                               R.getValueAsDef("BaseType")->getName());
     }
     else if (R.isSubClassOf("OCLPointerType")) {
-      unsigned AS = R.getValueAsDef("AddressSpace")->getValueAsInt("Value");
+      llvm::StringRef ASName = R.getValueAsDef("AddressSpace")->getName();
+
+      OCLPointerType::AddressSpace AS = 
+        llvm::StringSwitch<OCLPointerType::AddressSpace>(ASName)
+          .Case("ocl_as_private", OCLPointerType::AS_Private)
+          .Case("ocl_as_global", OCLPointerType::AS_Global)
+          .Case("ocl_as_local", OCLPointerType::AS_Local)
+          .Case("ocl_as_constant", OCLPointerType::AS_Constant)
+          .Default(OCLPointerType::AS_Unknown);
+
+      if (AS == OCLPointerType::AS_Unknown)
+        llvm::PrintFatalError("Invalid address space: " + ASName.str());
+
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
       // TODO: modifiers
-      Type = new OCLPointerType(Base, (OCLPointerType::AddressSpace)AS);
+      Type = new OCLPointerType(Base, AS);
     }
     else if (R.isSubClassOf("OCLGroupType")) {
       std::vector<llvm::Record *> Members = R.getValueAsListOfDefs("Members");
@@ -159,6 +264,9 @@ const OCLType &OCLTypesTable::get(llvm::Record &R) {
   return Impl->get(R);
 }
 
+static bool CompareLess(const OCLType *T, const OCLType *V) {
+  return T->compareLess(V);
+}
 
 void opencrun::LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T) {
   T.clear();
@@ -167,6 +275,8 @@ void opencrun::LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T) {
 
   for(unsigned I = 0, E = RawVects.size(); I < E; ++I)
     T.push_back(&OCLTypesTable::get(*RawVects[I]));
+
+  std::sort(T.begin(), T.end(), CompareLess);
 }
 
 //===----------------------------------------------------------------------===//

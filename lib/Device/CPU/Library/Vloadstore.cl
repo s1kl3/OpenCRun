@@ -3,7 +3,7 @@
 // The Vector Data Load and Store library is auto-generated.
 //
 
-#define OCL_VLOADSTORE
+#define OPENCRUN_BUILTIN_VLOADSTORE
 #include "Builtins.CPU.inc"
-#undef OCL_VLOADSTORE
+#undef OPENCRUN_BUILTIN_VLOADSTORE
 

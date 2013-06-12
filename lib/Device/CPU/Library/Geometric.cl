@@ -3,6 +3,6 @@
 // The Geometric library is auto-generated.
 //
 
-#define OCL_GEOMETRIC 
+#define OPENCRUN_BUILTIN_GEOMETRIC 
 #include "Builtins.CPU.inc"
-#undef OCL_GEOMETRIC 
+#undef OPENCRUN_BUILTIN_GEOMETRIC 

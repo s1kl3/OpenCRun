@@ -2,6 +2,8 @@
 // Integer builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "INTEGER" in {
+
 class IntegerBuiltin_Uii<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_u_integer, ocl_gentype_integer], 
@@ -193,6 +195,8 @@ class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
   ],
   "ViViCiCi">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Integer builtin declarations

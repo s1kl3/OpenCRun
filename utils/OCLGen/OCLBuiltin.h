@@ -8,6 +8,7 @@
 namespace opencrun {
 
 typedef std::vector<const OCLBasicType *> BuiltinSignature;
+void SortBuiltinSignatureList(std::list<BuiltinSignature> &l);
 
 //===----------------------------------------------------------------------===//
 // Param accessor
@@ -206,15 +207,19 @@ public:
   typedef std::vector<OCLBuiltinVariant> VariantsContainer;
   typedef VariantsContainer::const_iterator iterator;
 public:
-  OCLBuiltin(llvm::StringRef name, const std::vector<OCLBuiltinVariant> &v)
-   : Name(name), Variants(v) {}
+  OCLBuiltin(llvm::StringRef name, llvm::StringRef group, 
+             const std::vector<OCLBuiltinVariant> &v)
+   : Name(name), Group(group), Variants(v) {}
 
 public:
   std::string getName() const { return Name; }
+  std::string getGroup() const { return Group; }
   iterator begin() const { return Variants.begin(); }
   iterator end() const { return Variants.end(); }
+
 private:
   std::string Name;
+  std::string Group;
   std::vector<OCLBuiltinVariant> Variants;
 };
 

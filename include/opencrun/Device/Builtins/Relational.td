@@ -2,6 +2,8 @@
 // Relational builtin classes
 //===----------------------------------------------------------------------===//
 
+let Group = "RELATIONAL" in {
+
 class RelationalBuiltin_gggg<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype, ocl_gentype, ocl_gentype, ocl_gentype], 
@@ -65,6 +67,8 @@ class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
     isSameDimAs<Id<2>, Id<3>>,
     isSameBaseSizeAs<Id<2>, Id<3>>], "gggUi">
 ]>;
+
+}
 
 //===----------------------------------------------------------------------===//
 // Common builtin declarations
