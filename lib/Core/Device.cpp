@@ -43,7 +43,7 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   clang::CompilerInstance Compiler;
  
   // Create default DiagnosticsEngine and setup client.
-  Compiler.createDiagnostics(&Diag, false, false);
+  Compiler.createDiagnostics(&Diag, false);
 
   // Configure compiler invocation.
   clang::CompilerInvocation *Invocation = new clang::CompilerInvocation();
