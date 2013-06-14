@@ -10,6 +10,21 @@ class CommonBuiltin_rr<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<0>, Id<1>>]
 >;
 
+class CommonBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_gentype_float, 
+    ocl_gentype_float 
+  ],
+  [isSameAs<Id<0>, Id<1>>],
+  "ff">,
+  OCLBuiltinVariant<[
+    ocl_gentype_double, 
+    ocl_gentype_double 
+  ],
+  [isSameAs<Id<0>, Id<1>>],
+  "dd">
+]>;
+
 class CommonBuiltin_rrr_VrVrCr<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
@@ -107,9 +122,10 @@ class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
 // Common builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_degrees     : CommonBuiltin_rr<"degrees">;
-def blt_radians     : CommonBuiltin_rr<"radians">;
 def blt_sign        : CommonBuiltin_rr<"sign">;
+
+def blt_degrees     : CommonBuiltin_ff_dd<"degrees">;
+def blt_radians     : CommonBuiltin_ff_dd<"radians">;
 
 def blt_max         : CommonBuiltin_rrr_VrVrCr<"max">;
 def blt_min         : CommonBuiltin_rrr_VrVrCr<"min">;
@@ -127,14 +143,22 @@ def blt_smoothstep  : CommonBuiltin_rrrr_VrCrCrVr<"smoothstep">;
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_degrees, RecursiveSplit<[{
+  return (180 / M_PIF) * param1;
+}]>, "ff">;
+
+def : OCLBuiltinImpl<blt_degrees, RecursiveSplit<[{
   return (180 / M_PI) * param1;
-}]>>;
+}]>, "dd">;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_radians, RecursiveSplit<[{
+  return (M_PIF / 180) * param1;
+}]>, "ff">;
+
+def : OCLBuiltinImpl<blt_radians, RecursiveSplit<[{
   return (M_PI / 180) * param1;
-}]>>;
+}]>, "dd">;
 
 //----------------------------------------------------------------------------//
 
@@ -145,7 +169,7 @@ def : OCLBuiltinImpl<blt_sign, RecursiveSplit<[{
     return -1.0f;
   else if (param1 == -0.0f)
     return -0.0f;
-  else if (__builtin_isnanf(param1))
+  else if (__builtin_isnan(param1))
     return 0.0f;
   else
     return 0.0f;
@@ -178,7 +202,7 @@ def : OCLBuiltinImpl<blt_mix, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_clamp, RecursiveSplit<[{
-  return __builtin_ocl_min(__builtin_ocl_max(param1, param2), param3));
+  return __builtin_ocl_min(__builtin_ocl_max(param1, param2), param3);
 }]>>;
 
 //----------------------------------------------------------------------------//

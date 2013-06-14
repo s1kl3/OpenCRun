@@ -4,12 +4,6 @@
 
 let Group = "INTEGER" in {
 
-class IntegerBuiltin_Uii<string name> : OCLSimpleBuiltin<
-  name, 
-  [ocl_gentype_u_integer, ocl_gentype_integer], 
-  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>]
->;
-
 class IntegerBuiltin_ii<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_integer, ocl_gentype_integer], 
@@ -56,6 +50,21 @@ class IntegerBuiltin_fast_iiii<string name> : OCLSimpleBuiltin<
   ],
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
 >;
+
+class IntegerBuiltin_UiUi_UiSi<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_gentype_u_integer, 
+    ocl_gentype_u_integer
+  ],
+  [isSameAs<Id<0>, Id<1>>],
+  "UiUi">,
+  OCLBuiltinVariant<[
+    ocl_gentype_u_integer,
+    ocl_gentype_s_integer
+  ],
+  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>],
+  "UiSi">
+]>;
 
 class IntegerBuiltin_UiUiUi_SiSiSi<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
@@ -202,7 +211,7 @@ class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
 // Integer builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_abs         : IntegerBuiltin_Uii<"abs">;
+def blt_abs         : IntegerBuiltin_UiUi_UiSi<"abs">;
 
 def blt_clz         : IntegerBuiltin_ii<"clz">;
 def blt_popcount    : IntegerBuiltin_ii<"popcount">;
@@ -237,8 +246,12 @@ def blt_upsample    : IntegerBuiltin_SsScUc_UsUcUc_SiSsUs_UiUsUs_SlSiUi_UlUiUi<"
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_abs, RecursiveSplit<[{
+  return param1;
+}]>, "UiUi">;
+
+def : OCLBuiltinImpl<blt_abs, RecursiveSplit<[{
   return param1 >= 0 ? param1 : -(param1);
-}]>>;
+}]>, "UiSi">;
 
 //----------------------------------------------------------------------------//
 
@@ -303,10 +316,10 @@ def : OCLBuiltinImpl<blt_mul_hi, RecursiveSplit<[{
   TYPE shamt = sizeof(TYPE)*8/2;
   TYPE lo_mask = (1 << shamt) - 1;
 
-  TYPE xl = x & lo_mask;
-  TYPE xh = x >> shamt;
-  TYPE yl = y & lo_mask;
-  TYPE yh = y >> shamt;
+  TYPE xl = param1 & lo_mask;
+  TYPE xh = param1 >> shamt;
+  TYPE yl = param2 & lo_mask;
+  TYPE yh = param2 >> shamt;
 
   UTYPE xy_ll = xl * yl;
   UTYPE xy_lh = xl * yh;
@@ -363,7 +376,6 @@ def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
     return min_val;
   else
     return param1 + param2;
-  }
 }],
 [OCLEmitTypedefActual<"TYPE", Id<0>>, OCLEmitTypedefUnsigned<"UTYPE", Id<0>>]>,
 "SiSiSi">;
@@ -398,7 +410,7 @@ def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
 
   return ((param2 != 0) && (param1 > (max_val - param3)/param2)) ?
     max_val : param1 * param2 + param3;
-}]>, "UiUiUiUi">;
+}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>, "UiUiUiUi">;
 
 def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
   if ((param1 == 0) || (param2 == 0))

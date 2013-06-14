@@ -27,6 +27,8 @@ BUILT_SOURCES = Builtins.CPU.inc
 SOURCES = Async.cl Common.cl Mfence.cl Geometric.cl Integer.cl Math.cl \
       Vmisc.cl Relational.cl Synchronization.cl Vloadstore.cl WorkItem.cl
 
+TargetCommonOpts += -DOPENCRUN_LIB_IMPL
+
 #
 # Include Makefile.common so we know what to do.
 #

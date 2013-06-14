@@ -66,7 +66,7 @@ multiclass OCLVectors<OCLScalarType base> {
 
 def ocl_char : OCLIntegerType<8, 0>;
 def ocl_uchar : OCLIntegerType<8, 1>;
-def ocl_short: OCLIntegerType<16, 0>;
+def ocl_short : OCLIntegerType<16, 0>;
 def ocl_ushort : OCLIntegerType<16, 1>;
 def ocl_int : OCLIntegerType<32, 0>;
 def ocl_uint : OCLIntegerType<32, 1>;
@@ -177,9 +177,16 @@ def ocl_vgentype_integer : OCLGroupType<[
 ]>;
 
 // Real vectorial gentype
+def ocl_vgentype_float : OCLGroupType<[
+  ocl_vec_float
+]>;
+
+def ocl_vgentype_double : OCLGroupType<[
+  ocl_vec_double
+]>;
 
 def ocl_vgentype_real : OCLGroupType<[
-  ocl_vec_float, ocl_vec_double
+  ocl_vgentype_float, ocl_vgentype_double
 ]>;
 
 // Integer gentype
