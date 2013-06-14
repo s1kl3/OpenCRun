@@ -6,9 +6,11 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
+
 #include <algorithm>
 #include <map>
 #include <set>
+#include <utility>
 
 using namespace opencrun;
 
@@ -114,9 +116,11 @@ bool OCLGroupType::compareLess(const OCLType *T) const {
 class opencrun::OCLTypesTableImpl {
 public:
   typedef std::map<llvm::Record *, const OCLType *> OCLTypesMap;
-  typedef std::map<const OCLPointerType*, 
+  typedef std::map<const OCLPointerType *, 
                    std::map<OCLGroupType::const_iterator, 
                             const OCLPointerType *> > ExpandedPointerMap;
+  typedef std::pair<const OCLScalarType *, unsigned> OCLVTypesMapKey;
+  typedef std::map<OCLVTypesMapKey, const OCLVectorType *> OCLVTypesMap;
 
 public:
   ~OCLTypesTableImpl() {
@@ -137,6 +141,16 @@ public:
       ExpandPointerType(I);
 
     return *Ptrs[&I.Ptr][I.Iter];
+  }
+
+public:
+  const OCLVectorType *getVectorType(const OCLScalarType &SType,
+                                     unsigned Width) const {
+    OCLVTypesMap::const_iterator I = VTypes.find(std::make_pair(&SType, Width));
+    if (I != VTypes.end())
+      return I->second;
+    else
+      return NULL;
   }
 
 private:
@@ -185,6 +199,9 @@ private:
       if (const OCLScalarType *B = llvm::dyn_cast<OCLScalarType>(&Base)) {
         OCLVectorType *V = new OCLVectorType(*B, Width);
         V->getRequiredTypeExt() = B->getRequiredTypeExt();
+        OCLVTypesMapKey K = std::make_pair(B, Width);
+        if (VTypes.count(K) == 0)
+          VTypes[K] = V;
         Type = V;
       } else
         llvm::PrintFatalError("Invalid base type: " + 
@@ -254,6 +271,7 @@ private:
 private:
   OCLTypesMap Types;
   ExpandedPointerMap Ptrs;
+  OCLVTypesMap VTypes;
   std::vector<const OCLPointerType*> PtrTracker;
 };
 
@@ -262,6 +280,12 @@ llvm::OwningPtr<OCLTypesTableImpl> OCLTypesTable::Impl;
 const OCLType &OCLTypesTable::get(llvm::Record &R) {
   if (!Impl) Impl.reset(new OCLTypesTableImpl());
   return Impl->get(R);
+}
+
+const OCLVectorType *OCLTypesTable::getVectorType(const OCLScalarType &SType,
+                                                  unsigned Width) {
+  if (!Impl) Impl.reset(new OCLTypesTableImpl());
+  return Impl->getVectorType(SType, Width);
 }
 
 static bool CompareLess(const OCLType *T, const OCLType *V) {

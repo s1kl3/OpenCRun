@@ -6,6 +6,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Record.h"
+
 #include <set>
 #include <string>
 #include <vector>
@@ -63,7 +64,7 @@ public:
     case TK_Opaque:
     case TK_Scalar: case TK_Integer: case TK_Real: 
     case TK_Vector: 
-    case  TK_Pointer: 
+    case TK_Pointer: 
       return true;
     default: 
       return false;
@@ -185,6 +186,7 @@ public:
   enum Modifier {
     M_Const = 1 << 0
   };
+
   enum AddressSpace {
     AS_Unknown = -1,
     AS_Private = 0,
@@ -271,7 +273,9 @@ class OCLTypesTableImpl;
 class OCLTypesTable {
 public:
   static const OCLType &get(llvm::Record &R);
-  
+
+  static const OCLVectorType *getVectorType(const OCLScalarType &SType, 
+                                     unsigned Width);
 
 private:
   static llvm::OwningPtr<OCLTypesTableImpl> Impl;
@@ -281,7 +285,7 @@ private:
 };
 
 //===----------------------------------------------------------------------===//
-// PointerGroup Iterator
+// PointerGroup iterator
 //===----------------------------------------------------------------------===//
 
 class OCLPointerGroupIterator {

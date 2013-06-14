@@ -6,7 +6,16 @@
 
 using namespace opencrun;
 
-static const char *AddressSpaceName(OCLPointerType::AddressSpace AS) {
+static const char *ExtensionName(unsigned E) {
+  switch (E) {
+  case Ext_cl_khr_fp16: return "cl_khr_fp16";
+  case Ext_cl_khr_fp64: return "cl_khr_fp64";
+  default: break;
+  }
+  return 0;
+}
+
+const char *opencrun::AddressSpaceName(OCLPointerType::AddressSpace AS) {
   switch (AS) {
   case OCLPointerType::AS_Private: return "__private";
   case OCLPointerType::AS_Global: return "__global";
@@ -16,15 +25,6 @@ static const char *AddressSpaceName(OCLPointerType::AddressSpace AS) {
   }
 
   llvm_unreachable("Invalid address space!");
-  return 0;
-}
-
-static const char *ExtensionName(unsigned E) {
-  switch (E) {
-  case Ext_cl_khr_fp16: return "cl_khr_fp16";
-  case Ext_cl_khr_fp64: return "cl_khr_fp64";
-  default: break;
-  }
   return 0;
 }
 
@@ -43,7 +43,8 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << " ";
 
     // Address Space
-    OS << AddressSpaceName(P->getAddressSpace()) << " ";
+    // OS << AddressSpaceName(P->getAddressSpace()) << " ";
+    OS << "__opencrun_as(" << P->getAddressSpace() << ") ";
 
     // Star
     OS << "*";
@@ -114,3 +115,24 @@ void opencrun::EmitBuiltinGroupEnd(llvm::raw_ostream &OS,
   if (!Group.size()) return;
   OS << "#endif // OPENCRUN_BUILTIN_" << Group << "\n";
 }
+
+bool opencrun::IsScalarAlternative(BuiltinSignature &Sign) {
+  bool IsScalar = true;
+
+  for (unsigned I = 0, E = Sign.size(); I != E && IsScalar; ++I) {
+    if (llvm::isa<const OCLScalarType>(Sign[I]))
+      continue;
+    else if(llvm::isa<const OCLPointerType>(Sign[I])) {
+      const OCLPointerType *P = llvm::cast<const OCLPointerType>(Sign[I]);
+
+      if (!llvm::isa<const OCLScalarType>(P->getBaseType()))
+        IsScalar = false;
+
+    } else {
+      IsScalar = false;
+    }
+  }
+
+  return IsScalar;
+}
+

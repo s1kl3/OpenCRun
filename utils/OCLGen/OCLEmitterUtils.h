@@ -13,6 +13,8 @@ namespace opencrun {
 
 class OCLType;
 
+const char *AddressSpaceName(OCLPointerType::AddressSpace AS);
+
 void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                           std::string Name = "");
 
@@ -23,6 +25,8 @@ void EmitRequiredExtEnd(llvm::raw_ostream &OS, const llvm::BitVector &Req);
 
 void EmitBuiltinGroupBegin(llvm::raw_ostream &OS, llvm::StringRef Group);
 void EmitBuiltinGroupEnd(llvm::raw_ostream &OS, llvm::StringRef Group);
+
+bool IsScalarAlternative(BuiltinSignature &Sign);
 
 }
 

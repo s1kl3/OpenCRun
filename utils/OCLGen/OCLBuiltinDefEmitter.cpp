@@ -75,12 +75,14 @@ bool opencrun::EmitOCLBuiltinDef(llvm::raw_ostream &OS,
   OS << "#define OPENCRUN_OCLDEF_H\n\n";
 
   OS << "#define __opencrun_overload __attribute__((overloadable))\n\n";
+  OS << "#define __opencrun_as(n) __attribute__(( address_space(n) ))\n\n";
 
   for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
     EmitOCLBuiltinPrototype(OS, *OCLBuiltins[i]);
   }
 
   OS << "#ifndef OPENCRUN_LIB_IMPL\n";
+  OS << "#undef __opencrun_as(n)\n";
   OS << "#undef __opencrun_overload\n";
   OS << "#endif\n";
 
