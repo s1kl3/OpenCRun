@@ -24,8 +24,6 @@ OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
 
 HeaderDir := $(LibDir)/opencrun/include
 
-.PRECIOUS: $(HeaderDir)/.dir
-
 BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
                 $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
                 -I$(HeaderDir) -Wno-empty-translation-unit \
@@ -53,10 +51,6 @@ $(ObjDir)/Builtins.%.inc.tmp: %.td $(OCLGENTool) $(ObjDir)/.dir
 	$(Echo) Generating OCL builtins library implementation for '$*' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-lib-impl -o $(call SYSPATH, $@) $<
 
-$(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
-	$(Verb) cp $< $@
-	$(Echo) Copying $(notdir $@) to build dir
-
 endif
 
 #------------------------------------------------------------------------------#
@@ -64,10 +58,3 @@ endif
 #------------------------------------------------------------------------------#
 
 PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
-
-$(PROJ_headers):
-	$(Verb) $(MKDIR) $@
-
-$(PROJ_headers)/%.h: $(HeaderDir)/%.h | $(PROJ_headers)
-	$(Verb) $(DataInstall) $< $(PROJ_headers)
-	$(Echo) Installing compiler include file: $(notdir $<)

@@ -23,7 +23,22 @@ $(ObjDir)/ocltype.h.inc.tmp: $(BUILTINS_DIR)/OpenCL.td $(OCLGENTool) $(ObjDir)/.
 
 ###
 
-# Hook into the standard Makefile rules.
-all-local:: $(HeaderDir)/ocldef.h $(HeaderDir)/ocltype.h
+HEADERS := ocldef.h ocltype.h
+OBJHEADERS := $(addprefix $(HeaderDir)/, $(HEADERS))
+INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
 
-install-local:: $(PROJ_headers)/ocldef.h $(PROJ_headers)/ocltype.h
+$(OBJHEADERS) : $(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $@) to build dir
+
+$(PROJ_headers):
+	$(Verb) $(MKDIR) $@
+
+$(INSTHEADERS) : $(PROJ_headers)/%.h: $(HeaderDir)/%.h | $(PROJ_headers)
+	$(Verb) $(DataInstall) $< $(PROJ_headers)
+	$(Echo) Installing compiler include file: $(notdir $<)
+
+# Hook into the standard Makefile rules.
+all-local:: $(OBJHEADERS)
+
+install-local:: $(INSTHEADERS)
