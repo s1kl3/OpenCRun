@@ -1,12 +1,3 @@
-class OCLExtension;
-
-def ocl_ext_cl_khr_fp16 : OCLExtension;
-def ocl_ext_cl_khr_fp64 : OCLExtension;
-
-class ExtRequire<list<OCLExtension> l> {
-  list<OCLExtension> Requires = l;
-}
-
 class OCLType;
 
 class OCLBasicType : OCLType;
@@ -18,7 +9,7 @@ class OCLOpaqueType<string name> : OCLBasicType {
 def ocl_void : OCLOpaqueType<"void">;
 def ocl_size_t : OCLOpaqueType<"size_t">;
 
-class OCLAddressSpace;
+class OCLAddressSpace : OCLPredicate;
 
 def ocl_as_private : OCLAddressSpace;
 def ocl_as_global : OCLAddressSpace;
@@ -31,7 +22,7 @@ def ocl_mod_const : OCLModifier;
 
 class OCLPointerType<OCLType base, OCLAddressSpace as, 
                      list<OCLModifier> mod = []> 
- : OCLBasicType {
+ : OCLBasicType, Require<[as]> {
   OCLType BaseType = base;
   OCLAddressSpace AddressSpace = as;
   list<OCLModifier> Modifier = mod;
@@ -73,9 +64,9 @@ def ocl_uint : OCLIntegerType<32, 1>;
 def ocl_long : OCLIntegerType<64, 0>;
 def ocl_ulong : OCLIntegerType<64, 1>;
 
-def ocl_half : OCLRealType<16>, ExtRequire<[ocl_ext_cl_khr_fp16]>;
+def ocl_half : OCLRealType<16>, Require<[ocl_ext_cl_khr_fp16]>;
 def ocl_float : OCLRealType<32>;
-def ocl_double : OCLRealType<64>, ExtRequire<[ocl_ext_cl_khr_fp64]>;
+def ocl_double : OCLRealType<64>, Require<[ocl_ext_cl_khr_fp64]>;
 
 defm ocl_char : OCLVectors<ocl_char>;
 defm ocl_uchar : OCLVectors<ocl_uchar>;

@@ -154,24 +154,20 @@ public:
   }
 
 private:
-  void LoadRequiredTypeExt(OCLScalarType *B, llvm::Record &R) {
-    if (!R.getValue("Requires")) return;
+  void LoadPredicates(OCLBasicType *B, llvm::Record &R) {
+    if (!R.getValue("Predicates")) return;
 
-    std::vector<llvm::Record*> Requires = R.getValueAsListOfDefs("Requires");
+    std::vector<llvm::Record*> Predicates = R.getValueAsListOfDefs("Predicates");
 
-    for (unsigned i = 0, e = Requires.size(); i != e; ++i) {
-      llvm::StringRef Name = Requires[i]->getName();
+    for (unsigned i = 0, e = Predicates.size(); i != e; ++i) {
+      llvm::StringRef Name = Predicates[i]->getName();
+      OCLPredicate P = ParsePredicateName(Name);
 
-      OCLExtension Ext =
-        llvm::StringSwitch<OCLExtension>(Name)
-          .Case("ocl_ext_cl_khr_fp16", Ext_cl_khr_fp16)
-          .Case("ocl_ext_cl_khr_fp64", Ext_cl_khr_fp64)
-          .Default(Ext_MaxValue);
+      if (P == Pred_MaxValue)
+        llvm::PrintFatalError("Invalid opencl predicate: " + Name.str());
 
-      if (Ext == Ext_MaxValue)
-        llvm::PrintFatalError("Invalid opencl extension: " + Name.str());
-
-      B->getRequiredTypeExt().set(Ext);
+      // Assume private address space always supported!
+      if (P != Pred_AS_Private) B->getPredicates().set(P);
     }
   }
 
@@ -191,14 +187,14 @@ private:
     else if (R.isSubClassOf("OCLRealType")) {
       unsigned BitWidth = R.getValueAsInt("BitWidth");
       Type = new OCLRealType(R.getName(), BitWidth);
-      LoadRequiredTypeExt(static_cast<OCLScalarType*>(Type), R);
+      LoadPredicates(static_cast<OCLRealType*>(Type), R);
     }
     else if (R.isSubClassOf("OCLVectorType")) {
       unsigned Width = R.getValueAsInt("Width");
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
       if (const OCLScalarType *B = llvm::dyn_cast<OCLScalarType>(&Base)) {
         OCLVectorType *V = new OCLVectorType(*B, Width);
-        V->getRequiredTypeExt() = B->getRequiredTypeExt();
+        V->getPredicates() = B->getPredicates();
         OCLVTypesMapKey K = std::make_pair(B, Width);
         if (VTypes.count(K) == 0)
           VTypes[K] = V;
@@ -224,6 +220,7 @@ private:
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
       // TODO: modifiers
       Type = new OCLPointerType(Base, AS);
+      LoadPredicates(static_cast<OCLPointerType*>(Type), R);
     }
     else if (R.isSubClassOf("OCLGroupType")) {
       std::vector<llvm::Record *> Members = R.getValueAsListOfDefs("Members");
@@ -261,7 +258,10 @@ private:
     
     do {
       const OCLPointerType *P = Chain.pop_back_val();
-      T = new OCLPointerType(*T, P->getAddressSpace(), P->getModifierFlags());
+      OCLPointerType *NP = new OCLPointerType(*T, P->getAddressSpace(), 
+                                              P->getModifierFlags());
+      NP->getPredicates() = P->getPredicates();
+      T = NP;
       PtrTracker.push_back(llvm::cast<OCLPointerType>(T));
     } while (!Chain.empty()); 
     

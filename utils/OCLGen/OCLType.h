@@ -1,6 +1,8 @@
 #ifndef OCLTYPES_H
 #define OCLTYPES_H
 
+#include "OCLTarget.h"
+
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -12,15 +14,6 @@
 #include <vector>
 
 namespace opencrun {
-
-enum OCLExtension {
-  Ext_InitValue,
-
-  Ext_cl_khr_fp16 = Ext_InitValue,
-  Ext_cl_khr_fp64,
-
-  Ext_MaxValue
-};
 
 //===----------------------------------------------------------------------===//
 // OCLType hierarchy
@@ -71,17 +64,17 @@ public:
     }
   }
 
-  const llvm::BitVector &getRequiredTypeExt() const { return RequiredTypeExt; }
-  llvm::BitVector &getRequiredTypeExt() { return RequiredTypeExt; }
+  const llvm::BitVector &getPredicates() const { return Predicates; }
+  llvm::BitVector &getPredicates() { return Predicates; }
 
   virtual bool compareLess(const OCLType *T) const = 0;
 
 protected:
   OCLBasicType(TypeKind SubType, llvm::StringRef name) 
-   : OCLType(SubType, name), RequiredTypeExt(Ext_MaxValue) {}
+   : OCLType(SubType, name), Predicates(Pred_MaxValue) {}
 
 private:
-  llvm::BitVector RequiredTypeExt;
+  llvm::BitVector Predicates;
 };
 
 class OCLOpaqueType : public OCLBasicType {

@@ -12,6 +12,7 @@ using namespace opencrun;
 enum ActionType {
   GenOCLTypeDef,
   GenOCLBuiltinDef,
+  GenOCLBuiltinDefTarget,
   GenOCLBuiltinImpl
 };
 
@@ -23,6 +24,9 @@ Action(llvm::cl::desc("Action to perform"),
                         clEnumValN(GenOCLBuiltinDef,
                                    "gen-ocl-lib-def",
                                    "Generate 'ocldef.h' header file"),
+                        clEnumValN(GenOCLBuiltinDefTarget,
+                                   "gen-ocl-lib-def-target",
+                                   "Generate 'ocldef.TARGET.h' header file"),
                         clEnumValN(GenOCLBuiltinImpl,
                                    "gen-ocl-lib-impl",
                                    "Generate OpenCL C library implementation"),
@@ -34,6 +38,8 @@ static bool OCLGenMain(llvm::raw_ostream &OS, llvm::RecordKeeper &R) {
     return EmitOCLTypeDef(OS, R);
   case GenOCLBuiltinDef:
     return EmitOCLBuiltinDef(OS, R);
+  case GenOCLBuiltinDefTarget:
+    return EmitOCLBuiltinDefTarget(OS, R);
   case GenOCLBuiltinImpl:
     return EmitOCLBuiltinImpl(OS, R);
   }

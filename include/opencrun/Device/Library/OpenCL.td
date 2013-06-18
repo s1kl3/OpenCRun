@@ -1,5 +1,6 @@
-include "opencrun/Device/Builtins/Type.td"
-include "opencrun/Device/Builtins/Builtin.td"
+include "opencrun/Device/Library/Target.td"
+include "opencrun/Device/Library/Type.td"
+include "opencrun/Device/Library/Builtin.td"
 
 //===----------------------------------------------------------------------===//
 // OpenCL builtins classes
@@ -29,10 +30,10 @@ include "opencrun/Device/Builtins/Builtin.td"
 //
 //===----------------------------------------------------------------------===//
 
-include "opencrun/Device/Builtins/Common.td"
-include "opencrun/Device/Builtins/Geometric.td"
-include "opencrun/Device/Builtins/Integer.td"
-include "opencrun/Device/Builtins/Math.td"
-include "opencrun/Device/Builtins/Relational.td"
-include "opencrun/Device/Builtins/Vloadstore.td"
-include "opencrun/Device/Builtins/Vmisc.td"
+include "opencrun/Device/Library/Common.td"
+include "opencrun/Device/Library/Geometric.td"
+include "opencrun/Device/Library/Integer.td"
+include "opencrun/Device/Library/Math.td"
+include "opencrun/Device/Library/Relational.td"
+include "opencrun/Device/Library/Vloadstore.td"
+include "opencrun/Device/Library/Vmisc.td"

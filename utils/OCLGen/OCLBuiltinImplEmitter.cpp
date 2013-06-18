@@ -226,7 +226,7 @@ void EmitOCLDirectSplit(llvm::raw_ostream &OS,
             OS << BaseTy->getBaseType() << " ";
 
             // Address Space
-            OS << "__opencrun_as(" << PtrTy->getAddressSpace() <<") ";
+            OS << AddressSpaceName(PtrTy->getAddressSpace());
 
             OS << " *) param" << PI;
             if (i > 0)
@@ -288,7 +288,7 @@ void EmitOCLBuiltinImplementation(llvm::raw_ostream &OS, const OCLBuiltinImpl &B
 
       SortBuiltinSignatureList(Alts);
 
-      llvm::BitVector GroupReq;
+      llvm::BitVector GroupPreds;
       
       for (std::list<BuiltinSignature>::iterator I = Alts.begin(), 
                                                  E = Alts.end(); 
@@ -296,12 +296,12 @@ void EmitOCLBuiltinImplementation(llvm::raw_ostream &OS, const OCLBuiltinImpl &B
                                                  ++I) {
         BuiltinSignature &Sign = *I;
 
-        llvm::BitVector Req;
-        ComputeRequiredExt(Sign, Req);
-        if (Req != GroupReq) {
-          EmitRequiredExtEnd(OS, GroupReq);
-          GroupReq = Req;
-          EmitRequiredExtBegin(OS, GroupReq);
+        llvm::BitVector Preds;
+        ComputePredicates(Sign, Preds);
+        if (Preds != GroupPreds) {
+          EmitPredicatesEnd(OS, GroupPreds);
+          GroupPreds = Preds;
+          EmitPredicatesBegin(OS, GroupPreds);
           OS << "\n";
         }
        
@@ -330,7 +330,7 @@ void EmitOCLBuiltinImplementation(llvm::raw_ostream &OS, const OCLBuiltinImpl &B
         OS << "}\n\n";
       }
 
-      EmitRequiredExtEnd(OS, GroupReq);
+      EmitPredicatesEnd(OS, GroupPreds);
       OS << "\n";
     }
   }

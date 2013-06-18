@@ -99,21 +99,37 @@ class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLMultiBuiltin<name, [
 
 class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
-    ocl_gentype_real, 
-    ocl_gentype_real, 
-    ocl_gentype_real,
-    ocl_gentype_real
+    ocl_gentype_float, 
+    ocl_gentype_float, 
+    ocl_gentype_float,
+    ocl_gentype_float
   ],
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
-  "rrrr">,
+  "ffff">,
   OCLBuiltinVariant<[
-    ocl_vgentype_real,
-    ocl_vgentype_real,
-    ocl_sgentype_real,
-    ocl_sgentype_real
+    ocl_gentype_double, 
+    ocl_gentype_double, 
+    ocl_gentype_double,
+    ocl_gentype_double
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
+  "dddd">,
+  OCLBuiltinVariant<[
+    ocl_vgentype_float,
+    ocl_vgentype_float,
+    ocl_float,
+    ocl_float
   ],
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
-  "VrVrCrCr">
+  "VfVfCfCf">,
+ OCLBuiltinVariant<[
+    ocl_vgentype_double,
+    ocl_vgentype_double,
+    ocl_double,
+    ocl_double
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
+  "VdVdCdCd">
 ]>;
 
 }
@@ -208,13 +224,22 @@ def : OCLBuiltinImpl<blt_clamp, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_smoothstep, RecursiveSplit<[{
-  if (param3 <= param1)
-    return 0.0f;
-  else if (param3 >= param1)
-    return 1.0f;
-  else
-    return __builtin_ocl_clamp((param3 - param1)/(param2 - param1), 0.0f, 1.0f) *
-    __builtin_ocl_clamp((param3 - param1)/(param2 - param1), 0.0f, 1.0f) *
-    (3.0f - 2.0f * __builtin_ocl_clamp((param3 - param1)/(param2 - param1), 0.0f, 1.0f));
-}]>>;
+  if (param3 <= param1) return 0.0f;
+  else if (param3 >= param1) return 1.0f;
+
+  float t = (param3 - param1)/(param2 - param1);
+  t = __builtin_ocl_clamp(t, 0.0f, 1.0f);
+
+  return t * t * (3.0f - 2.0f * t);
+}]>, "ffff">;
+
+def : OCLBuiltinImpl<blt_smoothstep, RecursiveSplit<[{
+  if (param3 <= param1) return 0.0;
+  else if (param3 >= param1) return 1.0;
+
+  double t = (param3 - param1)/(param2 - param1);
+  t = __builtin_ocl_clamp(t, 0.0, 1.0);
+
+  return t * t * (3.0 - 2.0 * t);
+}]>, "dddd">;
 

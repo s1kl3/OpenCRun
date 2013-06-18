@@ -40,15 +40,15 @@ void EmitOCLScalarTypes(llvm::raw_ostream &OS) {
 }
 
 void EmitOCLVectorTypes(llvm::raw_ostream &OS) {
-  llvm::BitVector GroupReq;
+  llvm::BitVector GroupPreds;
   for (unsigned i = 0, e = OCLTypes.size(); i != e; ++i) {
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(OCLTypes[i])) {
-      const llvm::BitVector &Req = V->getBaseType().getRequiredTypeExt();
-      if (Req != GroupReq) {
-        EmitRequiredExtEnd(OS, GroupReq);
+      const llvm::BitVector &Preds = V->getBaseType().getPredicates();
+      if (Preds != GroupPreds) {
+        EmitPredicatesEnd(OS, GroupPreds);
         OS << "\n";
-        GroupReq = Req;
-        EmitRequiredExtBegin(OS, GroupReq); 
+        GroupPreds = Preds;
+        EmitPredicatesBegin(OS, GroupPreds); 
       }
 
       OS << "typedef " << V->getBaseType().getName()
@@ -56,7 +56,7 @@ void EmitOCLVectorTypes(llvm::raw_ostream &OS) {
          << V->getName() << ";\n";
     }
   }
-  EmitRequiredExtEnd(OS, GroupReq);
+  EmitPredicatesEnd(OS, GroupPreds);
 }
 
 bool opencrun::EmitOCLTypeDef(llvm::raw_ostream &OS, 

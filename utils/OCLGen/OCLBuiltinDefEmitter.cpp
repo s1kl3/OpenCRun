@@ -5,6 +5,7 @@
 
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
 using namespace opencrun;
@@ -33,18 +34,18 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
 
   SortBuiltinSignatureList(Alts);
 
-  llvm::BitVector GroupReq;
+  llvm::BitVector GroupPreds;
 
   for (std::list<BuiltinSignature>::iterator  
        I = Alts.begin(), E = Alts.end(); I != E; ++I) {
     BuiltinSignature &S = *I;
 
-    llvm::BitVector Req;
-    ComputeRequiredExt(S, Req);
-    if (Req != GroupReq) {
-      EmitRequiredExtEnd(OS, GroupReq);
-      GroupReq = Req;
-      EmitRequiredExtBegin(OS, GroupReq);
+    llvm::BitVector Preds;
+    ComputePredicates(S, Preds, true);
+    if (Preds != GroupPreds) {
+      EmitPredicatesEnd(OS, GroupPreds);
+      GroupPreds = Preds;
+      EmitPredicatesBegin(OS, GroupPreds);
       OS << "\n";
     }
 
@@ -60,7 +61,7 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
     }
     OS << ");\n\n";
   }
-  EmitRequiredExtEnd(OS, GroupReq);
+  EmitPredicatesEnd(OS, GroupPreds);
   OS << "\n";
 }
 
@@ -75,16 +76,49 @@ bool opencrun::EmitOCLBuiltinDef(llvm::raw_ostream &OS,
   OS << "#define OPENCRUN_OCLDEF_H\n\n";
 
   OS << "#define __opencrun_overload __attribute__((overloadable))\n\n";
-  OS << "#define __opencrun_as(n) __attribute__(( address_space(n) ))\n\n";
 
   for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
     EmitOCLBuiltinPrototype(OS, *OCLBuiltins[i]);
   }
 
   OS << "#ifndef OPENCRUN_LIB_IMPL\n";
-  OS << "#undef __opencrun_as(n)\n";
   OS << "#undef __opencrun_overload\n";
   OS << "#endif\n";
+
+  OS << "\n#endif\n";
+  return false;
+}
+
+bool opencrun::EmitOCLBuiltinDefTarget(llvm::raw_ostream &OS,
+                                 llvm::RecordKeeper &R) {
+  emitSourceFileHeader("OCL Target definitions", OS);
+
+  OS << "#ifndef OPENCRUN_OCLDEF_TARGET_H\n";
+  OS << "#define OPENCRUN_OCLDEF_TARGET_H\n\n";
+
+  std::vector<llvm::Record *> Features = 
+    R.getAllDerivedDefinitions("OCLTargetFeature");
+
+  llvm::BitVector Preds;
+
+  for (unsigned i = 0, e = Features.size(); i != e; ++i) {
+    std::vector<llvm::Record*> L =
+      Features[i]->getValueAsListOfDefs("Features");
+    for (unsigned j = 0, k = L.size(); j != k; ++j) {
+      llvm::StringRef Name = L[i]->getName();
+      OCLPredicate P = ParsePredicateName(Name);
+
+      if (P == Pred_MaxValue)
+        llvm::PrintFatalError("Illegal opencl predicate: " + Name.str());
+
+      if (P != Pred_AS_Private)
+        OS << "#define __opencrun_target_" << PredicateName(P) << "\n";
+    }
+  }
+
+  OS << "\n";
+  OS << "#include <ocltype.h>\n";
+  OS << "#include <ocldef.h>\n";
 
   OS << "\n#endif\n";
   return false;

@@ -16,22 +16,33 @@ CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
 # Builtins and OCLGen 
 #------------------------------------------------------------------------------#
 
-BUILTINS_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Builtins
+LIBRARY_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
 
 OCLGENTool = $(ToolDir)/oclgen
 
 OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
 
-HeaderDir := $(LibDir)/opencrun/include
 
 BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
                 $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
-                -I$(HeaderDir) -Wno-empty-translation-unit \
-                -include "ocltype.h" -include "ocldef.h"
+                -I$(HeaderDir) -Wno-empty-translation-unit
+
+HeaderDir := $(LibDir)/opencrun/include
+
+PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
+
+ifdef OPENCRUN_TARGET
+
+TargetRequire = $(HeaderDir)/ocldef.$(OPENCRUN_TARGET).h
+TargetCommonOpts = -DOPENCRUN_LIB_IMPL -include "$(HeaderDir)/ocldef.$(OPENCRUN_TARGET).h"
+
+HEADERS = ocldef.$(OPENCRUN_TARGET).h
+
+endif
 
 ifndef DISABLE_AUTO_DEPENDENCIES
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(HeaderDir)/ocldef.h $(HeaderDir)/ocltype.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
                                     $(LLVMCC_EMITIR_FLAG) \
@@ -39,7 +50,7 @@ $(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(HeaderDir)/ocl
                   $(BC_DEPEND_MOVEFILE)
 else
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(HeaderDir)/ocldef.h $(HeaderDir)/ocltype.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(Verb) $(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
 
@@ -47,14 +58,36 @@ endif
 
 ifdef TABLEGEN_INC_FILES_COMMON
 
+$(ObjDir)/ocldef.%.h.inc.tmp: %.td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL target library definition for '$*' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-lib-def-target -o $(call SYSPATH, $@) $<
+
 $(ObjDir)/Builtins.%.inc.tmp: %.td $(OCLGENTool) $(ObjDir)/.dir
 	$(Echo) Generating OCL builtins library implementation for '$*' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-lib-impl -o $(call SYSPATH, $@) $<
 
 endif
 
-#------------------------------------------------------------------------------#
-# Header file install path
-#------------------------------------------------------------------------------#
+ifdef HEADERS
 
-PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
+OBJHEADERS := $(addprefix $(HeaderDir)/, $(HEADERS))
+
+$(OBJHEADERS) : $(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $@) to build dir
+
+
+$(PROJ_headers):
+	$(Verb) $(MKDIR) $@
+
+INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
+
+$(INSTHEADERS) : $(PROJ_headers)/%.h : $(HeaderDir)/%.h | $(PROJ_headers)
+	$(Verb) $(DataInstall) $< $(PROJ_headers)
+	$(Echo) Installing compiler include file: $(notdir $<)
+
+all-local:: $(OBJHEADERS)
+
+install-local:: $(INSTHEADERS)
+
+endif

@@ -6,6 +6,7 @@
 
 namespace opencrun {
   bool EmitOCLBuiltinDef(llvm::raw_ostream &OS, llvm::RecordKeeper &R);
+  bool EmitOCLBuiltinDefTarget(llvm::raw_ostream &OS, llvm::RecordKeeper &R);
 }
 
 #endif

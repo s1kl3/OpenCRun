@@ -1,19 +1,11 @@
 #include "OCLEmitterUtils.h"
+#include "OCLTarget.h"
 #include "OCLType.h"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace opencrun;
-
-static const char *ExtensionName(unsigned E) {
-  switch (E) {
-  case Ext_cl_khr_fp16: return "cl_khr_fp16";
-  case Ext_cl_khr_fp64: return "cl_khr_fp64";
-  default: break;
-  }
-  return 0;
-}
 
 const char *opencrun::AddressSpaceName(OCLPointerType::AddressSpace AS) {
   switch (AS) {
@@ -43,8 +35,7 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << " ";
 
     // Address Space
-    // OS << AddressSpaceName(P->getAddressSpace()) << " ";
-    OS << "__opencrun_as(" << P->getAddressSpace() << ") ";
+    OS << AddressSpaceName(P->getAddressSpace()) << " ";
 
     // Star
     OS << "*";
@@ -57,49 +48,49 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << " " << Name;
 }
 
-void opencrun::ComputeRequiredExt(const BuiltinSignature &Sign, 
-                                  llvm::BitVector &Req) {
-  Req.reset();
+void opencrun::ComputePredicates(const BuiltinSignature &Sign, 
+                                 llvm::BitVector &Preds, bool IgnoreAS) {
+  Preds.reset();
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 
-    const OCLScalarType *ST = 0;
-
     // FIXME: handle also pointers
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
-      ST = &V->getBaseType();
-    else if (const OCLScalarType *S = llvm::dyn_cast<OCLScalarType>(B))
-      ST = S;
+      B = &V->getBaseType();
 
-    if (ST)
-      Req |= ST->getRequiredTypeExt();
+    Preds |= B->getPredicates();
   }
+  if (IgnoreAS)
+    Preds.reset(Pred_AS_InitValue, Pred_AS_MaxValue);
 }
 
-void opencrun::EmitRequiredExtBegin(llvm::raw_ostream &OS, 
-                                    const llvm::BitVector &Req) {
+void opencrun::EmitPredicatesBegin(llvm::raw_ostream &OS, 
+                                    const llvm::BitVector &Preds) {
+  if (!Preds.any()) return;
+
   llvm::SmallVector<const char *, 4> Names;
-  for (unsigned i = Ext_InitValue; i != Ext_MaxValue; ++i)
-    if (Req[i]) Names.push_back(ExtensionName(i));
+  for (unsigned i = Pred_Ext_InitValue; i != Pred_Ext_MaxValue; ++i)
+    if (Preds[i]) Names.push_back(PredicateName(i));
 
-  if (Names.size()) {
-    OS << "#if";
-    for (unsigned i = 0, e = Names.size(); i != e; ++i) {
-      OS << " defined(__opencrun_support_" << Names[i]<< ")";
-      if (i + 1 != e) OS << " &&";
+  unsigned Count = Preds.count();
+  OS << "#if";
+  for (unsigned i = Pred_InitValue; i != Pred_MaxValue; ++i)
+    if (Preds[i]) {
+      OS << " defined(__opencrun_target_" << PredicateName(i) << ")";
+      if (--Count) OS << " &&";
     }
-    OS << "\n";
-    for (unsigned i = 0, e = Names.size(); i != e; ++i)
-      OS << "#pragma OPENCL EXTENSION " << Names[i] << " : enable\n";
-  }
+  OS << "\n";
+  for (unsigned i = 0, e = Names.size(); i != e; ++i)
+    OS << "#pragma OPENCL EXTENSION " << Names[i] << " : enable\n";
 }
 
-void opencrun::EmitRequiredExtEnd(llvm::raw_ostream &OS, 
-                                  const llvm::BitVector &Req) {
-  if (!Req.any()) return;
-  for (unsigned i = Ext_InitValue; i != Ext_MaxValue; ++i)
-    if (Req[i])
-      OS << "#pragma OPENCL EXTENSION " << ExtensionName(i) 
+void opencrun::EmitPredicatesEnd(llvm::raw_ostream &OS, 
+                                  const llvm::BitVector &Preds) {
+  if (!Preds.any()) return;
+
+  for (unsigned i = Pred_Ext_InitValue; i != Pred_Ext_MaxValue; ++i)
+    if (Preds[i])
+      OS << "#pragma OPENCL EXTENSION " << PredicateName(i) 
          << " : disable\n";
   OS << "#endif\n";
 }

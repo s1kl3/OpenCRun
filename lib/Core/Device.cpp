@@ -129,10 +129,6 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
                                              clang::IK_OpenCL,
                                             clang::LangStandard::lang_opencl11);
 
-  // Force usage of fake address space map, see clang/lib/AST/ASTContext.cpp
-  clang::LangOptions &LangOpts = *Invocation.getLangOpts();
-  LangOpts.FakeAddressSpaceMap = true;
-
   // Remap file to in-memory buffer.
   clang::PreprocessorOptions &PreprocOpts = Invocation.getPreprocessorOpts();
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);

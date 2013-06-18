@@ -18,10 +18,11 @@ const char *AddressSpaceName(OCLPointerType::AddressSpace AS);
 void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                           std::string Name = "");
 
-void ComputeRequiredExt(const BuiltinSignature &S, llvm::BitVector &Req);
+void ComputePredicates(const BuiltinSignature &S, llvm::BitVector &Preds,
+                       bool IgnoreAS = false);
 
-void EmitRequiredExtBegin(llvm::raw_ostream &OS, const llvm::BitVector &Req);
-void EmitRequiredExtEnd(llvm::raw_ostream &OS, const llvm::BitVector &Req);
+void EmitPredicatesBegin(llvm::raw_ostream &OS, const llvm::BitVector &Preds);
+void EmitPredicatesEnd(llvm::raw_ostream &OS, const llvm::BitVector &Preds);
 
 void EmitBuiltinGroupBegin(llvm::raw_ostream &OS, llvm::StringRef Group);
 void EmitBuiltinGroupEnd(llvm::raw_ostream &OS, llvm::StringRef Group);

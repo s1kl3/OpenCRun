@@ -19,7 +19,7 @@ TABLEGEN_INC_FILES_COMMON = 1
 #
 # Auto-generate library.
 #
-BUILT_SOURCES = Builtins.CPU.inc
+BUILT_SOURCES = ocldef.CPU.h.inc Builtins.CPU.inc
 
 #
 # The LLVM build system does not known recognize .cl files automatically.
@@ -27,7 +27,7 @@ BUILT_SOURCES = Builtins.CPU.inc
 SOURCES = Async.cl Common.cl Mfence.cl Geometric.cl Integer.cl Math.cl \
       Vmisc.cl Relational.cl Synchronization.cl Vloadstore.cl WorkItem.cl
 
-TargetCommonOpts += -DOPENCRUN_LIB_IMPL
+OPENCRUN_TARGET = CPU
 
 #
 # Include Makefile.common so we know what to do.
