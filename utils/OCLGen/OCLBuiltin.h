@@ -239,7 +239,9 @@ class OCLStrategy {
 public:
   enum StrategyKind {
     SK_RecursiveSplit,
-    SK_DirectSplit
+    SK_DirectSplit,
+    SK_MergeSplit,
+    SK_TemplateStrategy
   };
 
 public:
@@ -292,6 +294,39 @@ public:
   DirectSplit(llvm::StringRef scalarimpl, 
               TypedefsContainer &typedefs) : 
     OCLStrategy(SK_DirectSplit, scalarimpl, typedefs) { }
+};
+
+class MergeSplit : public OCLStrategy {
+public:
+  static bool classof(const OCLStrategy *S) {
+    return S->getKind() == SK_MergeSplit;
+  }
+
+public:
+  MergeSplit(llvm::StringRef scalarimpl,
+             llvm::StringRef mergeop,
+             TypedefsContainer &typedefs) : 
+    OCLStrategy(SK_MergeSplit, scalarimpl, typedefs),
+    MergeOp(mergeop) { }
+
+public:
+  std::string getMergeOp() const { return MergeOp; }
+
+private:
+  std::string MergeOp;
+};
+
+
+class TemplateStrategy : public OCLStrategy {
+public:
+  static bool classof(const OCLStrategy *S) {
+    return S->getKind() == SK_TemplateStrategy;
+  }
+
+public:
+  TemplateStrategy(llvm::StringRef scalarimpl,
+                   TypedefsContainer &typedefs) :
+    OCLStrategy(SK_TemplateStrategy, scalarimpl, typedefs) { }
 };
 
 //===----------------------------------------------------------------------===//

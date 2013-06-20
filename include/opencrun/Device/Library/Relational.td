@@ -1,14 +1,9 @@
+
 //===----------------------------------------------------------------------===//
 // Relational builtin classes
 //===----------------------------------------------------------------------===//
 
 let Group = "RELATIONAL" in {
-
-class RelationalBuiltin_gggg<string name> : OCLSimpleBuiltin<
-  name, 
-  [ocl_gentype, ocl_gentype, ocl_gentype, ocl_gentype], 
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
->;
 
 class RelationalBuiltin_CnSi<string name> : OCLSimpleBuiltin<
   name,
@@ -42,6 +37,42 @@ class RelationalBuiltin_Snff_Sidd<string name> : OCLMultiBuiltin<name, [
    ocl_gentype_double
   ],
   [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>], "Sidd">
+]>;
+
+class RelationalBuiltin_iiii_ffff_dddd<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_gentype_integer,
+    ocl_gentype_integer,
+    ocl_gentype_integer,
+    ocl_gentype_integer
+  ],
+  [
+    isSameAs<Id<0>, Id<1>>, 
+    isSameAs<Id<1>, Id<2>>, 
+    isSameAs<Id<2>, Id<3>>
+  ], "iiii">,
+  OCLBuiltinVariant<[
+    ocl_gentype_float,
+    ocl_gentype_float,
+    ocl_gentype_float,
+    ocl_gentype_float
+  ],
+  [
+    isSameAs<Id<0>, Id<1>>, 
+    isSameAs<Id<1>, Id<2>>, 
+    isSameAs<Id<2>, Id<3>>
+  ], "ffff">,
+  OCLBuiltinVariant<[
+    ocl_gentype_double,
+    ocl_gentype_double,
+    ocl_gentype_double,
+    ocl_gentype_double
+  ],
+  [
+    isSameAs<Id<0>, Id<1>>, 
+    isSameAs<Id<1>, Id<2>>, 
+    isSameAs<Id<2>, Id<3>>
+  ], "dddd">
 ]>;
 
 class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
@@ -93,10 +124,208 @@ def blt_signbit         : RelationalBuiltin_Snf_Sid<"signbit">;
 def blt_any             : RelationalBuiltin_CnSi<"any">;
 def blt_all             : RelationalBuiltin_CnSi<"all">;
 
-def blt_bitselect       : RelationalBuiltin_gggg<"bitselect">;
+def blt_bitselect       : RelationalBuiltin_iiii_ffff_dddd<"bitselect">;
 
 def blt_select          : RelationalBuiltin_gggSi_gggUi<"select">;
 
 //===----------------------------------------------------------------------===//
 // Common builtin implementations
 //===----------------------------------------------------------------------===//
+
+def : OCLBuiltinImpl<blt_isequal, TemplateStrategy<[{
+  return param1 == param2; 
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isnotequal, TemplateStrategy<[{
+  return param1 != param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isgreater, TemplateStrategy<[{
+  return param1 > param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isgreaterequal, TemplateStrategy<[{
+  return param1 >= param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isless, TemplateStrategy<[{
+  return param1 < param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_islessequal, TemplateStrategy<[{
+  return param1 <= param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_islessgreater, TemplateStrategy<[{
+  return (param1 < param2) || (param1 > param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isordered, TemplateStrategy<[{
+  return (param1 == param1) 
+      && (param2 == param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isunordered, TemplateStrategy<[{
+  return (param1 != param1)
+      || (param2 != param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isfinite, TemplateStrategy<[{
+  return (param1 == param1) 
+      && (__builtin_ocl_fabs(param1) != HUGE_VALF);
+}]>, "Snf">;
+
+def : OCLBuiltinImpl<blt_isfinite, TemplateStrategy<[{
+  return (param1 == param1) 
+      && (__builtin_ocl_fabs(param1) != HUGE_VAL);
+}]>, "Sid">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isinf, TemplateStrategy<[{
+  return __builtin_ocl_fabs(param1) == HUGE_VALF;
+}]>, "Snf">;
+
+def : OCLBuiltinImpl<blt_isinf, TemplateStrategy<[{
+  return __builtin_ocl_fabs(param1) == HUGE_VAL;
+}]>, "Sid">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isnan, TemplateStrategy<[{
+  return param1 != param1;  
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_isnormal, TemplateStrategy<[{
+  return (param1 == param1) 
+      && (__builtin_ocl_fabs(param1) < HUGE_VALF)
+      && (__builtin_ocl_fabs(param1) >= FLT_MIN);
+}]>, "Snf">;
+
+def : OCLBuiltinImpl<blt_isnormal, TemplateStrategy<[{
+  return (param1 == param1) 
+      && (__builtin_ocl_fabs(param1) < HUGE_VAL)
+      && (__builtin_ocl_fabs(param1) >= DBL_MIN);
+}]>, "Sid">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_signbit, TemplateStrategy<[{
+  return param1 < 0.0f;
+}]>, "Snf">;
+
+def : OCLBuiltinImpl<blt_signbit, TemplateStrategy<[{
+  return param1 < 0.0;
+}]>, "Sid">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_any, MergeSplit<[{
+  return param1 < 0;
+}], "||">>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_all, MergeSplit<[{
+  return param1 < 0;
+}], "&&">>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
+  TYPE RetValue = (TYPE) 0;
+
+  for (unsigned int i = 0; i < (unsigned int) sizeof(TYPE); ++i) {
+    TYPE bit_i = param3 & (1 << i);
+
+    if (bit_i == 0)
+      RetValue |= param1 & (1 << i);
+    else if (bit_i == 1)
+      RetValue |= param2 & (1 << i);
+  }
+
+  return RetValue;
+}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>, "iiii">;
+
+def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
+  typedef union _float_bits {
+    float f;
+    int i;
+  } float_bits;
+
+  float_bits param1_bits, param2_bits, param3_bits;
+  float_bits RetValue;
+  
+  param1_bits.f = param1;
+  param2_bits.f = param2;
+  param3_bits.f = param3;
+
+  RetValue.f = 0.0f;
+
+  for (unsigned int i = 0; i < 32; ++i) {
+    int bit_i = param3_bits.i & (1 << i);
+
+    if (bit_i == 0)
+      RetValue.i |= param1_bits.i & (1 << i);
+    else if (bit_i == 1)
+      RetValue.i |= param2_bits.i & (1 << i);
+  }
+
+  return RetValue.f;
+}]>, "ffff">;
+
+def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
+  typedef union _double_bits {
+    double d;
+    long l;
+  } double_bits;
+
+  double_bits param1_bits, param2_bits, param3_bits;
+  double_bits RetValue;
+  
+  param1_bits.d = param1;
+  param2_bits.d = param2;
+  param3_bits.d = param3;
+
+  RetValue.d = 0.0;
+
+  for (unsigned int i = 0; i < 64; ++i) {
+    long bit_i = param3_bits.l & (1 << i);
+
+    if (bit_i == 0)
+      RetValue.l |= param1_bits.l & (1 << i);
+    else if (bit_i == 1)
+      RetValue.l |= param2_bits.l & (1 << i);
+  }
+
+  return RetValue.d;
+
+}]>, "dddd">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_select, TemplateStrategy<[{
+  return param3 ? param2 : param1;
+}]>>;
+
+

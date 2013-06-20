@@ -60,6 +60,14 @@ class RecursiveSplit<code scalarimpl, list<OCLEmitTypedef> typedefs = []>
 class DirectSplit<code scalarimpl, list<OCLEmitTypedef> typedefs = []> 
   : OCLStrategy<scalarimpl, typedefs>;
 
+class MergeSplit<code scalarimpl, string mergeop, list<OCLEmitTypedef> typedefs = []>
+  : OCLStrategy<scalarimpl, typedefs> {
+  string MergeOp = mergeop;
+}
+
+class TemplateStrategy<code scalarimpl, list <OCLEmitTypedef> typedefs = []>
+  : OCLStrategy<scalarimpl, typedefs>;
+
 //----------------------------------------------------------------------------//
 
 class OCLBuiltinVariant<list<OCLType> ops, 

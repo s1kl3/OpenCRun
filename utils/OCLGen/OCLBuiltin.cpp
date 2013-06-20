@@ -366,6 +366,11 @@ private:
       Strategy = new RecursiveSplit(ScalarImpl, Typedefs); 
     else if (R.isSubClassOf("DirectSplit"))
       Strategy = new DirectSplit(ScalarImpl, Typedefs);
+    else if (R.isSubClassOf("MergeSplit")) {
+      std::string MergeOp = R.getValueAsString("MergeOp");  
+      Strategy = new MergeSplit(ScalarImpl, MergeOp, Typedefs);
+    } else if (R.isSubClassOf("TemplateStrategy"))
+      Strategy = new TemplateStrategy(ScalarImpl, Typedefs);
     else
       llvm::PrintFatalError("Invalid OCLStrategy: " + R.getName());
 
