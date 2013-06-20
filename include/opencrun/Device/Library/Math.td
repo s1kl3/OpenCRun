@@ -303,6 +303,9 @@ def blt_nan         : MathBuiltin_rUi<"nan">;
 
 def blt_ilogb       : MathBuiltin_Snr<"ilogb">;
 
+def blt_half_sqrt   : MathBuiltin_rr<"half_sqrt">;
+def blt_half_rsqrt  : MathBuiltin_ff_dd<"half_rsqrt">;
+
 //===----------------------------------------------------------------------===//
 // Math builtin implementations
 //===----------------------------------------------------------------------===//
@@ -1081,4 +1084,25 @@ def : OCLBuiltinImpl<blt_ilogb, RecursiveSplit<[{
       return __builtin_ilogb(param1);
   }
 }]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_sqrt, RecursiveSplit<[{
+  switch (sizeof(param1) * 8) {
+    case 32:
+      return __builtin_sqrtf(param1);
+    case 64:
+      return __builtin_sqrt(param1);
+  }
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_rsqrt, RecursiveSplit<[{
+      return 1.0f / __builtin_sqrtf(param1);
+}]>, "ff">;
+
+def : OCLBuiltinImpl<blt_half_rsqrt, RecursiveSplit<[{
+      return 1.0 / __builtin_sqrt(param1);
+}]>, "dd">;
 

@@ -325,14 +325,6 @@ def ocl_gentype_double_geom : OCLGroupType<[
   ocl_double, ocl_double_2, ocl_double_3, ocl_double_4
 ]>;
 
-def ocl_vec_float_geom : OCLGroupType<[
-  ocl_float_3, ocl_float_4
-]>;
-
-def ocl_vec_double_geom : OCLGroupType<[
-  ocl_double_3, ocl_double_4
-]>;
-
 // Integer builtins custom types
 
 def ocl_gentype_integer_int : OCLGroupType<[
