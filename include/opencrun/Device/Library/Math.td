@@ -10,10 +10,22 @@ class MathBuiltin_rr<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<0>, Id<1>>]
 >;
 
+class MathBuiltin_ff<string name> : OCLSimpleBuiltin<
+  name, 
+  [ocl_gentype_float, ocl_gentype_float], 
+  [isSameAs<Id<0>, Id<1>>]
+>;
+
 class MathBuiltin_rrr<string name> : OCLSimpleBuiltin<
   name, 
   [ocl_gentype_real, ocl_gentype_real, ocl_gentype_real], 
-  [isSameAs<Id<0>, Id<1> >, isSameAs<Id<1>, Id<2>>]
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
+>;
+
+class MathBuiltin_fff<string name> : OCLSimpleBuiltin<
+  name, 
+  [ocl_gentype_float, ocl_gentype_float, ocl_gentype_float], 
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
 >;
 
 class MathBuiltin_rrrr<string name> : OCLSimpleBuiltin<
@@ -24,18 +36,26 @@ class MathBuiltin_rrrr<string name> : OCLSimpleBuiltin<
 
 class MathBuiltin_rrSn<string name> : OCLSimpleBuiltin<name,
   [ocl_gentype_real, ocl_gentype_real, ocl_s_int], 
-  [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>]
+  [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>]
 >;
 
 class MathBuiltin_Snr<string name> : OCLSimpleBuiltin<name, 
   [ocl_s_int, ocl_gentype_real], 
-  [isSameDimAs<Id<0>,Id<1>>]
+  [isSameDimAs<Id<0>, Id<1>>]
 >;
 
-class MathBuiltin_rUi<string name> : OCLSimpleBuiltin<name, 
-  [ocl_gentype_real, ocl_gentype_u_integer], 
-  [isSameDimAs<Id<0>,Id<1>>, isSameBaseSizeAs<Id<0>,Id<1>>]
->;
+class MathBuiltin_fUn_dUl<string name> : OCLMultiBuiltin<name, [ 
+  OCLBuiltinVariant<[
+    ocl_gentype_float, 
+    ocl_u_int
+  ],
+  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "fUi">,
+  OCLBuiltinVariant<[
+    ocl_gentype_double, 
+    ocl_u_long
+  ],
+  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "dUl">
+]>;
 
 class MathBuiltin_ffSn_ddSn<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
@@ -43,13 +63,13 @@ class MathBuiltin_ffSn_ddSn<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float, 
     ocl_s_int
   ], 
-  [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>], "ffSn">,
+  [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ffSn">,
   OCLBuiltinVariant<[
     ocl_gentype_double, 
     ocl_gentype_double, 
     ocl_s_int
   ], 
-  [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>], "ddSn">
+  [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ddSn">
 ]>;
 
 class MathBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
@@ -80,22 +100,43 @@ class MathBuiltin_fff_ddd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "dd">
 ]>;
 
+class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_gentype_real,
+    ocl_gentype_real,
+    ocl_gentype_real
+  ], 
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "rrr">,
+  OCLBuiltinVariant<[
+    ocl_vgentype_float,
+    ocl_vgentype_float,
+    ocl_float
+  ], 
+  [isSameAs<Id<0>, Id<1>>], "ffCf">,
+  OCLBuiltinVariant<[
+    ocl_vgentype_double,
+    ocl_vgentype_double,
+    ocl_double
+  ], 
+  [isSameAs<Id<0>, Id<1>>], "ddCd">
+]>;
+
 class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP1Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP1Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP2Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP2Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP4Sn">
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP4Sn">
 ]>;
 
 class MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<string name> : 
@@ -104,32 +145,32 @@ OCLMultiBuiltin<name, [
      ocl_gentype_float, 
      ocl_gentype_float, 
      OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP1Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP1Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_float, 
      ocl_gentype_float, 
      OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP2Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP2Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_float, 
      ocl_gentype_float, 
      OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP4Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP4Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_double, 
      ocl_gentype_double, 
      OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP1Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP1Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_double, 
      ocl_gentype_double, 
      OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP2Sn">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP2Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_double, 
      ocl_gentype_double, 
      OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP4Sn">
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP4Sn">
 ]>;
 
 class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLMultiBuiltin<name, [
@@ -138,21 +179,21 @@ class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLMultiBuiltin<name, [
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
       isSameDimAs<Id<2>, Pointee<3>>], "rrrP1Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
       isSameDimAs<Id<2>, Pointee<3>>], "rrrP2Sn">,
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>,Id<2>>, 
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
       isSameDimAs<Id<2>, Pointee<3>>], "rrrP4Sn">
 ]>;
 
@@ -161,12 +202,12 @@ class MathBuiltin_VrVrCn_rrSn<string name> : OCLMultiBuiltin<name, [
      ocl_vgentype_real, 
      ocl_vgentype_real, 
      ocl_int
-  ], [isSameAs<Id<0>,Id<1>>], "VrVrCn">,
+  ], [isSameAs<Id<0>, Id<1>>], "VrVrCn">,
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
      ocl_s_int
-  ], [isSameAs<Id<0>,Id<1>>, isSameDimAs<Id<1>,Id<2>>], "rrSn">
+  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "rrSn">
 ]>;
 
 class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
@@ -174,17 +215,17 @@ class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_real,
     ocl_gentype_real,
     OCLPointerType<ocl_gentype_real, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP1r">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP1r">,
   OCLBuiltinVariant<[
     ocl_gentype_real,
     ocl_gentype_real,
     OCLPointerType<ocl_gentype_real, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP2r">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP2r">,
   OCLBuiltinVariant<[
     ocl_gentype_real,
     ocl_gentype_real,
     OCLPointerType<ocl_gentype_real, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP4r">
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "rrP4r">
 ]>;
 
 class MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<string name> : 
@@ -193,32 +234,32 @@ OCLMultiBuiltin<name, [
     ocl_gentype_float,
     ocl_gentype_float,
     OCLPointerType<ocl_gentype_float, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP1f">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP1f">,
   OCLBuiltinVariant<[
     ocl_gentype_float,
     ocl_gentype_float,
     OCLPointerType<ocl_gentype_float, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP2f">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP2f">,
   OCLBuiltinVariant<[
     ocl_gentype_float,
     ocl_gentype_float,
     OCLPointerType<ocl_gentype_float, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP4f">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ffP4f">,
   OCLBuiltinVariant<[
     ocl_gentype_double,
     ocl_gentype_double,
     OCLPointerType<ocl_gentype_double, ocl_as_global, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP1d">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP1d">,
   OCLBuiltinVariant<[
     ocl_gentype_double,
     ocl_gentype_double,
     OCLPointerType<ocl_gentype_double, ocl_as_local, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP2d">,
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP2d">,
   OCLBuiltinVariant<[
     ocl_gentype_double,
     ocl_gentype_double,
     OCLPointerType<ocl_gentype_double, ocl_as_private, []>
-  ], [isSameAs<Id<0>,Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP4d">
+  ], [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Pointee<2>>], "ddP4d">
 ]>;
 
 }
@@ -283,28 +324,64 @@ def blt_remainder   : MathBuiltin_rrr<"remainder">;
 
 def blt_atan2pi     : MathBuiltin_fff_ddd<"atanpi2">;
 
-def blt_pown        : MathBuiltin_rrSn<"pown">;
-def blt_rootn       : MathBuiltin_ffSn_ddSn<"rootn">;
-
-def blt_frexp       : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"frexp">;
-def blt_lgamma_r    : MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<"lgamma_r">;
+def blt_fmin        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmin">;
+def blt_fmax        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmax">;
 
 def blt_fma         : MathBuiltin_rrrr<"fma">;
 def blt_mad         : MathBuiltin_rrrr<"mad">;
 
-def blt_remquo      : MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<"remquo">;
-
-def blt_modf        : MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<"modf">;
-def blt_sincos      : MathBuiltin_rrP1r_rrP2r_rrP4r<"sincos">;
+def blt_pown        : MathBuiltin_rrSn<"pown">;
+def blt_rootn       : MathBuiltin_ffSn_ddSn<"rootn">;
 
 def blt_ldexp       : MathBuiltin_VrVrCn_rrSn<"ldexp">;
 
-def blt_nan         : MathBuiltin_rUi<"nan">;
+def blt_nan         : MathBuiltin_fUn_dUl<"nan">;
 
 def blt_ilogb       : MathBuiltin_Snr<"ilogb">;
 
-def blt_half_sqrt   : MathBuiltin_rr<"half_sqrt">;
-def blt_half_rsqrt  : MathBuiltin_ff_dd<"half_rsqrt">;
+def blt_fract       : MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<"fract">;
+
+def blt_frexp       : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"frexp">;
+
+def blt_lgamma_r    : MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<"lgamma_r">;
+
+def blt_remquo      : MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<"remquo">;
+
+def blt_modf        : MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<"modf">;
+
+def blt_sincos      : MathBuiltin_rrP1r_rrP2r_rrP4r<"sincos">;
+
+// half_* versions - to be overridden in case of fast FPU
+def blt_half_cos    : MathBuiltin_ff<"half_cos">;
+def blt_half_divide : MathBuiltin_fff<"half_divide">;
+def blt_half_exp    : MathBuiltin_ff<"half_exp">;
+def blt_half_exp2   : MathBuiltin_ff<"half_exp2">;
+def blt_half_exp10  : MathBuiltin_ff<"half_exp10">;
+def blt_half_log    : MathBuiltin_ff<"half_log">;
+def blt_half_log2   : MathBuiltin_ff<"half_log2">;
+def blt_half_log10  : MathBuiltin_ff<"half_log10">;
+def blt_half_powr   : MathBuiltin_fff<"half_powr">;
+def blt_half_recip  : MathBuiltin_ff<"half_recip">;
+def blt_half_rsqrt  : MathBuiltin_ff<"half_rsqrt">;
+def blt_half_sin    : MathBuiltin_ff<"half_sin">;
+def blt_half_sqrt   : MathBuiltin_ff<"half_sqrt">;
+def blt_half_tan    : MathBuiltin_ff<"half_tan">;
+
+// native_* versions - to be overridden by target-dependent implementations
+def blt_native_cos      : MathBuiltin_ff<"native_cos">;
+def blt_native_divide   : MathBuiltin_fff<"native_divide">;
+def blt_native_exp      : MathBuiltin_ff<"native_exp">;
+def blt_native_exp2     : MathBuiltin_ff<"native_exp2">;
+def blt_native_exp10    : MathBuiltin_ff<"native_exp10">;
+def blt_native_log      : MathBuiltin_ff<"native_log">;
+def blt_native_log2     : MathBuiltin_ff<"native_log2">;
+def blt_native_log10    : MathBuiltin_ff<"native_log10">;
+def blt_native_powr     : MathBuiltin_fff<"native_powr">;
+def blt_native_recip    : MathBuiltin_ff<"native_recip">;
+def blt_native_rsqrt    : MathBuiltin_ff<"native_rsqrt">;
+def blt_native_sin      : MathBuiltin_ff<"native_sin">;
+def blt_native_sqrt     : MathBuiltin_ff<"native_sqrt">;
+def blt_native_tan      : MathBuiltin_ff<"native_tan">;
 
 //===----------------------------------------------------------------------===//
 // Math builtin implementations
@@ -434,6 +511,17 @@ def : OCLBuiltinImpl<blt_cos, RecursiveSplit<[{
       return __builtin_cosf(param1);
     case 64:
       return __builtin_cos(param1);
+  }
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_cosh, RecursiveSplit<[{
+  switch (sizeof(param1) * 8) {
+    case 32:
+      return __builtin_coshf(param1);
+    case 64:
+      return __builtin_cosh(param1);
   }
 }]>>;
 
@@ -862,6 +950,28 @@ def : OCLBuiltinImpl<blt_remainder, RecursiveSplit<[{
 
 //----------------------------------------------------------------------------//
 
+def : OCLBuiltinImpl<blt_fmin, RecursiveSplit<[{
+  switch (sizeof(param1) * 8) {
+    case 32:
+      return __builtin_fminf(param1, param2);
+    case 64:
+      return __builtin_fmin(param1, param2);
+  }
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_fmax, RecursiveSplit<[{
+  switch (sizeof(param1) * 8) {
+    case 32:
+      return __builtin_fmaxf(param1, param2);
+    case 64:
+      return __builtin_fmax(param1, param2);
+  }
+}]>>;
+
+//----------------------------------------------------------------------------//
+
 def : OCLBuiltinImpl<blt_pown, RecursiveSplit<[{
   switch (sizeof(param1) * 8) {
     case 32:
@@ -880,6 +990,44 @@ def : OCLBuiltinImpl<blt_rootn, RecursiveSplit<[{
 def : OCLBuiltinImpl<blt_rootn, RecursiveSplit<[{
   return __builtin_pow(param1, 1.0/param2);
 }]>, "ddSn">;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP1f">;
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP2f">;
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP4f">;
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP1d">;
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP2d">;
+
+def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
+  TYPE flr = __builtin_ocl_floor(param1);
+  *param2 = flr;
+  return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
+}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP4d">;
 
 //----------------------------------------------------------------------------//
 
@@ -1076,6 +1224,28 @@ def : OCLBuiltinImpl<blt_ldexp, RecursiveSplit<[{
 
 //----------------------------------------------------------------------------//
 
+def : OCLBuiltinImpl<blt_nan, RecursiveSplit<[{
+  union {
+    uint i;
+    float f;
+  } n;
+
+  n.i = (param1 | 0x7f800000U);
+  return n.f;
+}]>, "fUn">;
+
+def : OCLBuiltinImpl<blt_nan, RecursiveSplit<[{
+  union {
+    ulong l;
+    double d;
+  } n;
+
+  n.l = (param1 | 0x7f80000000000000U);
+  return n.d;
+}]>, "dUl">;
+
+//----------------------------------------------------------------------------//
+
 def : OCLBuiltinImpl<blt_ilogb, RecursiveSplit<[{
   switch (sizeof(param1) * 8) {
     case 32:
@@ -1087,22 +1257,168 @@ def : OCLBuiltinImpl<blt_ilogb, RecursiveSplit<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_half_sqrt, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_sqrtf(param1);
-    case 64:
-      return __builtin_sqrt(param1);
-  }
+def : OCLBuiltinImpl<blt_half_cos, RecursiveSplit<[{
+  return __builtin_ocl_cos(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_divide, RecursiveSplit<[{
+  return param1 / param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_exp, RecursiveSplit<[{
+  return __builtin_ocl_exp(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_exp2, RecursiveSplit<[{
+  return __builtin_ocl_exp2(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_exp10, RecursiveSplit<[{
+  return __builtin_ocl_exp10(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_log, RecursiveSplit<[{
+  return __builtin_ocl_log(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_log2, RecursiveSplit<[{
+  return __builtin_ocl_log2(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_log10, RecursiveSplit<[{
+  return __builtin_ocl_log10(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_powr, RecursiveSplit<[{
+  return __builtin_ocl_powr(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_recip, RecursiveSplit<[{
+  return 1.0f / param1;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_half_rsqrt, RecursiveSplit<[{
-      return 1.0f / __builtin_sqrtf(param1);
-}]>, "ff">;
+  return __builtin_ocl_rsqrt(param1);
+}]>>;
 
-def : OCLBuiltinImpl<blt_half_rsqrt, RecursiveSplit<[{
-      return 1.0 / __builtin_sqrt(param1);
-}]>, "dd">;
+//----------------------------------------------------------------------------//
 
+def : OCLBuiltinImpl<blt_half_sin, RecursiveSplit<[{
+  return __builtin_ocl_sin(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_sqrt, RecursiveSplit<[{
+  return __builtin_ocl_sqrt(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_half_tan, RecursiveSplit<[{
+  return __builtin_ocl_tan(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_cos, RecursiveSplit<[{
+  return __builtin_ocl_cos(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_divide, RecursiveSplit<[{
+  return param1 / param2;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_exp, RecursiveSplit<[{
+  return __builtin_ocl_exp(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_exp2, RecursiveSplit<[{
+  return __builtin_ocl_exp2(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_exp10, RecursiveSplit<[{
+  return __builtin_ocl_exp10(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_log, RecursiveSplit<[{
+  return __builtin_ocl_log(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_log2, RecursiveSplit<[{
+  return __builtin_ocl_log2(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_log10, RecursiveSplit<[{
+  return __builtin_ocl_log10(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_powr, RecursiveSplit<[{
+  return __builtin_ocl_powr(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_recip, RecursiveSplit<[{
+  return 1.0f / param1;
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_rsqrt, RecursiveSplit<[{
+  return __builtin_ocl_rsqrt(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_sin, RecursiveSplit<[{
+  return __builtin_ocl_sin(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_sqrt, RecursiveSplit<[{
+  return __builtin_ocl_sqrt(param1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_native_tan, RecursiveSplit<[{
+  return __builtin_ocl_tan(param1);
+}]>>;
