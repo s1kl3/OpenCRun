@@ -22,6 +22,7 @@ OCLGENTool = $(ToolDir)/oclgen
 
 OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
 
+NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
 
 BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
                 $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
