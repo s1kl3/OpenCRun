@@ -49,7 +49,7 @@ class MathBuiltin_fUn_dUl<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float, 
     ocl_u_int
   ],
-  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "fUi">,
+  [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "fUn">,
   OCLBuiltinVariant<[
     ocl_gentype_double, 
     ocl_u_long
@@ -91,13 +91,13 @@ class MathBuiltin_fff_ddd<string name> : OCLMultiBuiltin<name, [
     ocl_gentype_float,
     ocl_gentype_float
   ], 
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "ff">,
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "fff">,
   OCLBuiltinVariant<[
     ocl_gentype_double,
     ocl_gentype_double,
     ocl_gentype_double
   ], 
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "dd">
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "ddd">
 ]>;
 
 class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLMultiBuiltin<name, [
@@ -322,7 +322,7 @@ def blt_pow         : MathBuiltin_rrr<"pow">;
 def blt_powr        : MathBuiltin_rrr<"powr">;
 def blt_remainder   : MathBuiltin_rrr<"remainder">;
 
-def blt_atan2pi     : MathBuiltin_fff_ddd<"atanpi2">;
+def blt_atan2pi     : MathBuiltin_fff_ddd<"atan2pi">;
 
 def blt_fmin        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmin">;
 def blt_fmax        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmax">;
