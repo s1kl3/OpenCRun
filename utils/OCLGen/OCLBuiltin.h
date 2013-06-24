@@ -4,11 +4,23 @@
 #include "OCLType.h"
 
 #include <list>
+#include <map>
 
 namespace opencrun {
 
+//===----------------------------------------------------------------------===//
+// BuiltinSignature utils
+//===----------------------------------------------------------------------===//
+class OCLBuiltinVariant;
+
 typedef std::vector<const OCLBasicType *> BuiltinSignature;
-void SortBuiltinSignatureList(std::list<BuiltinSignature> &l);
+typedef std::list<BuiltinSignature> BuiltinSignatureList;
+
+void ExpandSignature(const OCLBuiltinVariant &B, BuiltinSignatureList &R);
+
+struct BuiltinSignatureCompare {
+  bool operator()(const BuiltinSignature &B1, const BuiltinSignature &B2) const;
+};
 
 //===----------------------------------------------------------------------===//
 // Param accessor
@@ -84,7 +96,7 @@ public:
   virtual ~OCLTypeConstraint();
 
   ConstraintKind getKind() const { return Kind; }
-  virtual bool apply(const std::vector<const OCLBasicType *> &Ops) const = 0;
+  virtual bool apply(const BuiltinSignature &Ops) const = 0;
   unsigned getMaxOperand() const { return MaxOperand; }
 
 private:
@@ -103,7 +115,10 @@ public:
     default: return false;
     }
   }
-  virtual bool apply(const std::vector<const OCLBasicType *> &Ops) const = 0;
+
+public:
+  virtual bool apply(const BuiltinSignature &Ops) const = 0;
+
 protected:
   OCLBinaryTypeConstraint(ConstraintKind K, 
                           const OCLParam &P1, const OCLParam &P2)
@@ -126,7 +141,7 @@ public:
   OCLSameTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_Same, P1, P2) {}
 
-  bool apply(const std::vector<const OCLBasicType *> &Ops) const;
+  bool apply(const BuiltinSignature &Ops) const;
 };
 
 class OCLSameDimTypeConstraint : public OCLBinaryTypeConstraint {
@@ -139,7 +154,7 @@ public:
   OCLSameDimTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameDim, P1, P2) {}
 
-  bool apply(const std::vector<const OCLBasicType *> &Ops) const;
+  bool apply(const BuiltinSignature &Ops) const;
 };
 
 class OCLSameBaseTypeConstraint : public OCLBinaryTypeConstraint {
@@ -152,7 +167,7 @@ public:
   OCLSameBaseTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBase, P1, P2) {}
 
-  bool apply(const std::vector<const OCLBasicType *> &Ops) const;
+  bool apply(const BuiltinSignature &Ops) const;
 };
 
 class OCLSameBaseSizeTypeConstraint : public OCLBinaryTypeConstraint {
@@ -165,7 +180,7 @@ public:
   OCLSameBaseSizeTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBaseSize, P1, P2) {}
 
-  bool apply(const std::vector<const OCLBasicType *> &Ops) const;
+  bool apply(const BuiltinSignature &Ops) const;
 };
 
 class OCLSameBaseKindTypeConstraint : public OCLBinaryTypeConstraint {
@@ -178,155 +193,7 @@ public:
   OCLSameBaseKindTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBaseSize, P1, P2) {}
 
-  bool apply(const std::vector<const OCLBasicType *> &Ops) const;
-};
-
-//===----------------------------------------------------------------------===//
-// OCLEmitTypedef hierarchy 
-//===----------------------------------------------------------------------===//
-
-class OCLEmitTypedef {
-public:
-  enum TypedefKind {
-    TK_Actual,
-    TK_Unsigned
-  };
-
-protected:
-  OCLEmitTypedef(TypedefKind kind, llvm::StringRef ty, const OCLParam &op) : 
-    Kind(kind),
-    TypeName(ty),
-    Op(op) { }
-
-public:
-  TypedefKind getKind() const { return Kind; }
-  std::string getName() const { return TypeName; }
-  const OCLParam &getParam() const { return Op; }
-
-private:
-  TypedefKind Kind;
-  std::string TypeName;
-  const OCLParam &Op;
-};
-
-class OCLEmitTypedefActual : public OCLEmitTypedef {
-public:
-  static bool classof(const OCLEmitTypedef *E) {
-    return E->getKind() == TK_Actual;
-  }
-
-public:
-  OCLEmitTypedefActual(llvm::StringRef ty, const OCLParam &op) :
-    OCLEmitTypedef(TK_Actual, ty, op) { }
-};
-
-class OCLEmitTypedefUnsigned : public OCLEmitTypedef {
-public:
-  static bool classof(const OCLEmitTypedef *E) {
-    return E->getKind() == TK_Unsigned;
-  }
-
-public:
-  OCLEmitTypedefUnsigned(llvm::StringRef ty, const OCLParam &op) :
-    OCLEmitTypedef(TK_Unsigned, ty, op) { }
-};
-
-//===----------------------------------------------------------------------===//
-// OCLStrategy hierarchy 
-//===----------------------------------------------------------------------===//
-
-class OCLStrategy {
-public:
-  enum StrategyKind {
-    SK_RecursiveSplit,
-    SK_DirectSplit,
-    SK_MergeSplit,
-    SK_TemplateStrategy
-  };
-
-public:
-  typedef std::vector<const OCLEmitTypedef *> TypedefsContainer;
-
-public:
-  typedef TypedefsContainer::const_iterator iterator;
-
-public:
-  iterator begin() const { return Typedefs.begin(); }
-  iterator end() const { return Typedefs.end(); }
-
-protected:
-  OCLStrategy(StrategyKind kind,
-              llvm::StringRef scalarimpl,
-              TypedefsContainer &typedefs) : 
-    Kind(kind),
-    ScalarImpl(scalarimpl),
-    Typedefs(typedefs) { }
-
-public:
-  StrategyKind getKind() const { return Kind; }
-  std::string getScalarImpl() const { return ScalarImpl; }
-
-private:
-  StrategyKind Kind;
-  std::string ScalarImpl;
-  TypedefsContainer Typedefs;
-};
-
-class RecursiveSplit : public OCLStrategy {
-public:
-  static bool classof(const OCLStrategy *S) {
-    return S->getKind() == SK_RecursiveSplit;
-  }
-
-public:
-  RecursiveSplit(llvm::StringRef scalarimpl, 
-                 TypedefsContainer &typedefs) : 
-    OCLStrategy(SK_RecursiveSplit, scalarimpl, typedefs) { }
-};
-
-class DirectSplit : public OCLStrategy {
-public:
-  static bool classof(const OCLStrategy *S) {
-    return S->getKind() == SK_DirectSplit;
-  }
-
-public:
-  DirectSplit(llvm::StringRef scalarimpl, 
-              TypedefsContainer &typedefs) : 
-    OCLStrategy(SK_DirectSplit, scalarimpl, typedefs) { }
-};
-
-class MergeSplit : public OCLStrategy {
-public:
-  static bool classof(const OCLStrategy *S) {
-    return S->getKind() == SK_MergeSplit;
-  }
-
-public:
-  MergeSplit(llvm::StringRef scalarimpl,
-             llvm::StringRef mergeop,
-             TypedefsContainer &typedefs) : 
-    OCLStrategy(SK_MergeSplit, scalarimpl, typedefs),
-    MergeOp(mergeop) { }
-
-public:
-  std::string getMergeOp() const { return MergeOp; }
-
-private:
-  std::string MergeOp;
-};
-
-
-class TemplateStrategy : public OCLStrategy {
-public:
-  static bool classof(const OCLStrategy *S) {
-    return S->getKind() == SK_TemplateStrategy;
-  }
-
-public:
-  TemplateStrategy(llvm::StringRef scalarimpl,
-                   TypedefsContainer &typedefs) :
-    OCLStrategy(SK_TemplateStrategy, scalarimpl, typedefs) { }
+  bool apply(const BuiltinSignature &Ops) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -341,66 +208,243 @@ public:
 public:
   OCLBuiltinVariant(OperandsContainer &Ops, 
                     ConstraintsContainer &Constrs,
-                    llvm::StringRef VarId)
-   : Operands(Ops), Constraints(Constrs), VariantId(VarId) { }
+                    llvm::StringRef VarName)
+   : Operands(Ops), Constraints(Constrs), VariantName(VarName) { }
 
 public:
   const OCLType &getOperand(unsigned i) const { return *Operands[i]; }
   size_t size() const { return Operands.size(); }
   const ConstraintsContainer &getConstraints() const { return Constraints; }
-  std::string getVariantId() const { return VariantId; }
+  std::string getVariantName() const { return VariantName; }
 
 private:
   OperandsContainer Operands;
   ConstraintsContainer Constraints;
-  std::string VariantId;
+  std::string VariantName;
 };
 
 class OCLBuiltin {
 public:
-  typedef std::vector<OCLBuiltinVariant> VariantsContainer;
-  typedef VariantsContainer::const_iterator iterator;
+  typedef std::map<llvm::StringRef, const OCLBuiltinVariant*> VariantsMap;
+  typedef VariantsMap::const_iterator iterator;
 
 public:
-  OCLBuiltin(llvm::StringRef name, 
-             llvm::StringRef group,
-             const VariantsContainer &v)
-   : Name(name), Group(group), Variants(v) { }
+  OCLBuiltin(llvm::StringRef name, llvm::StringRef group, const VariantsMap &v)
+   : Name(name), Group(group), Variants(v) {}
+
+  ~OCLBuiltin();
 
 public:
   std::string getName() const { return Name; }
   std::string getGroup() const { return Group; }
   iterator begin() const { return Variants.begin(); }
   iterator end() const { return Variants.end(); }
+  iterator find(llvm::StringRef V) const { return Variants.find(V); }
 
 private:
   std::string Name;
   std::string Group;
-  VariantsContainer Variants;
+  VariantsMap Variants;
 };
 
 //===----------------------------------------------------------------------===//
 // OCLBuiltinImpl
 //===----------------------------------------------------------------------===//
 
+class OCLDecl {
+public:
+  enum DeclKind {
+    DK_Typedef,
+    DK_TypedefId,
+    DK_TypedefUnsigned
+  };
+
+protected:
+  OCLDecl(DeclKind K) : Kind(K) {}
+
+public:
+  DeclKind getKind() const { return Kind; }
+
+private:
+  DeclKind Kind;
+};
+
+class OCLTypedefDecl : public OCLDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    switch (D->getKind()) {
+    case DK_Typedef: case DK_TypedefId: case DK_TypedefUnsigned:
+      return true;
+    default: return false;
+    }
+  }
+
+protected:
+  OCLTypedefDecl(DeclKind K, llvm::StringRef name, const OCLParam &p)
+   : OCLDecl(K), Name(name), Param(p) {}
+
+public:
+  std::string getName() const { return Name; }
+  const OCLParam &getParam() const { return Param; }
+
+private:
+  std::string Name;
+  const OCLParam &Param;
+};
+
+class OCLTypedefIdDecl : public OCLTypedefDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_TypedefId;
+  }
+
+public:
+  OCLTypedefIdDecl(llvm::StringRef name, const OCLParam &p)
+   : OCLTypedefDecl(DK_TypedefId, name, p) {}
+};
+
+class OCLTypedefUnsignedDecl : public OCLTypedefDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_TypedefUnsigned;
+  }
+
+public:
+  OCLTypedefUnsignedDecl(llvm::StringRef name, const OCLParam &p)
+   : OCLTypedefDecl(DK_TypedefUnsigned, name, p) {}
+};
+
+class OCLReduction {
+public:
+  enum ReductionKind {
+    RK_InfixBinAssoc
+  };
+
+protected:
+  OCLReduction(ReductionKind K) : Kind(K) {}
+
+public:
+  ReductionKind getKind() const { return Kind; }
+
+private:
+  ReductionKind Kind;
+};
+
+class OCLInfixBinAssocReduction : public OCLReduction {
+public:
+  static bool classof(const OCLReduction *R) {
+    return R->getKind() == RK_InfixBinAssoc;
+  }
+
+public:
+  OCLInfixBinAssocReduction(llvm::StringRef op)
+   : OCLReduction(RK_InfixBinAssoc), Operator(op) {}
+
+  std::string getOperator() const { return Operator; }
+
+private:
+  std::string Operator;
+};
+
+class OCLStrategy {
+public:
+  enum StrategyKind {
+    SK_RecursiveSplit,
+    SK_DirectSplit,
+    SK_MergeSplit,
+    SK_TemplateStrategy
+  };
+
+public:
+  typedef std::vector<const OCLDecl *> DeclsContainer;
+
+public:
+  typedef DeclsContainer::const_iterator decl_iterator;
+
+public:
+  decl_iterator begin() const { return Decls.begin(); }
+  decl_iterator end() const { return Decls.end(); }
+
+protected:
+  OCLStrategy(StrategyKind kind, DeclsContainer &decls)
+   : Kind(kind), Decls(decls) {}
+
+public:
+  StrategyKind getKind() const { return Kind; }
+
+private:
+  StrategyKind Kind;
+  DeclsContainer Decls;
+};
+
+class OCLRecursiveSplit : public OCLStrategy {
+public:
+  static bool classof(const OCLStrategy *S) {
+    return S->getKind() == SK_RecursiveSplit;
+  }
+
+public:
+  OCLRecursiveSplit(llvm::StringRef scalarimpl, DeclsContainer &decls,
+                    const OCLReduction *red = 0)
+   : OCLStrategy(SK_RecursiveSplit, decls), ScalarImpl(scalarimpl), 
+     Reduction(red) {}
+
+  std::string getScalarImpl() const { return ScalarImpl; }
+  const OCLReduction *getReduction() const { return Reduction; }
+
+private:
+  std::string ScalarImpl;
+  const OCLReduction *Reduction;
+};
+
+class OCLDirectSplit : public OCLStrategy {
+public:
+  static bool classof(const OCLStrategy *S) {
+    return S->getKind() == SK_DirectSplit;
+  }
+
+public:
+  OCLDirectSplit(llvm::StringRef scalarimpl, DeclsContainer &decls)
+   : OCLStrategy(SK_DirectSplit, decls), ScalarImpl(scalarimpl) {}
+
+  std::string getScalarImpl() const { return ScalarImpl; }
+
+private:
+  std::string ScalarImpl;
+};
+
+class OCLTemplateStrategy : public OCLStrategy {
+public:
+  static bool classof(const OCLStrategy *S) {
+    return S->getKind() == SK_TemplateStrategy;
+  }
+
+public:
+  OCLTemplateStrategy(llvm::StringRef impl, DeclsContainer &decls)
+   : OCLStrategy(SK_TemplateStrategy, decls), TemplateImpl(impl) {}
+
+  std::string getTemplateImpl() const { return TemplateImpl; }
+
+private:
+  std::string TemplateImpl;
+};
+
 class OCLBuiltinImpl {
 public:
   OCLBuiltinImpl(const OCLBuiltin &builtin, 
                  const OCLStrategy &strategy,
-                 const std::string variantid = "") 
-    : BuiltIn(builtin),
-      Strategy(strategy),
-      VariantId(variantid) { }
+                 const std::string varname) 
+    : BuiltIn(builtin), Strategy(strategy), VariantName(varname) { }
 
 public:
   const OCLBuiltin &getBuiltin() const { return BuiltIn; }
   const OCLStrategy &getStrategy() const { return Strategy; }
-  const std::string getVariantId() const { return VariantId; }
+  const std::string getVariantName() const { return VariantName; }
 
 private:
   const OCLBuiltin &BuiltIn;
   const OCLStrategy &Strategy;
-  const std::string VariantId;
+  std::string VariantName;
 };
 
 //===----------------------------------------------------------------------===//
@@ -419,23 +463,17 @@ private:
 };
 
 //===----------------------------------------------------------------------===//
-// OCLBuiltins Loader
+// OCLBuiltins and OCLBuiltinImpls Loaders
 //===----------------------------------------------------------------------===//
 
 typedef std::vector<const OCLBuiltin *> OCLBuiltinsContainer;
 
 void LoadOCLBuiltins(const llvm::RecordKeeper &R, OCLBuiltinsContainer &B);
 
-void ExpandSignature(const OCLBuiltinVariant &B, std::list<BuiltinSignature> &R);
-
-
-//===----------------------------------------------------------------------===//
-// OCLBuiltinImpls Loader
-//===----------------------------------------------------------------------===//
-
 typedef std::vector<const OCLBuiltinImpl *> OCLBuiltinImplsContainer;
 
-void LoadOCLBuiltinImpls(const llvm::RecordKeeper &R, OCLBuiltinImplsContainer &B);
+void LoadOCLBuiltinImpls(const llvm::RecordKeeper &R, 
+                         OCLBuiltinImplsContainer &B);
 
 }
 

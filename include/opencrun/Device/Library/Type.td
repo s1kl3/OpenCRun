@@ -1,6 +1,8 @@
 class OCLType;
 
-class OCLBasicType : OCLType;
+class OCLBasicType : OCLType {
+  list<OCLPredicate> Predicates = [];
+}
 
 class OCLOpaqueType<string name> : OCLBasicType {
   string Name = name;
@@ -22,7 +24,7 @@ def ocl_mod_const : OCLModifier;
 
 class OCLPointerType<OCLType base, OCLAddressSpace as, 
                      list<OCLModifier> mod = []> 
- : OCLBasicType, Require<[as]> {
+ : OCLBasicType, Requires<[as]> {
   OCLType BaseType = base;
   OCLAddressSpace AddressSpace = as;
   list<OCLModifier> Modifier = mod;
@@ -41,6 +43,7 @@ class OCLRealType<int bitwidth> : OCLScalarType<bitwidth>;
 class OCLVectorType<OCLScalarType base, int w> : OCLBasicType {
   OCLScalarType BaseType = base;
   int Width = w;
+  let Predicates = base.Predicates;
 }
 
 class OCLGroupType<list<OCLType> members> : OCLType {
@@ -64,9 +67,9 @@ def ocl_uint : OCLIntegerType<32, 1>;
 def ocl_long : OCLIntegerType<64, 0>;
 def ocl_ulong : OCLIntegerType<64, 1>;
 
-def ocl_half : OCLRealType<16>, Require<[ocl_ext_cl_khr_fp16]>;
+def ocl_half : OCLRealType<16>, Requires<[ocl_ext_cl_khr_fp16]>;
 def ocl_float : OCLRealType<32>;
-def ocl_double : OCLRealType<64>, Require<[ocl_ext_cl_khr_fp64]>;
+def ocl_double : OCLRealType<64>, Requires<[ocl_ext_cl_khr_fp64]>;
 
 defm ocl_char : OCLVectors<ocl_char>;
 defm ocl_uchar : OCLVectors<ocl_uchar>;
@@ -323,6 +326,10 @@ def ocl_gentype_float_geom : OCLGroupType<[
 
 def ocl_gentype_double_geom : OCLGroupType<[
   ocl_double, ocl_double_2, ocl_double_3, ocl_double_4
+]>;
+
+def ocl_gentype_real_geom : OCLGroupType<[
+  ocl_gentype_float_geom, ocl_gentype_double_geom
 ]>;
 
 // Integer builtins custom types

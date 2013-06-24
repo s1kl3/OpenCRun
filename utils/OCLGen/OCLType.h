@@ -64,10 +64,10 @@ public:
     }
   }
 
-  const llvm::BitVector &getPredicates() const { return Predicates; }
-  llvm::BitVector &getPredicates() { return Predicates; }
-
+public:
   virtual bool compareLess(const OCLType *T) const = 0;
+  const llvm::BitVector &getPredicates() const { return Predicates; }
+  void setPredicates(const llvm::BitVector &preds) { Predicates = preds; }
 
 protected:
   OCLBasicType(TypeKind SubType, llvm::StringRef name) 
@@ -107,9 +107,8 @@ protected:
    : OCLBasicType(SubType, BuildName(name)), BitWidth(bits) {}
 
 public:
-  unsigned getBitWidth() const { return BitWidth; }
-
   virtual bool compareLess(const OCLType *T) const = 0;
+  unsigned getBitWidth() const { return BitWidth; }
 
 private:
   std::string BuildName(llvm::StringRef);
@@ -125,13 +124,12 @@ public:
   }
 
 public:
-  OCLIntegerType(llvm::StringRef name, unsigned bits, bool unsign)
-   : OCLScalarType(TK_Integer, name, bits), Unsigned(unsign) {}
-
-  bool isSigned() const { return !Unsigned; }
-  bool isUnsigned() const { return Unsigned; }
+  OCLIntegerType(llvm::StringRef name, unsigned bits, bool nosign)
+   : OCLScalarType(TK_Integer, name, bits), Unsigned(nosign) {}
 
   virtual bool compareLess(const OCLType *T) const;
+  bool isSigned() const { return !Unsigned; }
+  bool isUnsigned() const { return Unsigned; }
 
 private:
   bool Unsigned;
@@ -161,10 +159,9 @@ public:
    : OCLBasicType(OCLType::TK_Vector, BuildName(base, w)), 
      BaseType(base), Width(w) {}
 
+  virtual bool compareLess(const OCLType *T) const;
   const OCLScalarType &getBaseType() const { return BaseType; }
   unsigned getWidth() const { return Width; }
-
-  virtual bool compareLess(const OCLType *T) const;
 
 private:
   std::string BuildName(const OCLScalarType &, unsigned);
@@ -198,11 +195,11 @@ public:
    : OCLBasicType(TK_Pointer, BuildName(base, as, mods)), 
      BaseType(base), AddrSpace(as), Modifiers(mods) {}
 
+  virtual bool compareLess(const OCLType *T) const;
   const OCLType &getBaseType() const { return BaseType; }
   AddressSpace getAddressSpace() const { return AddrSpace; }
   unsigned getModifierFlags() const { return Modifiers; }
   bool hasModifier(Modifier m) const { return Modifiers & m; }
-  virtual bool compareLess(const OCLType *T) const;
 
 private:
   std::string BuildName(const OCLType &, AddressSpace, unsigned);
@@ -227,12 +224,12 @@ public:
   OCLGroupType(llvm::StringRef name, const std::set<const OCLBasicType*> &elems)
    : OCLType(TK_Group, name), Elements(elems.begin(), elems.end()) {}
 
+  virtual bool compareLess(const OCLType *T) const;
   const_iterator begin() const { return Elements.begin(); }  
   const_iterator end() const { return Elements.end(); }  
   iterator begin() { return Elements.begin(); }  
   iterator end() { return Elements.end(); }
   size_t size() const { return Elements.size(); }
-  virtual bool compareLess(const OCLType *T) const;
 
 private:
   ElementContainer Elements;
@@ -261,14 +258,19 @@ void LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T);
 // Types table singleton
 //===----------------------------------------------------------------------===//
 
+typedef std::pair<OCLPointerType::AddressSpace, unsigned> OCLPtrDesc;
+typedef std::vector<OCLPtrDesc> OCLPtrStructure;
+
 class OCLTypesTableImpl;
 
 class OCLTypesTable {
 public:
   static const OCLType &get(llvm::Record &R);
 
-  static const OCLVectorType *getVectorType(const OCLScalarType &SType, 
-                                     unsigned Width);
+  static const OCLVectorType *getVectorType(const OCLScalarType &Base, 
+                                            unsigned Width);
+  static const OCLPointerType *getPointerType(const OCLBasicType &Base,
+                                              const OCLPtrStructure &PtrS);
 
 private:
   static llvm::OwningPtr<OCLTypesTableImpl> Impl;

@@ -274,7 +274,7 @@ def : OCLBuiltinImpl<blt_clz, RecursiveSplit<[{
   }
 
   return n;
-}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>>;
+}], [TypedefId<"TYPE", Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -332,7 +332,7 @@ def : OCLBuiltinImpl<blt_mul_hi, RecursiveSplit<[{
   c += lo < lo_tmp;
 
   return xy_hh + ((TYPE)xy_lh >> shamt) + ((TYPE)xy_hl >> shamt) + c;  
-}], [OCLEmitTypedefActual<"TYPE", Id<0>>, OCLEmitTypedefUnsigned<"UTYPE", Id<0>>]>>;
+}], [TypedefId<"TYPE", Id<0>>, TypedefUnsigned<"UTYPE", Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -364,7 +364,7 @@ def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
   TYPE max_val = ~0;
 
   return (param1 > (max_val - param2)) ? max_val : param1 + param2;
-}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>, "UiUiUi">;
+}], [TypedefId<"TYPE", Id<0>>]>, "UiUiUi">;
 
 def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
   UTYPE max_val = (UTYPE)~0 >> 1; 
@@ -377,7 +377,7 @@ def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
   else
     return param1 + param2;
 }],
-[OCLEmitTypedefActual<"TYPE", Id<0>>, OCLEmitTypedefUnsigned<"UTYPE", Id<0>>]>,
+[TypedefId<"TYPE", Id<0>>, TypedefUnsigned<"UTYPE", Id<0>>]>,
 "SiSiSi">;
 
 //----------------------------------------------------------------------------//
@@ -397,7 +397,7 @@ def : OCLBuiltinImpl<blt_sub_sat, RecursiveSplit<[{
   else
     return param1 - param2;
 }],
-[OCLEmitTypedefActual<"TYPE", Id<0>>, OCLEmitTypedefUnsigned<"UTYPE", Id<0>>]>, 
+[TypedefId<"TYPE", Id<0>>, TypedefUnsigned<"UTYPE", Id<0>>]>, 
 "SiSiSi">;
 
 //----------------------------------------------------------------------------//
@@ -410,7 +410,7 @@ def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
 
   return ((param2 != 0) && (param1 > (max_val - param3)/param2)) ?
     max_val : param1 * param2 + param3;
-}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>, "UiUiUiUi">;
+}], [TypedefId<"TYPE", Id<0>>]>, "UiUiUiUi">;
 
 def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
   if ((param1 == 0) || (param2 == 0))
@@ -426,7 +426,7 @@ def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
   else
     return param1 * param2 + param3;
 }], 
-[OCLEmitTypedefActual<"TYPE", Id<0>>, OCLEmitTypedefUnsigned<"UTYPE", Id<0>>]>,
+[TypedefId<"TYPE", Id<0>>, TypedefUnsigned<"UTYPE", Id<0>>]>,
 "SiSiSiSi">;
 
 //----------------------------------------------------------------------------//
@@ -451,5 +451,5 @@ def : OCLBuiltinImpl<blt_clamp_int, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_upsample, RecursiveSplit<[{
   return ((RETTYPE)param1 << (sizeof(param1) * 8)) | (RETTYPE)param2;
-}], [OCLEmitTypedefActual<"RETTYPE", Id<0>>]>>;
+}], [TypedefId<"RETTYPE", Id<0>>]>>;
 

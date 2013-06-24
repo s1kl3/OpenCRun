@@ -36,58 +36,21 @@ class isSameBaseKindAs<OCLParam op1, OCLParam op2>
 
 //----------------------------------------------------------------------------//
 
-class OCLEmitTypedef<string typename, OCLParam op> {
-  string TypeName = typename;
-  OCLParam Op = op;
-}
-
-class OCLEmitTypedefActual<string typename, OCLParam op>
-  : OCLEmitTypedef<typename, op>;
-
-class OCLEmitTypedefUnsigned<string typename, OCLParam op>
-  : OCLEmitTypedef<typename, op>;
-
-//----------------------------------------------------------------------------//
-
-class OCLStrategy<code scalarimpl, list<OCLEmitTypedef> typedefs> {
-  code ScalarImpl = scalarimpl;
-  list<OCLEmitTypedef> Typedefs = typedefs;
-}
-
-class RecursiveSplit<code scalarimpl, list<OCLEmitTypedef> typedefs = []> 
-  : OCLStrategy<scalarimpl, typedefs>;
-
-class DirectSplit<code scalarimpl, list<OCLEmitTypedef> typedefs = []> 
-  : OCLStrategy<scalarimpl, typedefs>;
-
-class MergeSplit<code scalarimpl, string mergeop, list<OCLEmitTypedef> typedefs = []>
-  : OCLStrategy<scalarimpl, typedefs> {
-  string MergeOp = mergeop;
-}
-
-class TemplateStrategy<code scalarimpl, list <OCLEmitTypedef> typedefs = []>
-  : OCLStrategy<scalarimpl, typedefs>;
-
-//----------------------------------------------------------------------------//
-
-class OCLBuiltinVariant<list<OCLType> ops, 
-                        list<OCLTypeConstraint> constrs, 
-                        string variantid = ""> {
+class OCLBuiltinVariant<list<OCLType> ops, list<OCLTypeConstraint> constrs,
+                        string name> {
+  string VariantName = name;
   list<OCLType> Operands = ops;
   list<OCLTypeConstraint> Constraints = constrs;
-  string VariantId = variantid;
 }
-
-//----------------------------------------------------------------------------//
 
 class OCLBuiltin<string name> {
   string Name = name;
-  string Group = ?;
+  string Group = "";
 }
 
 class OCLSimpleBuiltin<string name, list<OCLType> ops, 
                        list<OCLTypeConstraint> constrs>
-  : OCLBuiltin<name>, OCLBuiltinVariant<ops, constrs>;
+  : OCLBuiltin<name>, OCLBuiltinVariant<ops, constrs, "">;
 
 class OCLMultiBuiltin<string name, list<OCLBuiltinVariant> var>
  : OCLBuiltin<name> {
@@ -96,20 +59,56 @@ class OCLMultiBuiltin<string name, list<OCLBuiltinVariant> var>
 
 //----------------------------------------------------------------------------//
 
-class OCLBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, string variantid = ""> {
+class OCLDeclaration;
+
+class OCLTypedef<string name, OCLParam param> : OCLDeclaration {
+  string Name = name;
+  OCLParam Param = param;
+}
+
+class TypedefId<string typename, OCLParam param>
+ : OCLTypedef<typename, param>;
+
+class TypedefUnsigned<string typename, OCLParam param>
+ : OCLTypedef<typename, param>;
+
+
+class OCLStrategy<list<OCLDeclaration> decls> {
+  list<OCLDeclaration> Declarations = decls;
+}
+
+class OCLReduction;
+
+def OCLDefaultReduction : OCLReduction;
+
+class InfixBinAssocReduction<code op> : OCLReduction {
+  code Operator = op;
+}
+
+class RecursiveSplit<code scalarimpl, list<OCLDeclaration> decls = []> 
+ : OCLStrategy<decls> {
+  code ScalarImpl = scalarimpl;
+  OCLReduction Reduction = OCLDefaultReduction;
+}
+
+class RecursiveSplitReduction<code scalarimpl, OCLReduction red,
+                              list<OCLDeclaration> decls = []> 
+ : RecursiveSplit<scalarimpl, decls> {
+  let Reduction = red;
+}
+
+class DirectSplit<code scalarimpl, list<OCLDeclaration> decls = []> 
+ : OCLStrategy<decls> {
+  code ScalarImpl = scalarimpl;
+}
+
+class TemplateStrategy<code impl, list<OCLDeclaration> decls = []>
+  : OCLStrategy<decls> {
+  code TemplateImpl = impl;
+}
+
+class OCLBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, string varname = ""> {
   OCLBuiltin BuiltIn = builtin;
   OCLStrategy Strategy = s;
-  string VariantId = variantid;
+  string VariantName = varname;
 }
-
-class CustomImpl<list<OCLBasicType> params, code impl> {
-  list<OCLBasicType> Params = params;
-  code Implementation = impl;
-}
-
-class CustomStrategy<bit partial, list<CustomImpl> impls> {
-  bit IsPartial = partial;
-  list<CustomImpl> Implementations = impls;
-}
-
-

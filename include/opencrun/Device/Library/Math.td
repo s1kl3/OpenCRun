@@ -997,37 +997,37 @@ def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP1f">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP1f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP2f">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP2f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ffP4f">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP4f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP1d">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP1d">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP2d">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP2d">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>, "ddP4d">;
+}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP4d">;
 
 //----------------------------------------------------------------------------//
 
@@ -1038,7 +1038,7 @@ def : OCLBuiltinImpl<blt_frexp, DirectSplit<[{
     case 64:
       return __builtin_frexp(param1, (TYPE *) param2);
   }
-}], [OCLEmitTypedefActual<"TYPE", Pointee<2>>]>>;
+}], [TypedefId<"TYPE", Pointee<2>>]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -1170,7 +1170,7 @@ def : OCLBuiltinImpl<blt_remquo, DirectSplit<[{
     case 64:
       return __builtin_remquo(param1, param2, (TYPE *) param3);
   }
-}], [OCLEmitTypedefActual<"TYPE", Pointee<3>>]>>;
+}], [TypedefId<"TYPE", Pointee<3>>]>, "rrrP4Sn">;
 
 //----------------------------------------------------------------------------//
 
@@ -1209,7 +1209,7 @@ def : OCLBuiltinImpl<blt_sincos, DirectSplit<[{
       *param2 = __builtin_cos(param1);
       return __builtin_sin(param1);
   }
-}]>>;
+}]>, "rrP4r">;
 
 //----------------------------------------------------------------------------//
 

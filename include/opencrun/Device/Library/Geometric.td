@@ -22,6 +22,12 @@ class GeometricBuiltin_Cfff<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<1>, Id<2>>]
 >;
 
+class GeometricBuiltin_Crrr<string name> : OCLSimpleBuiltin<
+  name,
+  [ocl_sgentype_real, ocl_gentype_real_geom, ocl_gentype_real_geom],
+  [isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>,Id<1>>]
+>;
+
 class GeometricBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float_geom,
@@ -109,7 +115,7 @@ OCLMultiBuiltin<name, [
 
 def blt_cross : GeometricBuiltin_V3fV3fV3f_V4fV4fV4f_V3dV3dV3d_V4dV4dV4d<"cross">;
 
-def blt_dot             : GeometricBuiltin_Cfff_Cddd<"dot">;
+def blt_dot             : GeometricBuiltin_Crrr<"dot">;
 def blt_distance        : GeometricBuiltin_Cfff_Cddd<"distance">;
 
 def blt_length          : GeometricBuiltin_Cff_Cdd<"length">;
@@ -154,9 +160,9 @@ def : OCLBuiltinImpl<blt_cross, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_dot, MergeSplit<[{
+def : OCLBuiltinImpl<blt_dot, RecursiveSplitReduction<[{
   return param1 * param2;
-}], "+">>;
+}], InfixBinAssocReduction<[{ + }]>>>;
 
 //----------------------------------------------------------------------------//
 

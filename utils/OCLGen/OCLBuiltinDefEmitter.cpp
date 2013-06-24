@@ -19,20 +19,19 @@ OCLBuiltinsContainer OCLBuiltins;
 }
 
 void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
-  std::list<BuiltinSignature> Alts;
-
+  BuiltinSignatureList Alts;
 
   OS << "// Builtin: " << B.getName() << "\n\n";
 
   OS << "#define " << B.getName() << " __builtin_ocl_" << B.getName() << "\n\n";
 
   for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
-    const OCLBuiltinVariant &BV = *BI;
+    const OCLBuiltinVariant &BV = *BI->second;
 
     ExpandSignature(BV, Alts);
   }
 
-  SortBuiltinSignatureList(Alts);
+  Alts.sort(BuiltinSignatureCompare());
 
   llvm::BitVector GroupPreds;
 

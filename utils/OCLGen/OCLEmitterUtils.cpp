@@ -106,24 +106,3 @@ void opencrun::EmitBuiltinGroupEnd(llvm::raw_ostream &OS,
   if (!Group.size()) return;
   OS << "#endif // OPENCRUN_BUILTIN_" << Group << "\n";
 }
-
-bool opencrun::IsScalarAlternative(BuiltinSignature &Sign) {
-  bool IsScalar = true;
-
-  for (unsigned I = 0, E = Sign.size(); I != E && IsScalar; ++I) {
-    if (llvm::isa<const OCLScalarType>(Sign[I]))
-      continue;
-    else if(llvm::isa<const OCLPointerType>(Sign[I])) {
-      const OCLPointerType *P = llvm::cast<const OCLPointerType>(Sign[I]);
-
-      if (!llvm::isa<const OCLScalarType>(P->getBaseType()))
-        IsScalar = false;
-
-    } else {
-      IsScalar = false;
-    }
-  }
-
-  return IsScalar;
-}
-

@@ -99,6 +99,26 @@ class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLMultiBuiltin<name, [
 
 class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
+    ocl_gentype_real, 
+    ocl_gentype_real, 
+    ocl_gentype_real,
+    ocl_gentype_real
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
+  "rrrr">,
+  OCLBuiltinVariant<[
+    ocl_vgentype_real,
+    ocl_vgentype_real,
+    ocl_sgentype_real,
+    ocl_sgentype_real
+  ],
+  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
+  "VrVrCrCr">
+]>;
+
+class CommonBuiltin_ffff_dddd_VfCfCfVf_VdCdCdVd<string name> : 
+  OCLMultiBuiltin<name, [
+  OCLBuiltinVariant<[
     ocl_gentype_float, 
     ocl_gentype_float, 
     ocl_gentype_float,
@@ -120,16 +140,16 @@ class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
     ocl_float,
     ocl_float
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
-  "VfVfCfCf">,
+  [isSameAs<Id<0>, Id<3>>, isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>, Id<2>>],
+  "VfCfCfVf">,
  OCLBuiltinVariant<[
     ocl_vgentype_double,
     ocl_vgentype_double,
     ocl_double,
     ocl_double
   ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<2>, Id<3>>, isSameBaseAs<Id<1>, Id<2>>],
-  "VdVdCdCd">
+  [isSameAs<Id<0>, Id<3>>, isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>, Id<2>>],
+  "VdCdCdVd">
 ]>;
 
 }
@@ -152,7 +172,7 @@ def blt_mix         : CommonBuiltin_rrrr_VrVrVrCr<"mix">;
 
 def blt_clamp       : CommonBuiltin_rrrr_VrVrCrCr<"clamp">;
 
-def blt_smoothstep  : CommonBuiltin_rrrr_VrCrCrVr<"smoothstep">;
+def blt_smoothstep  : CommonBuiltin_ffff_dddd_VfCfCfVf_VdCdCdVd<"smoothstep">;
 
 //===----------------------------------------------------------------------===//
 // Common builtin implementations

@@ -123,6 +123,10 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
   return S1->getKind() == S2->getKind();
 }
 
+OCLBuiltin::~OCLBuiltin() {
+  llvm::DeleteContainerSeconds(Variants);
+}
+
 static bool CompareLess(const OCLBuiltin *B1, const OCLBuiltin *B2) {
   return B1->getGroup() < B2->getGroup() ||
          (B1->getGroup() == B2->getGroup() && B1->getName() < B2->getName());
@@ -146,8 +150,6 @@ void opencrun::LoadOCLBuiltinImpls(const llvm::RecordKeeper &R,
 
   for (unsigned I = 0, E = RawVects.size(); I < E; ++I)
     B.push_back(&OCLBuiltinsTable::getBuiltinImpl(*RawVects[I]));
-
-  //std::sort(B.begin(), B.end(), CompareLess);
 }
 
 //===----------------------------------------------------------------------===//
@@ -162,7 +164,8 @@ public:
 
   typedef std::map<llvm::Record *, const OCLBuiltinImpl *> OCLBuiltinImplsMap;
   typedef std::map<llvm::Record *, const OCLStrategy *> OCLStrategiesMap;
-  typedef std::map<llvm::Record *, const OCLEmitTypedef *> OCLEmitTypedefsMap;
+  typedef std::map<llvm::Record *, const OCLReduction *> OCLReductionsMap;
+  typedef std::map<llvm::Record *, const OCLDecl *> OCLDeclsMap;
 
 public:
   ~OCLBuiltinsTableImpl() { 
@@ -172,7 +175,8 @@ public:
 
     llvm::DeleteContainerSeconds(BuiltinImpls);
     llvm::DeleteContainerSeconds(Strategies);
-    llvm::DeleteContainerSeconds(Typedefs);
+    llvm::DeleteContainerSeconds(Reductions);
+    llvm::DeleteContainerSeconds(Decls);
   }
 
 public:
@@ -211,11 +215,18 @@ public:
     return *Strategies[&R];
   }
 
-  const OCLEmitTypedef &getEmitTypedef(llvm::Record &R) {
-    if (!Typedefs.count(&R))
-      BuildEmitTypedef(R);
+  const OCLDecl &getDecl(llvm::Record &R) {
+    if (!Decls.count(&R))
+      BuildDecl(R);
 
-    return *Typedefs[&R];
+    return *Decls[&R];
+  }
+
+  const OCLReduction &getReduction(llvm::Record &R) {
+    if (!Reductions.count(&R))
+      BuildReduction(R);
+
+    return *Reductions[&R];
   }
 
 private:
@@ -227,15 +238,12 @@ private:
     std::string Name = R.getValueAsString("Name");
     std::string Group = R.getValueAsString("Group");
 
-    OCLBuiltin::VariantsContainer Variants;
+    OCLBuiltin::VariantsMap Variants;
     if (R.isSubClassOf("OCLMultiBuiltin")) {
       std::vector<llvm::Record *> Vars = R.getValueAsListOfDefs("Variants");
-      Variants.reserve(Vars.size());
-      for (unsigned i = 0, e = Vars.size(); i != e; ++i) {
+      for (unsigned i = 0, e = Vars.size(); i != e; ++i)
         BuildBuiltinVariant(*Vars[i], Variants);
-      }
     } else if (R.isSubClassOf("OCLSimpleBuiltin")) {
-      Variants.reserve(1);
       BuildBuiltinVariant(R, Variants);
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
@@ -245,9 +253,7 @@ private:
     Builtins[&R] = Builtin;
   }
 
-  void BuildBuiltinVariant(llvm::Record &R, 
-                           OCLBuiltin::VariantsContainer &Var) {
-
+  void BuildBuiltinVariant(llvm::Record &R, OCLBuiltin::VariantsMap &Var) {
     std::vector<llvm::Record*> Ops = R.getValueAsListOfDefs("Operands");
     OCLBuiltinVariant::OperandsContainer Operands;
     Operands.reserve(Ops.size());
@@ -260,9 +266,9 @@ private:
     for (unsigned i = 0, e = Constrs.size(); i != e; ++i)
       ConstrVec.push_back(&getTypeConstr(*Constrs[i]));
 
-    std::string Id = R.getValueAsString("VariantId");
+    llvm::StringRef VarName = R.getValueAsString("VariantName");
 
-    Var.push_back(OCLBuiltinVariant(Operands, ConstrVec, Id));
+    Var[VarName] = new OCLBuiltinVariant(Operands, ConstrVec, VarName);
   }
 
   void BuildConstraint(llvm::Record &R) {
@@ -321,57 +327,65 @@ private:
 
     const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("BuiltIn"));
     const OCLStrategy &Strategy = getStrategy(*R.getValueAsDef("Strategy"));
-    const std::string Variant = R.getValueAsString("VariantId");
+    llvm::StringRef VarName = R.getValueAsString("VariantName");
 
-    BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, Variant);
+    BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, VarName);
 
     BuiltinImpls[&R] = BuiltinImpl;
   }
 
-  void BuildEmitTypedef(llvm::Record &R) {
-    OCLEmitTypedef *Typedef = 0;
+  void BuildDecl(llvm::Record &R) {
+    OCLDecl *Decl = 0;
 
-    if (R.isSubClassOf("OCLEmitTypedefActual")) {
-      std::string TypeName = R.getValueAsString("TypeName");
-      
-      const OCLParam &Op = getParam(*R.getValueAsDef("Op"));
-
-      Typedef = new OCLEmitTypedefActual(TypeName, Op);
-    } else if (R.isSubClassOf("OCLEmitTypedefUnsigned")) {
-      std::string TypeName = R.getValueAsString("TypeName");
-
-      const OCLParam &Op = getParam(*R.getValueAsDef("Op"));
-
-      Typedef = new OCLEmitTypedefUnsigned(TypeName, Op);
+    if (R.isSubClassOf("OCLTypedef")) {
+      llvm::StringRef Name = R.getValueAsString("Name");
+      const OCLParam &Param = getParam(*R.getValueAsDef("Param"));
+      if (R.isSubClassOf("TypedefId"))
+        Decl = new OCLTypedefIdDecl(Name, Param);
+      else if (R.isSubClassOf("TypedefUnsigned"))
+        Decl = new OCLTypedefUnsignedDecl(Name, Param);
+      else
+        llvm::PrintFatalError("Invalid OCLTypedef: " + R.getName());
     } else
-      llvm::PrintFatalError("Invalid OCLEmitTypedef: " + R.getName());
+      llvm::PrintFatalError("Invalid OCLDecl: " + R.getName());
 
-    Typedefs[&R] = Typedef;
+    Decls[&R] = Decl;
+  }
+
+  void BuildReduction(llvm::Record &R) {
+    OCLReduction *Red = 0;
+    
+    if (R.isSubClassOf("InfixBinAssocReduction")) {
+      Red = new OCLInfixBinAssocReduction(R.getValueAsString("Operator"));
+    } else if (R.getName() == "OCLDefaultReduction") {
+      Red = 0;
+    } else
+      llvm::PrintFatalError("Invalid OCLReduction: " + R.getName());
+
+    Reductions[&R] = Red;
   }
 
   void BuildStrategy(llvm::Record &R) {
     OCLStrategy *Strategy = 0;
 
-    std::string ScalarImpl = R.getValueAsString("ScalarImpl");
+    std::vector<llvm::Record *> Declarations =
+      R.getValueAsListOfDefs("Declarations");
+    OCLStrategy::DeclsContainer Decls;
+    Decls.reserve(Declarations.size());
+    for (unsigned I = 0, E = Declarations.size(); I != E; ++I)
+      Decls.push_back(&getDecl(*Declarations[I]));
 
-    std::vector<llvm::Record *> Tys =
-      R.getValueAsListOfDefs("Typedefs");
-    OCLStrategy::TypedefsContainer Typedefs;
-
-    Typedefs.reserve(Tys.size());
-    for (unsigned I = 0, E = Tys.size(); I != E; ++I)
-      Typedefs.push_back(&getEmitTypedef(*Tys[I]));
-
-    if (R.isSubClassOf("RecursiveSplit"))
-      Strategy = new RecursiveSplit(ScalarImpl, Typedefs); 
-    else if (R.isSubClassOf("DirectSplit"))
-      Strategy = new DirectSplit(ScalarImpl, Typedefs);
-    else if (R.isSubClassOf("MergeSplit")) {
-      std::string MergeOp = R.getValueAsString("MergeOp");  
-      Strategy = new MergeSplit(ScalarImpl, MergeOp, Typedefs);
-    } else if (R.isSubClassOf("TemplateStrategy"))
-      Strategy = new TemplateStrategy(ScalarImpl, Typedefs);
-    else
+    if (R.isSubClassOf("RecursiveSplit")) {
+      llvm::StringRef ScalarImpl = R.getValueAsString("ScalarImpl");
+      const OCLReduction *Red = &getReduction(*R.getValueAsDef("Reduction"));
+      Strategy = new OCLRecursiveSplit(ScalarImpl, Decls, Red); 
+    } else if (R.isSubClassOf("DirectSplit")) {
+      llvm::StringRef ScalarImpl = R.getValueAsString("ScalarImpl");
+      Strategy = new OCLDirectSplit(ScalarImpl, Decls);
+    } else if (R.isSubClassOf("TemplateStrategy")) {
+      llvm::StringRef TemplateImpl = R.getValueAsString("TemplateImpl");
+      Strategy = new OCLTemplateStrategy(TemplateImpl, Decls);
+    } else
       llvm::PrintFatalError("Invalid OCLStrategy: " + R.getName());
 
     Strategies[&R] = Strategy;
@@ -384,7 +398,8 @@ private:
 
   OCLBuiltinImplsMap BuiltinImpls;
   OCLStrategiesMap Strategies;
-  OCLEmitTypedefsMap Typedefs;
+  OCLReductionsMap Reductions;
+  OCLDeclsMap Decls;
 };
 
 llvm::OwningPtr<OCLBuiltinsTableImpl> OCLBuiltinsTable::Impl;
@@ -462,21 +477,21 @@ static ConstraintMap ComputeConstraintMap(const OCLBuiltinVariant &B) {
 }
 
 void opencrun::ExpandSignature(const OCLBuiltinVariant &B, 
-                               std::list<BuiltinSignature> &R) {
+                               BuiltinSignatureList &L) {
   BuiltinSignature Sign;
   Sign.reserve(B.size());
 
   ConstraintMap CMap = ComputeConstraintMap(B);
 
-  EnumerateSignature(B, 0, CMap, Sign, R);
+  EnumerateSignature(B, 0, CMap, Sign, L);
 }
 
 //===----------------------------------------------------------------------===//
 // Builtin signature ordering 
 //===----------------------------------------------------------------------===//
 
-static bool CompareLessSignature(const BuiltinSignature &S1, 
-                                 const BuiltinSignature &S2) {
+bool BuiltinSignatureCompare::operator()(const BuiltinSignature &S1, 
+                                         const BuiltinSignature &S2) const {
   unsigned i;
   unsigned e = std::min(S1.size(), S2.size());
   for (i = 0; i != e; ++i)
@@ -484,8 +499,4 @@ static bool CompareLessSignature(const BuiltinSignature &S1,
 
   if (i != e) return S1[i]->compareLess(S2[i]);
   return S1.size() < S2.size();
-}
-
-void opencrun::SortBuiltinSignatureList(std::list<BuiltinSignature> &l) {
-  l.sort(CompareLessSignature);
 }

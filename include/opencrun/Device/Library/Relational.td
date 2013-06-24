@@ -240,15 +240,15 @@ def : OCLBuiltinImpl<blt_signbit, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_any, MergeSplit<[{
+def : OCLBuiltinImpl<blt_any, RecursiveSplitReduction<[{
   return param1 < 0;
-}], "||">>;
+}], InfixBinAssocReduction<[{ || }]>>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_all, MergeSplit<[{
+def : OCLBuiltinImpl<blt_all, RecursiveSplitReduction<[{
   return param1 < 0;
-}], "&&">>;
+}], InfixBinAssocReduction<[{ && }]>>>;
 
 //----------------------------------------------------------------------------//
 
@@ -265,7 +265,7 @@ def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
   }
 
   return RetValue;
-}], [OCLEmitTypedefActual<"TYPE", Id<0>>]>, "iiii">;
+}], [TypedefId<"TYPE", Id<0>>]>, "iiii">;
 
 def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
   typedef union _float_bits {
