@@ -1209,7 +1209,7 @@ def : OCLBuiltinImpl<blt_sincos, DirectSplit<[{
       *param2 = __builtin_cos(param1);
       return __builtin_sin(param1);
   }
-}]>, "rrP4r">;
+}]>>;
 
 //----------------------------------------------------------------------------//
 

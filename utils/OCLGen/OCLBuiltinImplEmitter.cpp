@@ -256,25 +256,36 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
   LoadOCLBuiltins(R, OCLBuiltins);
   LoadOCLBuiltinImpls(R, OCLBuiltinImpls);
 
-  typedef std::map<BuiltinSignature, const OCLStrategy*> SignatureStrategyMap;
-  typedef std::map<const OCLBuiltin *, SignatureStrategyMap> BuiltinImplMap;
+  typedef std::map<BuiltinSignature, const OCLBuiltinImpl *> SignatureImplMap;
+  typedef std::map<const OCLBuiltin *, SignatureImplMap> BuiltinImplMap;
 
   BuiltinImplMap Impls;
   for (unsigned i = 0, e = OCLBuiltinImpls.size(); i != e; ++i) {
     const OCLBuiltinImpl &Impl = *OCLBuiltinImpls[i];
     const OCLBuiltin &B = Impl.getBuiltin();
     OCLBuiltin::iterator VI = B.find(Impl.getVariantName());
-    if (VI == B.end()) {
+
+    std::list<const OCLBuiltinVariant *> CurVariants;
+    if (VI != B.end()) {
+      CurVariants.push_back(VI->second);
+    } else if (Impl.getVariantName() == "") {
+      for (OCLBuiltin::iterator VI = B.begin(), VE = B.end(); VI != VE; ++VI)
+        CurVariants.push_back(VI->second);
+    } else {
       llvm::PrintWarning("Unknown variant '" + Impl.getVariantName() + "' "
                          "for builtin '" + B.getName() + "'");
       continue;
     }
 
     BuiltinSignatureList l;
-    ExpandSignature(*VI->second, l);
+    for (std::list<const OCLBuiltinVariant*>::iterator
+         I = CurVariants.begin(), E = CurVariants.end(); I != E; ++I)
+      ExpandSignature(**I, l);
+
     for (BuiltinSignatureList::iterator I = l.begin(), 
          E = l.end(); I != E; ++I) {
-      Impls[&B][*I] = &Impl.getStrategy();
+      if (!Impls[&B].count(*I) || Impls[&B][*I]->getVariantName() == "")
+        Impls[&B][*I] = &Impl;
     }
   }
 
@@ -292,7 +303,7 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
     }
 
     llvm::BitVector GroupPreds;
-    for (SignatureStrategyMap::const_iterator SI = BI->second.begin(),
+    for (SignatureImplMap::const_iterator SI = BI->second.begin(),
          SE = BI->second.end(); SI != SE; ++SI) {
       llvm::BitVector Preds;
       ComputePredicates(SI->first, Preds);
@@ -303,7 +314,7 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
         EmitPredicatesBegin(OS, GroupPreds);
       }
 
-      EmitImplementation(OS, *BI->first, SI->first, *SI->second);
+      EmitImplementation(OS, *BI->first, SI->first, SI->second->getStrategy());
     }
     EmitPredicatesEnd(OS, GroupPreds);
     OS << "\n";
