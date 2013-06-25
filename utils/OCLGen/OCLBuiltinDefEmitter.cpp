@@ -35,8 +35,8 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
 
   llvm::BitVector GroupPreds;
 
-  for (std::list<BuiltinSignature>::iterator  
-       I = Alts.begin(), E = Alts.end(); I != E; ++I) {
+  for (BuiltinSignatureList::iterator I = Alts.begin(), 
+       E = Alts.end(); I != E; ++I) {
     BuiltinSignature &S = *I;
 
     llvm::BitVector Preds;
@@ -45,7 +45,6 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
       EmitPredicatesEnd(OS, GroupPreds);
       GroupPreds = Preds;
       EmitPredicatesBegin(OS, GroupPreds);
-      OS << "\n";
     }
 
     OS << "__opencrun_overload\n";

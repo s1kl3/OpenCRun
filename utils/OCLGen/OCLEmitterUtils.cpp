@@ -82,17 +82,18 @@ void opencrun::EmitPredicatesBegin(llvm::raw_ostream &OS,
   OS << "\n";
   for (unsigned i = 0, e = Names.size(); i != e; ++i)
     OS << "#pragma OPENCL EXTENSION " << Names[i] << " : enable\n";
+  OS << "\n";
 }
 
 void opencrun::EmitPredicatesEnd(llvm::raw_ostream &OS, 
                                   const llvm::BitVector &Preds) {
   if (!Preds.any()) return;
-
+  
   for (unsigned i = Pred_Ext_InitValue; i != Pred_Ext_MaxValue; ++i)
     if (Preds[i])
       OS << "#pragma OPENCL EXTENSION " << PredicateName(i) 
          << " : disable\n";
-  OS << "#endif\n";
+  OS << "#endif\n\n";
 }
 
 void opencrun::EmitBuiltinGroupBegin(llvm::raw_ostream &OS, 

@@ -351,7 +351,6 @@ public:
   enum StrategyKind {
     SK_RecursiveSplit,
     SK_DirectSplit,
-    SK_MergeSplit,
     SK_TemplateStrategy
   };
 

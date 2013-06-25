@@ -110,13 +110,13 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
   OS.indent(2) << *LeftSign[0] << " Tmp1 = (" << *LeftSign[0] << ") "
                << "__builtin_ocl_" << B.getName() << "(\n";
   for (unsigned i = 1, e = LeftSign.size(); i != e; ++i) {
-    OS.indent(8) << "param" << i;
+    OS.indent(6) << "param" << i;
     EmitSubvector(OS, LeftRanges[i]);
     if (i + 1 != e)
       OS << ", \n";
     else {
       OS << "\n";
-      OS.indent(2) << ");\n\n";
+      OS.indent(4) << ");\n\n";
     }
   }
 
@@ -124,13 +124,13 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
   OS.indent(2) << *RightSign[0] << " Tmp2 = (" << *RightSign[0] << ") "
                << "__builtin_ocl_" << B.getName() << "(\n";
   for (unsigned i = 1, e = RightSign.size(); i != e; ++i) {
-    OS.indent(8) << "param" << i;
+    OS.indent(6) << "param" << i;
     EmitSubvector(OS, RightRanges[i]);
     if (i + 1 != e)
       OS << ", \n";
     else {
       OS << "\n";
-      OS.indent(2) << ");\n\n";
+      OS.indent(4) << ");\n\n";
     }
   }
 
@@ -203,11 +203,13 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
         } else
           llvm::PrintFatalError("Type not supported by DirectSplit strategy!");
       }
-      if (PI + 1 != PE) OS << ",\n";
+      if (PI + 1 != PE) OS << ",";
+      OS << "\n";
     }
     OS.indent(6) << ")";
 
-    if (i + 1 != N) OS << ",\n";
+    if (i + 1 != N) OS << ",";
+    OS << "\n";
   }
 
   OS.indent(4) << ");\n";
@@ -256,7 +258,8 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
   LoadOCLBuiltins(R, OCLBuiltins);
   LoadOCLBuiltinImpls(R, OCLBuiltinImpls);
 
-  typedef std::map<BuiltinSignature, const OCLBuiltinImpl *> SignatureImplMap;
+  typedef std::map<BuiltinSignature, const OCLBuiltinImpl *, 
+                   BuiltinSignatureCompare> SignatureImplMap;
   typedef std::map<const OCLBuiltin *, SignatureImplMap> BuiltinImplMap;
 
   BuiltinImplMap Impls;
@@ -292,9 +295,13 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
   emitSourceFileHeader("OCL Builtin implementations", OS);
 
   llvm::StringRef GlobalGroup = "";
-  for (BuiltinImplMap::const_iterator BI = Impls.begin(), 
-       BE = Impls.end(); BI != BE; ++BI) {
-    llvm::StringRef Group = BI->first->getGroup();
+  for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
+    const OCLBuiltin &B = *OCLBuiltins[i];
+
+    BuiltinImplMap::iterator BI = Impls.find(&B);
+    if (BI == Impls.end()) continue;
+
+    llvm::StringRef Group = B.getGroup();
     if (Group != GlobalGroup) {
       EmitBuiltinGroupEnd(OS, GlobalGroup);
       GlobalGroup = Group;
@@ -310,14 +317,12 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
       if (GroupPreds != Preds) {
         EmitPredicatesEnd(OS, GroupPreds);
         GroupPreds = Preds;
-        OS << "\n";
         EmitPredicatesBegin(OS, GroupPreds);
       }
-
-      EmitImplementation(OS, *BI->first, SI->first, SI->second->getStrategy());
+      EmitImplementation(OS, B, SI->first, SI->second->getStrategy());
+      OS << "\n";
     }
     EmitPredicatesEnd(OS, GroupPreds);
-    OS << "\n";
   }
   EmitBuiltinGroupEnd(OS, GlobalGroup);
   

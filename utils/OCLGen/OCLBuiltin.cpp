@@ -494,8 +494,8 @@ bool BuiltinSignatureCompare::operator()(const BuiltinSignature &S1,
                                          const BuiltinSignature &S2) const {
   unsigned i;
   unsigned e = std::min(S1.size(), S2.size());
-  for (i = 0; i != e; ++i)
-    if (S1[i]->compareLess(S2[i]) || S2[i]->compareLess(S1[i])) break;
+
+  for (i = 0; i != e && S1[i] == S2[i]; ++i);
 
   if (i != e) return S1[i]->compareLess(S2[i]);
   return S1.size() < S2.size();

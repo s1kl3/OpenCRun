@@ -59,7 +59,7 @@ bool OCLRealType::compareLess(const OCLType *T) const {
   if (const OCLRealType *R = llvm::dyn_cast<OCLRealType>(T))
     return getBitWidth() < R->getBitWidth();
   if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(T))
-    return compareLess(&V->getBaseType());
+    return this == &V->getBaseType() || compareLess(&V->getBaseType());
 
   // Real < !Integer && !Real
   return true;
