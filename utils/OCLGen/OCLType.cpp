@@ -49,6 +49,8 @@ bool OCLIntegerType::compareLess(const OCLType *T) const {
             getBitWidth() < I->getBitWidth()) || 
            (isUnsigned() && isUnsigned() == I->isUnsigned() && 
             getBitWidth() < I->getBitWidth());
+  if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(T))
+    return this == &V->getBaseType() || compareLess(&V->getBaseType());
 
   // Integer < !Integer
   return true;
