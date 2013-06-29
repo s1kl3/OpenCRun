@@ -59,6 +59,10 @@ void EmitOCLVectorTypes(llvm::raw_ostream &OS) {
   EmitPredicatesEnd(OS, GroupPreds);
 }
 
+void EmitOCLMiscTypes(llvm::raw_ostream &OS) {
+  OS << "typedef ulong cl_mem_fence_flags;\n";
+}
+
 bool opencrun::EmitOCLTypeDef(llvm::raw_ostream &OS, 
                               llvm::RecordKeeper &R) {
   LoadOCLTypes(R, OCLTypes);
@@ -148,8 +152,15 @@ bool opencrun::EmitOCLTypeDef(llvm::raw_ostream &OS,
      << " * On all IEEE754 machines, this is +Infinity.\n"
      << " */\n"
      << "\n"
-     << "# define HUGE_VAL	(__builtin_huge_val())\n"
-     << "# define HUGE_VALF	(__builtin_huge_valf())\n"
+     << "#define HUGE_VAL	(__builtin_huge_val())\n"
+     << "#define HUGE_VALF	(__builtin_huge_valf())\n"
+     << "\n"
+     << "/*\n"
+     << " * Synchronization Macros.\n"
+     << " */\n"
+     << "\n"
+     << "#define CLK_LOCAL_MEM_FENCE 0\n"
+     << "#define CLK_GLOBAL_MEM_FENCE 1\n"
      << "\n\n";
   
 
@@ -157,8 +168,11 @@ bool opencrun::EmitOCLTypeDef(llvm::raw_ostream &OS,
   EmitOCLScalarTypes(OS);
   OS << "\n";
 
-  OS <<"// Vector types\n";
+  OS << "// Vector types\n";
   EmitOCLVectorTypes(OS);
+
+  OS << "// Misc types\n";
+  EmitOCLMiscTypes(OS);
 
   OS << "\n#endif\n";
   

@@ -27,8 +27,6 @@ void EmitPredicatesEnd(llvm::raw_ostream &OS, const llvm::BitVector &Preds);
 void EmitBuiltinGroupBegin(llvm::raw_ostream &OS, llvm::StringRef Group);
 void EmitBuiltinGroupEnd(llvm::raw_ostream &OS, llvm::StringRef Group);
 
-bool IsScalarAlternative(BuiltinSignature &Sign);
-
 }
 
 #endif

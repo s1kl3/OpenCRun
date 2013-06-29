@@ -46,8 +46,10 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
       GroupPreds = Preds;
       EmitPredicatesBegin(OS, GroupPreds);
     }
+    
+    if (Alts.size() > 1)
+      OS << "__opencrun_overload\n";
 
-    OS << "__opencrun_overload\n";
     EmitOCLTypeSignature(OS, *S[0]);
     OS << " ";
     OS << "__builtin_ocl_" << B.getName();

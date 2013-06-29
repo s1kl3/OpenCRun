@@ -19,8 +19,8 @@ class VmiscBuiltin_Cng_CnVg<string name> : OCLMultiBuiltin<name, [
 
 class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
   OCLBuiltinVariant<[
-     ocl_gentype_vmisc,
-     ocl_gentype_vmisc,
+     ocl_vgentype_vmisc,
+     ocl_vgentype_vmisc,
      ocl_gentype_uinteger_vmisc
   ],
   [
@@ -29,9 +29,9 @@ class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
      isSameBaseSizeAs<Id<0>, Id<2>>
   ], "ggUi">,
   OCLBuiltinVariant<[
-     ocl_gentype_vmisc,
-     ocl_gentype_vmisc,
-     ocl_gentype_vmisc,
+     ocl_vgentype_vmisc,
+     ocl_vgentype_vmisc,
+     ocl_vgentype_vmisc,
      ocl_gentype_uinteger_vmisc
   ],
   [
@@ -48,7 +48,13 @@ class VmiscBuiltin_ggUi_gggUi<string name> : OCLMultiBuiltin<name, [
 // Misc. Vector builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_vec_step    : VmiscBuiltin_Cng_CnVg<"vec_step">;
+// vec_step is supported since Clang 3.0
+// def blt_vec_step    : VmiscBuiltin_Cng_CnVg<"vec_step">;
 
 def blt_shuffle     : VmiscBuiltin_ggUi_gggUi<"shuffle">;
 def blt_shuffle2    : VmiscBuiltin_ggUi_gggUi<"shuffle2">;
+
+//===----------------------------------------------------------------------===//
+// Misc. Vector builtin implementations
+//===----------------------------------------------------------------------===//
+

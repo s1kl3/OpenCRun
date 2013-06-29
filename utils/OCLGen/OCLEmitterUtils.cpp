@@ -54,7 +54,12 @@ void opencrun::ComputePredicates(const BuiltinSignature &Sign,
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 
-    // FIXME: handle also pointers
+    while (llvm::isa<OCLPointerType>(B)) {
+      const OCLPointerType *P = llvm::cast<OCLPointerType>(B);
+      Preds |= P->getPredicates();
+      B = llvm::cast<OCLBasicType>(&P->getBaseType());
+    }
+
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
       B = &V->getBaseType();
 

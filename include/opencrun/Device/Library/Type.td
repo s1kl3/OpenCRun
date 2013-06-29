@@ -10,6 +10,8 @@ class OCLOpaqueType<string name> : OCLBasicType {
 
 def ocl_void : OCLOpaqueType<"void">;
 def ocl_size_t : OCLOpaqueType<"size_t">;
+def ocl_mem_fence_flags : OCLOpaqueType<"cl_mem_fence_flags">;
+def ocl_event_t : OCLOpaqueType<"event_t">;
 
 class OCLAddressSpace : OCLPredicate;
 
@@ -347,17 +349,15 @@ def ocl_s_long_rel : OCLGroupType<[
 
 // Misc. Vector builtins custom types
 
+def ocl_vgentype_vmisc : OCLGroupType<[
+  ocl_vgentype_2,
+  ocl_vgentype_4,
+  ocl_vgentype_8,
+  ocl_vgentype_16
+]>;
+
 def ocl_gentype_vmisc : OCLGroupType<[
-  ocl_char_2, ocl_char_4, ocl_char_8, ocl_char_16,
-  ocl_uchar_2, ocl_uchar_4, ocl_uchar_8, ocl_uchar_16,
-  ocl_short_2, ocl_short_4, ocl_short_8, ocl_short_16,
-  ocl_ushort_2, ocl_ushort_4, ocl_ushort_8, ocl_ushort_16,
-  ocl_int_2, ocl_int_4, ocl_int_8, ocl_int_16,
-  ocl_uint_2, ocl_uint_4, ocl_uint_8, ocl_uint_16,
-  ocl_long_2, ocl_long_4, ocl_long_8, ocl_long_16,
-  ocl_ulong_2, ocl_ulong_4, ocl_ulong_8, ocl_ulong_16,
-  ocl_float_2, ocl_float_4, ocl_float_8, ocl_float_16,
-  ocl_double_2, ocl_double_4, ocl_double_8, ocl_double_16
+  ocl_sgentype_integer, ocl_sgentype_real, ocl_vgentype_vmisc  
 ]>;
 
 def ocl_gentype_uinteger_vmisc : OCLGroupType<[

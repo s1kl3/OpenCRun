@@ -19,6 +19,7 @@ include "opencrun/Device/Library/Builtin.td"
 //      d       double types
 //      z       size_t
 //      v       void
+//      e       event_t
 //
 // Each one may be preceded by the following modifiers:
 //
@@ -30,10 +31,14 @@ include "opencrun/Device/Library/Builtin.td"
 //
 //===----------------------------------------------------------------------===//
 
+include "opencrun/Device/Library/Async.td"
 include "opencrun/Device/Library/Common.td"
 include "opencrun/Device/Library/Geometric.td"
 include "opencrun/Device/Library/Integer.td"
 include "opencrun/Device/Library/Math.td"
+include "opencrun/Device/Library/Mfence.td"
 include "opencrun/Device/Library/Relational.td"
+include "opencrun/Device/Library/Synchronization.td"
 include "opencrun/Device/Library/Vloadstore.td"
 include "opencrun/Device/Library/Vmisc.td"
+include "opencrun/Device/Library/WorkItem.td"
