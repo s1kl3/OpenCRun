@@ -23,7 +23,7 @@
 //                    be the OpenCL address space pointed to.
 //                    Otherwise, an invalid address space is used. Address space
 //                    values comes frome clang::LangAS::opencl_*. Invalid
-//                    address space is clang::LangA::Last.
+//                    address space is clang::LangAS::Last.
 //
 // The OpenCLMetadataHandler class has been further extended to provide
 // additional information about an OpenCL kernels, like type mappings.

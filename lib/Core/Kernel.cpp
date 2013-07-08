@@ -127,7 +127,7 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
 
 cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   // We cannot check Size with respect to the size of Arg on the host, because
-  // we cannot known the size of the type on the host -- we cannot a type
+  // we cannot known the size of the type on the host -- we cannot compare a type
   // declared on the device domain with one declared on the host domain. Trust
   // the user!
   ThisLock.acquire();
