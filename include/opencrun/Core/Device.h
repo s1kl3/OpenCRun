@@ -331,6 +331,9 @@ protected:
 
 class Device : public _cl_device_id, public DeviceInfo {
 public:
+  typedef llvm::SmallVector<size_t, 4> WorkSizes;
+
+public:
   static bool classof(const _cl_device_id *Dev) { return true; }
 
 protected:
@@ -339,6 +342,11 @@ protected:
   virtual ~Device() { }
 
 public:
+  virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW, 
+                                          WorkSizes &LW) const {
+    return false;
+  }
+
   virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf) = 0;
@@ -351,6 +359,7 @@ public:
                           clang::DiagnosticConsumer &Diag,
                           llvm::MemoryBuffer &Src,
                           llvm::Module *&Mod);
+
   virtual void UnregisterKernel(Kernel &Kern) { }
 
 private:

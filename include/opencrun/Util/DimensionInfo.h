@@ -168,12 +168,11 @@ public:
   DimensionInfo(llvm::SmallVector<size_t, 4> &GlobalWorkOffsets,
                 llvm::SmallVector<size_t, 4> &GlobalWorkSizes,
                 llvm::SmallVector<size_t, 4> &LocalWorkSizes) {
-    size_t E;
 
-    E = std::min(GlobalWorkOffsets.size(), GlobalWorkSizes.size());
-    E = std::min(E, LocalWorkSizes.size());
+    assert(GlobalWorkOffsets.size() == GlobalWorkSizes.size() &&
+           GlobalWorkSizes.size() == LocalWorkSizes.size());
 
-    for(size_t I = 0; I < E; ++I)
+    for(size_t I = 0, E = LocalWorkSizes.size(); I != E; ++I)
       Info.push_back(InfoWrapper(GlobalWorkOffsets[I],
                                  GlobalWorkSizes[I],
                                  LocalWorkSizes[I]));
@@ -213,9 +212,6 @@ public:
   unsigned GetGlobalWorkItems() const {
     InfoContainer::const_iterator I = Info.begin(), E = Info.end();
 
-    if(I == E)
-      return 0;
-
     unsigned Size = 1;
     for(; I != E; ++I)
       Size *= I->GetGlobalSize();
@@ -240,9 +236,6 @@ public:
   unsigned GetLocalWorkItems() const {
     InfoContainer::const_iterator I = Info.begin(), E = Info.end();
 
-    if(I == E)
-      return 0;
-
     unsigned Size = 1;
     for(; I != E; ++I)
       Size *= I->GetLocalSize();
@@ -255,12 +248,12 @@ public:
       return false;
 
     // Checking bounds.
-    for(unsigned I = 0; I < Info.size(); ++I)
+    for(unsigned I = 0, E = Info.size(); I != E; ++I)
       if(Info[I].GetGlobalSize() % Sizes[I])
         return false;
 
     // Setting the sizes.
-    for(unsigned I = 0; I < Info.size(); ++I)
+    for(unsigned I = 0, E = Info.size(); I != E; ++I)
       Info[I].SetLocalSize(Sizes[I]);
 
     return true;

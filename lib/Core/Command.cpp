@@ -397,6 +397,10 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
     if(Kern->RequireWorkGroupSizes())
       NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                   "kernel requires fixed local work size");
+
+    if (!Dev.ComputeGlobalWorkPartition(GlobalWorkSizes, this->LocalWorkSizes))
+      NotifyError(CL_INVALID_WORK_GROUP_SIZE,
+                  "unable to partition global work on device");
     return *this;
   }
 
