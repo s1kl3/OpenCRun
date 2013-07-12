@@ -430,20 +430,22 @@ private:
 
 class OCLBuiltinImpl {
 public:
-  OCLBuiltinImpl(const OCLBuiltin &builtin, 
-                 const OCLStrategy &strategy,
-                 const std::string varname) 
-    : BuiltIn(builtin), Strategy(strategy), VariantName(varname) { }
+  OCLBuiltinImpl(const OCLBuiltin &builtin, const OCLStrategy &strategy,
+                 const std::string varname, bool target) 
+    : BuiltIn(builtin), Strategy(strategy), VariantName(varname), 
+      IsTarget(target) {}
 
 public:
   const OCLBuiltin &getBuiltin() const { return BuiltIn; }
   const OCLStrategy &getStrategy() const { return Strategy; }
   const std::string getVariantName() const { return VariantName; }
+  bool isTarget() const { return IsTarget; }
 
 private:
   const OCLBuiltin &BuiltIn;
   const OCLStrategy &Strategy;
   std::string VariantName;
+  bool IsTarget;
 };
 
 //===----------------------------------------------------------------------===//

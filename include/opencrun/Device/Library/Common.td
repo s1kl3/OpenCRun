@@ -179,7 +179,7 @@ def blt_smoothstep  : CommonBuiltin_ffff_dddd_VfCfCfVf_VdCdCdVd<"smoothstep">;
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_degrees, RecursiveSplit<[{
-  return (180 / M_PIF) * param1;
+  return (180 / M_PI_F) * param1;
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_degrees, RecursiveSplit<[{
@@ -189,7 +189,7 @@ def : OCLBuiltinImpl<blt_degrees, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_radians, RecursiveSplit<[{
-  return (M_PIF / 180) * param1;
+  return (M_PI_F / 180) * param1;
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_radians, RecursiveSplit<[{

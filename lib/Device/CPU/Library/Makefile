@@ -19,7 +19,7 @@ TABLEGEN_INC_FILES_COMMON = 1
 #
 # Auto-generate library.
 #
-BUILT_SOURCES = ocldef.CPU.h.inc Builtins.CPU.inc
+BUILT_SOURCES = oclconst.CPU.h.inc ocltype.CPU.h.inc ocltarget.CPU.h.inc Builtins.CPU.inc
 
 #
 # The LLVM build system does not known recognize .cl files automatically.

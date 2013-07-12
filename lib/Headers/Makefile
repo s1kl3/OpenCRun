@@ -6,18 +6,22 @@
 LEVEL = ../..
 
 TABLEGEN_INC_FILES_COMMON = 1
-BUILT_SOURCES = ocldef.h.inc ocltype.h.inc
+BUILT_SOURCES = oclconst.h.inc ocltype.h.inc oclbuiltin.h.inc
 
-HEADERS := ocldef.h ocltype.h
+HEADERS := oclconst.h ocltype.h oclbuiltin.h
 
 #
 # Include Makefile.common so we know what to do.
 #
 include $(LEVEL)/Makefile.common
 
-$(ObjDir)/ocldef.h.inc.tmp: $(LIBRARY_DIR)/OpenCL.td $(OCLGENTool) $(ObjDir)/.dir
+$(ObjDir)/oclconst.h.inc.tmp: $(LIBRARY_DIR)/OpenCL.td $(OCLGENTool) $(ObjDir)/.dir
 	$(Echo) Generating OCL builtins library definition with oclgen
-	$(Verb) $(OCLGen) -gen-ocl-lib-def -o $(call SYSPATH, $@) $<
+	$(Verb) $(OCLGen) -gen-ocl-constants -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/oclbuiltin.h.inc.tmp: $(LIBRARY_DIR)/OpenCL.td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL builtins library definition with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-builtin-defs -o $(call SYSPATH, $@) $<
 
 $(ObjDir)/ocltype.h.inc.tmp: $(LIBRARY_DIR)/OpenCL.td $(OCLGENTool) $(ObjDir)/.dir
 	$(Echo) Generating OCL types definition with oclgen

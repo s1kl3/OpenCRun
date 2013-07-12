@@ -3,10 +3,8 @@
 
 #include "OCLTarget.h"
 
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Record.h"
 
 #include <set>
@@ -66,15 +64,15 @@ public:
 
 public:
   virtual bool compareLess(const OCLType *T) const = 0;
-  const llvm::BitVector &getPredicates() const { return Predicates; }
-  void setPredicates(const llvm::BitVector &preds) { Predicates = preds; }
+  const PredicateSet &getPredicates() const { return Predicates; }
+  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
 protected:
   OCLBasicType(TypeKind SubType, llvm::StringRef name) 
-   : OCLType(SubType, name), Predicates(Pred_MaxValue) {}
+   : OCLType(SubType, name) {}
 
 private:
-  llvm::BitVector Predicates;
+  PredicateSet Predicates;
 };
 
 class OCLOpaqueType : public OCLBasicType {
@@ -177,36 +175,28 @@ public:
     M_Const = 1 << 0
   };
 
-  enum AddressSpace {
-    AS_Unknown = -1,
-    AS_Private = 0,
-    AS_Global = 1,
-    AS_Local = 2,
-    AS_Constant = 3
-  };
-
 public:
   static bool classof(const  OCLType *Ty) {
     return Ty->getKind() == TK_Pointer;
   }
 
 public:
-  OCLPointerType(const OCLType &base, AddressSpace as, unsigned mods = 0)
+  OCLPointerType(const OCLType &base, AddressSpaceKind as, unsigned mods = 0)
    : OCLBasicType(TK_Pointer, BuildName(base, as, mods)), 
-     BaseType(base), AddrSpace(as), Modifiers(mods) {}
+     BaseType(base), AddressSpace(as), Modifiers(mods) {}
 
   virtual bool compareLess(const OCLType *T) const;
   const OCLType &getBaseType() const { return BaseType; }
-  AddressSpace getAddressSpace() const { return AddrSpace; }
+  AddressSpaceKind getAddressSpace() const { return AddressSpace; }
   unsigned getModifierFlags() const { return Modifiers; }
   bool hasModifier(Modifier m) const { return Modifiers & m; }
 
 private:
-  std::string BuildName(const OCLType &, AddressSpace, unsigned);
+  std::string BuildName(const OCLType &, AddressSpaceKind, unsigned);
 
 private:
   const OCLType &BaseType;
-  AddressSpace AddrSpace;
+  AddressSpaceKind AddressSpace;
   unsigned Modifiers;
 };
 
@@ -235,6 +225,23 @@ private:
   ElementContainer Elements;
 };
 
+class OCLOpaqueTypeDef {
+public:
+  OCLOpaqueTypeDef(const OCLOpaqueType &Ty, llvm::StringRef def, bool isTarget)
+   : Type(Ty), Def(def), IsTarget(isTarget) {}
+
+  std::string getDef() const { return Def; }
+  const OCLOpaqueType &getType() const { return Type; }
+  bool isTarget() const { return IsTarget; }
+  const PredicateSet &getPredicates() const { return Predicates; }
+  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
+
+private:
+  const OCLOpaqueType &Type;
+  std::string Def;
+  bool IsTarget;
+  PredicateSet Predicates;
+};
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const OCLType &Ty) {
   if (const OCLGroupType *GT = llvm::dyn_cast<OCLGroupType>(&Ty)) {
@@ -252,13 +259,16 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const OCLType &Ty) {
 //===----------------------------------------------------------------------===//
 
 typedef std::vector<const OCLType *> OCLTypesContainer;
+typedef std::vector<const OCLOpaqueTypeDef *> OCLOpaqueTypeDefsContainer;
 void LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T);
+void LoadOCLOpaqueTypeDefs(const llvm::RecordKeeper &R, 
+                           OCLOpaqueTypeDefsContainer &T);
 
 //===----------------------------------------------------------------------===//
 // Types table singleton
 //===----------------------------------------------------------------------===//
 
-typedef std::pair<OCLPointerType::AddressSpace, unsigned> OCLPtrDesc;
+typedef std::pair<AddressSpaceKind, unsigned> OCLPtrDesc;
 typedef std::vector<OCLPtrDesc> OCLPtrStructure;
 
 class OCLTypesTableImpl;
@@ -267,9 +277,11 @@ class OCLTypesTable {
 public:
   static const OCLType &get(llvm::Record &R);
 
+  static const OCLOpaqueTypeDef &getOpaqueTypeDef(llvm::Record &R);
+
   static const OCLVectorType *getVectorType(const OCLScalarType &Base, 
                                             unsigned Width);
-  static const OCLPointerType *getPointerType(const OCLBasicType &Base,
+  static const OCLPointerType &getPointerType(const OCLBasicType &Base,
                                               const OCLPtrStructure &PtrS);
 
 private:
@@ -277,6 +289,8 @@ private:
 
   friend class OCLPointerGroupIterator;
   friend void LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T);
+  friend void LoadOCLOpaqueTypeDefs(const llvm::RecordKeeper &R, 
+                                    OCLOpaqueTypeDefsContainer &T);
 };
 
 //===----------------------------------------------------------------------===//

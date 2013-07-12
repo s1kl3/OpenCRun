@@ -1,6 +1,6 @@
-#include "OCLBuiltinImplEmitter.h"
-#include "OCLEmitterUtils.h"
 #include "OCLBuiltin.h"
+#include "OCLEmitter.h"
+#include "OCLEmitterUtils.h"
 #include "OCLType.h"
 
 #include "llvm/TableGen/Error.h"
@@ -193,7 +193,7 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
           PtrS.push_back(OCLPtrDesc(PtrTy->getAddressSpace(), 
                                     PtrTy->getModifierFlags()));
           const OCLType &CastTy = 
-            *OCLTypesTable::getPointerType(V->getBaseType(), PtrS);
+            OCLTypesTable::getPointerType(V->getBaseType(), PtrS);
           EmitOCLTypeSignature(OS, CastTy, "");
 
           OS << ") param" << PI;
@@ -252,8 +252,8 @@ static void EmitImplementation(llvm::raw_ostream &OS,
   OS << "}\n";
 }
 
-bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS, 
-                                  llvm::RecordKeeper &R) {
+bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS, 
+                                   llvm::RecordKeeper &R) {
   LoadOCLTypes(R, OCLTypes);
   LoadOCLBuiltins(R, OCLBuiltins);
   LoadOCLBuiltinImpls(R, OCLBuiltinImpls);
@@ -287,7 +287,8 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
 
     for (BuiltinSignatureList::iterator I = l.begin(), 
          E = l.end(); I != E; ++I) {
-      if (!Impls[&B].count(*I) || Impls[&B][*I]->getVariantName() == "")
+      if (!Impls[&B].count(*I) || Impl.isTarget() || 
+          Impls[&B][*I]->getVariantName() == "")
         Impls[&B][*I] = &Impl;
     }
   }
@@ -309,10 +310,10 @@ bool opencrun::EmitOCLBuiltinImpl(llvm::raw_ostream &OS,
       EmitBuiltinGroupBegin(OS, GlobalGroup);
     }
 
-    llvm::BitVector GroupPreds;
+    PredicateSet GroupPreds;
     for (SignatureImplMap::const_iterator SI = BI->second.begin(),
          SE = BI->second.end(); SI != SE; ++SI) {
-      llvm::BitVector Preds;
+      PredicateSet Preds;
       ComputePredicates(SI->first, Preds);
       if (GroupPreds != Preds) {
         EmitPredicatesEnd(OS, GroupPreds);

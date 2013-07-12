@@ -111,4 +111,11 @@ class OCLBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, string varname = ""> {
   OCLBuiltin BuiltIn = builtin;
   OCLStrategy Strategy = s;
   string VariantName = varname;
+  bit isTarget = 0;
+}
+
+class OCLTargetBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, 
+                           string varname = "">
+ : OCLBuiltinImpl<builtin, s, varname> {
+  let isTarget = 1;
 }

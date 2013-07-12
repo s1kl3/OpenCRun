@@ -1,4 +1,5 @@
 include "opencrun/Device/Library/Target.td"
+include "opencrun/Device/Library/Constants.td"
 include "opencrun/Device/Library/Type.td"
 include "opencrun/Device/Library/Builtin.td"
 

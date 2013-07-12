@@ -36,7 +36,7 @@ std::string OCLVectorType::BuildName(const OCLScalarType &Base,
 }
 
 std::string OCLPointerType::BuildName(const OCLType &Base, 
-                                      OCLPointerType::AddressSpace AS,
+                                      AddressSpaceKind AS,
                                       unsigned Modifiers) {
   return "@ptr<as:" + llvm::Twine(AS).str() +", m:" + 
          llvm::Twine(Modifiers).str() + ">{ " + Base.getName() + " }";
@@ -125,6 +125,7 @@ public:
   typedef std::map<OCLVectorId, const OCLVectorType *> OCLVectorsMap;
   typedef std::pair<const OCLBasicType *, OCLPtrStructure> OCLPointerId;
   typedef std::map<OCLPointerId, const OCLPointerType *> OCLPointersMap;
+  typedef std::map<llvm::Record*, const OCLOpaqueTypeDef*> OCLOpaqueTypeDefsMap;
 
 public:
   ~OCLTypesTableImpl() {
@@ -154,29 +155,32 @@ public:
     return 0;
   }
 
-  const OCLPointerType *getPointerType(const OCLBasicType &Base,
+  const OCLPointerType &getPointerType(const OCLBasicType &Base,
                                        const OCLPtrStructure &PtrS) {
     if (!Ptrs.count(OCLPointerId(&Base, PtrS)))
       BuildPointerType(Base, PtrS);
 
-    return Ptrs[OCLPointerId(&Base, PtrS)];
+    return *Ptrs[OCLPointerId(&Base, PtrS)];
+  }
+
+  const OCLOpaqueTypeDef &getOpaqueTypeDef(llvm::Record &R) {
+    if (!OpaqueTypeDefs.count(&R))
+      BuildOpaqueTypeDef(R);
+
+    return *OpaqueTypeDefs[&R];
   }
 
 private:
-  llvm::BitVector FetchPredicates(llvm::Record &R) {
-    llvm::BitVector Preds(Pred_MaxValue);
+  PredicateSet FetchPredicates(llvm::Record &R) {
+    PredicateSet Preds;
     std::vector<llvm::Record*> Predicates =
       R.getValueAsListOfDefs("Predicates");
 
     for (unsigned i = 0, e = Predicates.size(); i != e; ++i) {
-      llvm::StringRef Name = Predicates[i]->getName();
-      OCLPredicate P = ParsePredicateName(Name);
+      const OCLPredicate &P = OCLPredicatesTable::get(*Predicates[i]);
 
-      if (P == Pred_MaxValue)
-        llvm::PrintFatalError("Invalid opencl predicate: " + Name.str());
-
-      // Assume private address space always supported!
-      if (P != Pred_AS_Private) Preds.set(P);
+      if (&P != OCLPredicatesTable::getAddressSpace(AS_Private))
+        Preds.insert(&P);
     }
     return Preds;
   }
@@ -209,22 +213,14 @@ private:
       Type = V;
     }
     else if (R.isSubClassOf("OCLPointerType")) {
-      llvm::StringRef ASName = R.getValueAsDef("AddressSpace")->getName();
+      llvm::Record *ASRecord = R.getValueAsDef("AddressSpace");
 
-      OCLPointerType::AddressSpace AS = 
-        llvm::StringSwitch<OCLPointerType::AddressSpace>(ASName)
-          .Case("ocl_as_private", OCLPointerType::AS_Private)
-          .Case("ocl_as_global", OCLPointerType::AS_Global)
-          .Case("ocl_as_local", OCLPointerType::AS_Local)
-          .Case("ocl_as_constant", OCLPointerType::AS_Constant)
-          .Default(OCLPointerType::AS_Unknown);
-
-      if (AS == OCLPointerType::AS_Unknown)
-        llvm::PrintFatalError("Invalid address space: " + ASName.str());
+      const OCLAddressSpace *AS = 
+        llvm::cast<OCLAddressSpace>(&OCLPredicatesTable::get(*ASRecord));
 
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
       // TODO: modifiers
-      Type = new OCLPointerType(Base, AS);
+      Type = new OCLPointerType(Base, AS->getAddressSpace());
     }
     else if (R.isSubClassOf("OCLGroupType")) {
       std::vector<llvm::Record *> Members = R.getValueAsListOfDefs("Members");
@@ -253,17 +249,12 @@ private:
   void BuildPointerType(const OCLBasicType &Base, const OCLPtrStructure &PtrS) {
     OCLPtrStructure ChildPtrS(PtrS.begin() + 1, PtrS.end());
 
-    const OCLBasicType *B = PtrS.size() > 1 ? getPointerType(Base, ChildPtrS)
-                                            : &Base;
+    const OCLBasicType &B = PtrS.size() > 1 ? getPointerType(Base, ChildPtrS)
+                                            : Base;
 
-    OCLPointerType *P = new OCLPointerType(*B, PtrS[0].first, PtrS[0].second);
-    llvm::BitVector Preds(Pred_MaxValue);
-    switch (PtrS[0].first) {
-    case Pred_AS_Global: Preds.set(OCLPointerType::AS_Global); break;
-    case Pred_AS_Local: Preds.set(OCLPointerType::AS_Local); break;
-    case Pred_AS_Constant: Preds.set(OCLPointerType::AS_Constant); break;
-    default: break;
-    }
+    OCLPointerType *P = new OCLPointerType(B, PtrS[0].first, PtrS[0].second);
+    PredicateSet Preds;
+    Preds.insert(OCLPredicatesTable::getAddressSpace(PtrS[0].first));
     P->setPredicates(Preds);
     Ptrs[OCLPointerId(&Base, PtrS)] = P;
   }
@@ -288,10 +279,29 @@ private:
       std::reverse(PtrS.begin(), PtrS.end());
       PtrS.push_back(OCLPtrDesc(P->getAddressSpace(), P->getModifierFlags()));
       std::reverse(PtrS.begin(), PtrS.end());
-      T = getPointerType(*llvm::cast<OCLBasicType>(T), PtrS);
+      T = &getPointerType(*llvm::cast<OCLBasicType>(T), PtrS);
     } while (!Chain.empty()); 
     
     GroupPtrs[&I.Ptr][I.Iter] = llvm::cast<OCLPointerType>(T);
+  }
+
+  void BuildOpaqueTypeDef(llvm::Record &R) {
+    OCLOpaqueTypeDef *D = 0;
+
+    if (R.isSubClassOf("OCLOpaqueTypeDef")) {
+      const OCLType *T = &get(*R.getValueAsDef("Type"));
+
+      llvm::StringRef Def = R.getValueAsString("Define");
+      bool IsTarget = R.getValueAsBit("isTarget");
+
+      D = new OCLOpaqueTypeDef(*llvm::cast<OCLOpaqueType>(T), Def, IsTarget);
+
+      PredicateSet Preds = FetchPredicates(R);
+      D->setPredicates(Preds);
+    }
+    else llvm::PrintFatalError("Invalid OCLOpaqueTypeDef: " + R.getName());
+
+    OpaqueTypeDefs[&R] = D;
   }
 
 private:
@@ -299,6 +309,7 @@ private:
   OCLVectorsMap Vects;
   OCLPointersMap Ptrs;
   OCLGroupPointersMap GroupPtrs;
+  OCLOpaqueTypeDefsMap OpaqueTypeDefs;
 };
 
 llvm::OwningPtr<OCLTypesTableImpl> OCLTypesTable::Impl;
@@ -308,13 +319,18 @@ const OCLType &OCLTypesTable::get(llvm::Record &R) {
   return Impl->get(R);
 }
 
+const OCLOpaqueTypeDef &OCLTypesTable::getOpaqueTypeDef(llvm::Record &R) {
+  if (!Impl) Impl.reset(new OCLTypesTableImpl());
+  return Impl->getOpaqueTypeDef(R);
+}
+
 const OCLVectorType *OCLTypesTable::getVectorType(const OCLScalarType &Base,
                                                   unsigned Width) {
   if (!Impl) Impl.reset(new OCLTypesTableImpl());
   return Impl->getVectorType(Base, Width);
 }
 
-const OCLPointerType *
+const OCLPointerType &
 OCLTypesTable::getPointerType(const OCLBasicType &Base,
                               const OCLPtrStructure &PtrS) {
   if (!Impl) Impl.reset(new OCLTypesTableImpl());
@@ -334,6 +350,17 @@ void opencrun::LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T) {
     T.push_back(&OCLTypesTable::get(*RawVects[I]));
 
   std::sort(T.begin(), T.end(), CompareLess);
+}
+
+void opencrun::LoadOCLOpaqueTypeDefs(const llvm::RecordKeeper &R, 
+                                     OCLOpaqueTypeDefsContainer &T) {
+  T.clear();
+
+  std::vector<llvm::Record *> RawVects = 
+    R.getAllDerivedDefinitions("OCLOpaqueTypeDef");
+
+  for(unsigned I = 0, E = RawVects.size(); I < E; ++I)
+    T.push_back(&OCLTypesTable::getOpaqueTypeDef(*RawVects[I]));
 }
 
 //===----------------------------------------------------------------------===//

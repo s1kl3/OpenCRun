@@ -1,4 +1,3 @@
-
 #include "opencrun/Core/Device.h"
 #include "opencrun/Device/CPU/CPUDevice.h"
 
@@ -134,9 +133,12 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
   PreprocOpts.RetainRemappedFileBuffers = true;
 
-  // Implicit include of 'ocltype.h' and 'ocldef.h'
-  PreprocOpts.Includes.push_back("ocltype.h");
-  PreprocOpts.Includes.push_back("ocldef.h");
+  // Implicit target include
+  llvm::SmallString<16> InclName("ocltarget.");
+  InclName += Name;
+  InclName += ".h";
+  PreprocOpts.Includes.push_back(InclName.str());
+
 
   // Add include paths.
   clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();
@@ -155,6 +157,7 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   else
     llvm::sys::path::append(Path, LLVM_PREFIX, "lib", "opencrun", "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Quoted, false, false);
+  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 
   // Set target triple.
   clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();

@@ -13,12 +13,25 @@ def ocl_size_t : OCLOpaqueType<"size_t">;
 def ocl_mem_fence_flags : OCLOpaqueType<"cl_mem_fence_flags">;
 def ocl_event_t : OCLOpaqueType<"event_t">;
 
-class OCLAddressSpace : OCLPredicate;
+class OCLOpaqueTypeDef<OCLOpaqueType ty, string define> {
+  OCLOpaqueType Type = ty;
+  string Define = define;
+  list<OCLPredicate> Predicates = [];
+  bit isTarget = 0;
+}
 
-def ocl_as_private : OCLAddressSpace;
-def ocl_as_global : OCLAddressSpace;
-def ocl_as_local : OCLAddressSpace;
-def ocl_as_constant : OCLAddressSpace;
+class OCLTargetOpaqueTypeDef<OCLOpaqueType ty, string define>
+ : OCLOpaqueTypeDef<ty, define> {
+  let isTarget = 1;
+}
+
+class OCLAddressSpace<string name>
+ : OCLPredicate<"__opencrun_target_addrspace_", name>;
+
+def ocl_as_private : OCLAddressSpace<"private">;
+def ocl_as_global : OCLAddressSpace<"global">;
+def ocl_as_local : OCLAddressSpace<"local">;
+def ocl_as_constant : OCLAddressSpace<"constant">;
 
 class OCLModifier;
 

@@ -1,37 +1,115 @@
 #ifndef OCLTARGET_H
 #define OCLTARGET_H
 
+#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/TableGen/Record.h"
+
+#include <set>
+#include <vector>
 
 namespace opencrun {
 
-enum OCLPredicate {
-  Pred_InitValue,
+class OCLPredicate {
+public:
+  enum PredicateKind {
+    PK_Extension,
+    PK_AddressSpace,
+    PK_Macro
+  };
 
-  // Address Space predicates
-  Pred_AS_InitValue = Pred_InitValue,
-  Pred_AS_Private = Pred_AS_InitValue,
-  Pred_AS_Global,
-  Pred_AS_Local,
-  Pred_AS_Constant,
-  Pred_AS_MaxValue,
+protected:
+  OCLPredicate(PredicateKind K, llvm::StringRef P, llvm::StringRef N)
+   : Kind(K), Prefix(P), Name(N) {}
 
-  // Extension predicates
-  Pred_Ext_InitValue = Pred_AS_MaxValue,
-  Pred_Ext_cl_khr_fp16 = Pred_Ext_InitValue,
-  Pred_Ext_cl_khr_fp64,
-  Pred_Ext_MaxValue,
+public:
+  PredicateKind getKind() const { return Kind; }
+  std::string getPrefix() const { return Prefix; }
+  std::string getName() const { return Name; }
+  std::string getFullName() const { return Prefix + Name; }
 
-  Pred_MaxValue = Pred_Ext_MaxValue
+private:
+  PredicateKind Kind;
+  std::string Prefix;
+  std::string Name;
 };
 
-bool IsAddressSpacePredicate(unsigned P);
+class OCLExtension : public OCLPredicate {
+public:
+  static bool classof(const OCLPredicate *P) {
+    return P->getKind() == PK_Extension;
+  }
 
-bool IsExtensionPredicate(unsigned P);
+  OCLExtension(llvm::StringRef Prefix, llvm::StringRef Name)
+   : OCLPredicate(PK_Extension, Prefix, Name) {}
+};
 
-const char *PredicateName(unsigned P);
+enum AddressSpaceKind {
+  AS_Begin = 0,
+  AS_Private = AS_Begin,
+  AS_Global,
+  AS_Local,
+  AS_Constant,
 
-OCLPredicate ParsePredicateName(llvm::StringRef Name);
+  AS_End,
+  AS_Unknown
+};
+
+class OCLAddressSpace : public OCLPredicate {
+public:
+  static bool classof(const OCLPredicate *P) {
+    return P->getKind() == PK_AddressSpace;
+  }
+
+public:
+  OCLAddressSpace(llvm::StringRef Prefix, llvm::StringRef Name, 
+                  AddressSpaceKind AS)
+   : OCLPredicate(PK_AddressSpace, Prefix, Name), AddressSpace(AS) {}
+
+  AddressSpaceKind getAddressSpace() const { return AddressSpace; }
+
+private:
+  AddressSpaceKind AddressSpace;
+};
+
+class OCLMacro : public OCLPredicate {
+public:
+  static bool classof(const OCLPredicate *P) {
+    return P->getKind() == PK_Macro;
+  }
+
+public:
+  OCLMacro(llvm::StringRef Prefix, llvm::StringRef Name)
+   : OCLPredicate(PK_Macro, Prefix, Name) {}
+};
+
+typedef std::set<const OCLPredicate*> PredicateSet;
+
+//===----------------------------------------------------------------------===//
+// OCLPredicates Loader
+//===----------------------------------------------------------------------===//
+
+typedef std::vector<const OCLPredicate *> OCLPredicatesContainer;
+void LoadOCLPredicates(const llvm::RecordKeeper &R, OCLPredicatesContainer &P);
+
+//===----------------------------------------------------------------------===//
+// Predicates table singleton
+//===----------------------------------------------------------------------===//
+
+class OCLPredicatesTableImpl;
+
+class OCLPredicatesTable {
+public:
+  static const OCLPredicate &get(llvm::Record &R);
+
+  static const OCLAddressSpace *getAddressSpace(AddressSpaceKind K);
+
+private:
+  static llvm::OwningPtr<OCLPredicatesTableImpl> Impl;
+
+  friend void LoadOCLPredicates(const llvm::RecordKeeper &R,
+                                OCLPredicatesContainer &P);
+};
 
 }
 

@@ -1,47 +1,95 @@
 #include "OCLTarget.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/TableGen/Error.h"
+#include "llvm/TableGen/Record.h"
 
 using namespace opencrun;
 
-bool opencrun::IsAddressSpacePredicate(unsigned P) {
-  switch (P) {
-  default: return false;
-  case Pred_AS_Global:
-  case Pred_AS_Local:
-  case Pred_AS_Constant:
-    return true;
+class opencrun::OCLPredicatesTableImpl {
+public:
+  typedef std::map<llvm::Record *, const OCLPredicate *> OCLPredicatesMap;
+  typedef std::map<AddressSpaceKind, const OCLAddressSpace*> OCLAddrSpaceMap;
+
+public:
+  ~OCLPredicatesTableImpl() {
+    llvm::DeleteContainerSeconds(Predicates);
   }
+
+public:
+  const OCLPredicate &get(llvm::Record &R) {
+    if (!Predicates.count(&R))
+      BuildPredicate(R);
+
+    return *Predicates[&R];
+  }
+
+  const OCLAddressSpace *getAddressSpace(AddressSpaceKind K) {
+    if (!AddrSpaces.count(K)) return 0;
+
+    return AddrSpaces[K];
+  }
+private:
+  void BuildPredicate(llvm::Record &R) {
+    OCLPredicate *P = 0;
+
+    if (R.isSubClassOf("OCLPredicate")) {
+      llvm::StringRef Prefix = R.getValueAsString("Prefix");
+      llvm::StringRef Name = R.getValueAsString("Name");
+
+      if (R.isSubClassOf("OCLExtension")) {
+        P = new OCLExtension(Prefix, Name);
+      } else if (R.isSubClassOf("OCLMacro")) { 
+        P = new OCLMacro(Prefix, Name);
+      } else if (R.isSubClassOf("OCLAddressSpace")) {
+        AddressSpaceKind AS = 
+          llvm::StringSwitch<AddressSpaceKind>(Name)
+            .Case("private", AS_Private)
+            .Case("global", AS_Global)
+            .Case("local", AS_Local)
+            .Case("constant", AS_Constant)
+            .Default(AS_Unknown);
+
+        if (AS == AS_Unknown)
+          llvm::PrintFatalError("Illegal address space!");
+
+        OCLAddressSpace *PAS = new OCLAddressSpace(Prefix, Name, AS);
+        AddrSpaces[AS] = PAS;
+        P = PAS;
+      } else
+        llvm::PrintFatalError("Unknown predicate kind: " + R.getName());
+    }
+    else
+      llvm::PrintFatalError("Unknown predicate: " + R.getName());
+
+    Predicates[&R] = P;
+  }
+
+private:
+  OCLPredicatesMap Predicates;
+  OCLAddrSpaceMap AddrSpaces;
+};
+
+llvm::OwningPtr<OCLPredicatesTableImpl> OCLPredicatesTable::Impl;
+
+const OCLPredicate &OCLPredicatesTable::get(llvm::Record &R) {
+  if (!Impl) Impl.reset(new OCLPredicatesTableImpl());
+  return Impl->get(R);
 }
 
-bool opencrun::IsExtensionPredicate(unsigned P) {
-  switch (P) {
-  default: return false;
-  case Pred_Ext_cl_khr_fp16:
-  case Pred_Ext_cl_khr_fp64:
-    return true;
-  }
+const OCLAddressSpace *OCLPredicatesTable::getAddressSpace(AddressSpaceKind K) {
+  if (!Impl) Impl.reset(new OCLPredicatesTableImpl());
+  return Impl->getAddressSpace(K);
 }
 
-const char *opencrun::PredicateName(unsigned P) {
-  switch (P) {
-  case Pred_Ext_cl_khr_fp16: return "cl_khr_fp16";
-  case Pred_Ext_cl_khr_fp64: return "cl_khr_fp64";
-  case Pred_AS_Global: return "addrspace_global";
-  case Pred_AS_Local: return "addrspace_local";
-  case Pred_AS_Constant: return "addrspace_constant";
-  default: break;
-  }
-  return 0;
-}
+void opencrun::LoadOCLPredicates(const llvm::RecordKeeper &R, 
+                                 OCLPredicatesContainer &P) {
+  P.clear();
 
-OCLPredicate opencrun::ParsePredicateName(llvm::StringRef Name) {
-  return llvm::StringSwitch<OCLPredicate>(Name)
-          .Case("ocl_ext_cl_khr_fp16", Pred_Ext_cl_khr_fp16)
-          .Case("ocl_ext_cl_khr_fp64", Pred_Ext_cl_khr_fp64)
-          .Case("ocl_as_private", Pred_AS_Private)
-          .Case("ocl_as_global", Pred_AS_Global)
-          .Case("ocl_as_local", Pred_AS_Local)
-          .Case("ocl_as_constant", Pred_AS_Constant)
-          .Default(Pred_MaxValue);
+  std::vector<llvm::Record *> RawVects = 
+    R.getAllDerivedDefinitions("OCLPredicate");
+
+  for(unsigned I = 0, E = RawVects.size(); I < E; ++I)
+    P.push_back(&OCLPredicatesTable::get(*RawVects[I]));
 }

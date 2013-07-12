@@ -328,8 +328,9 @@ private:
     const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("BuiltIn"));
     const OCLStrategy &Strategy = getStrategy(*R.getValueAsDef("Strategy"));
     llvm::StringRef VarName = R.getValueAsString("VariantName");
+    bool IsTarget = R.getValueAsBit("isTarget");
 
-    BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, VarName);
+    BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, VarName, IsTarget);
 
     BuiltinImpls[&R] = BuiltinImpl;
   }

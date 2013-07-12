@@ -7,12 +7,12 @@
 
 using namespace opencrun;
 
-const char *opencrun::AddressSpaceName(OCLPointerType::AddressSpace AS) {
+const char *opencrun::AddressSpaceQualifier(AddressSpaceKind AS) {
   switch (AS) {
-  case OCLPointerType::AS_Private: return "__private";
-  case OCLPointerType::AS_Global: return "__global";
-  case OCLPointerType::AS_Local: return "__local";
-  case OCLPointerType::AS_Constant: return "__constant";
+  case AS_Private: return "__private";
+  case AS_Global: return "__global";
+  case AS_Local: return "__local";
+  case AS_Constant: return "__constant";
   default: break;
   }
 
@@ -35,7 +35,7 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << " ";
 
     // Address Space
-    OS << AddressSpaceName(P->getAddressSpace()) << " ";
+    OS << AddressSpaceQualifier(P->getAddressSpace()) << " ";
 
     // Star
     OS << "*";
@@ -49,55 +49,59 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
 }
 
 void opencrun::ComputePredicates(const BuiltinSignature &Sign, 
-                                 llvm::BitVector &Preds, bool IgnoreAS) {
-  Preds.reset();
+                                 PredicateSet &Preds, bool IgnoreAS) {
+  Preds.clear();
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 
     while (llvm::isa<OCLPointerType>(B)) {
       const OCLPointerType *P = llvm::cast<OCLPointerType>(B);
-      Preds |= P->getPredicates();
+      Preds.insert(P->getPredicates().begin(), P->getPredicates().end());
       B = llvm::cast<OCLBasicType>(&P->getBaseType());
     }
 
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
       B = &V->getBaseType();
 
-    Preds |= B->getPredicates();
+    Preds.insert(B->getPredicates().begin(), B->getPredicates().end());
   }
-  if (IgnoreAS)
-    Preds.reset(Pred_AS_InitValue, Pred_AS_MaxValue);
+  if (IgnoreAS) {
+    for (unsigned i = AS_Begin; i != AS_End; ++i)
+      Preds.erase(OCLPredicatesTable::getAddressSpace(AddressSpaceKind(i)));
+  }
 }
 
 void opencrun::EmitPredicatesBegin(llvm::raw_ostream &OS, 
-                                    const llvm::BitVector &Preds) {
-  if (!Preds.any()) return;
+                                    const PredicateSet &Preds) {
+  if (Preds.empty()) return;
 
-  llvm::SmallVector<const char *, 4> Names;
-  for (unsigned i = Pred_Ext_InitValue; i != Pred_Ext_MaxValue; ++i)
-    if (Preds[i]) Names.push_back(PredicateName(i));
+  llvm::SmallVector<llvm::StringRef, 4> ExtNames;
 
-  unsigned Count = Preds.count();
+  unsigned Count = Preds.size();
   OS << "#if";
-  for (unsigned i = Pred_InitValue; i != Pred_MaxValue; ++i)
-    if (Preds[i]) {
-      OS << " defined(__opencrun_target_" << PredicateName(i) << ")";
-      if (--Count) OS << " &&";
-    }
+  for (PredicateSet::iterator I = Preds.begin(), E = Preds.end(); I != E; ++I) {
+    const OCLPredicate *P = *I;
+    OS << " defined(" << P->getFullName() << ")";
+    if (--Count) OS << " &&";
+
+    if (const OCLExtension *E = llvm::dyn_cast<OCLExtension>(P))
+      ExtNames.push_back(E->getName());
+  }
   OS << "\n";
-  for (unsigned i = 0, e = Names.size(); i != e; ++i)
-    OS << "#pragma OPENCL EXTENSION " << Names[i] << " : enable\n";
-  OS << "\n";
+  if (ExtNames.size()) {
+    for (unsigned i = 0, e = ExtNames.size(); i != e; ++i)
+      OS << "#pragma OPENCL EXTENSION " << ExtNames[i] << " : enable\n";
+    OS << "\n";
+  }
 }
 
 void opencrun::EmitPredicatesEnd(llvm::raw_ostream &OS, 
-                                  const llvm::BitVector &Preds) {
-  if (!Preds.any()) return;
+                                  const PredicateSet &Preds) {
+  if (Preds.empty()) return;
   
-  for (unsigned i = Pred_Ext_InitValue; i != Pred_Ext_MaxValue; ++i)
-    if (Preds[i])
-      OS << "#pragma OPENCL EXTENSION " << PredicateName(i) 
-         << " : disable\n";
+  for (PredicateSet::iterator I = Preds.begin(), E = Preds.end(); I != E; ++I)
+    if (const OCLExtension *E = llvm::dyn_cast<OCLExtension>(*I))
+      OS << "#pragma OPENCL EXTENSION " << E->getName() << " : disable\n";
   OS << "#endif\n\n";
 }
 

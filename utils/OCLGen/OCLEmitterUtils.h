@@ -13,16 +13,16 @@ namespace opencrun {
 
 class OCLType;
 
-const char *AddressSpaceName(OCLPointerType::AddressSpace AS);
+const char *AddressSpaceQualifier(AddressSpaceKind AS);
 
 void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                           std::string Name = "");
 
-void ComputePredicates(const BuiltinSignature &S, llvm::BitVector &Preds,
+void ComputePredicates(const BuiltinSignature &S, PredicateSet &Preds,
                        bool IgnoreAS = false);
 
-void EmitPredicatesBegin(llvm::raw_ostream &OS, const llvm::BitVector &Preds);
-void EmitPredicatesEnd(llvm::raw_ostream &OS, const llvm::BitVector &Preds);
+void EmitPredicatesBegin(llvm::raw_ostream &OS, const PredicateSet &Preds);
+void EmitPredicatesEnd(llvm::raw_ostream &OS, const PredicateSet &Preds);
 
 void EmitBuiltinGroupBegin(llvm::raw_ostream &OS, llvm::StringRef Group);
 void EmitBuiltinGroupEnd(llvm::raw_ostream &OS, llvm::StringRef Group);

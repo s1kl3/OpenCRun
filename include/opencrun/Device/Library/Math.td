@@ -410,7 +410,7 @@ def : OCLBuiltinImpl<blt_acosh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_acospi, RecursiveSplit<[{
-  return __builtin_acosf(param1)/M_PIF;
+  return __builtin_acosf(param1)/M_PI_F;
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_acospi, RecursiveSplit<[{
@@ -442,7 +442,7 @@ def : OCLBuiltinImpl<blt_asinh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_asinpi, RecursiveSplit<[{
-  return __builtin_asinf(param1)/M_PIF;
+  return __builtin_asinf(param1)/M_PI_F;
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_asinpi, RecursiveSplit<[{
@@ -474,7 +474,7 @@ def : OCLBuiltinImpl<blt_atanh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atanpi, RecursiveSplit<[{
-  return __builtin_atanf(param1)/M_PIF;
+  return __builtin_atanf(param1)/M_PI_F;
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_atanpi, RecursiveSplit<[{
@@ -528,7 +528,7 @@ def : OCLBuiltinImpl<blt_cosh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cospi, RecursiveSplit<[{
-  return __builtin_cosf(param1 * M_PIF);
+  return __builtin_cosf(param1 * M_PI_F);
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_cospi, RecursiveSplit<[{
@@ -745,7 +745,7 @@ def : OCLBuiltinImpl<blt_sinh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_sinpi, RecursiveSplit<[{
-  return __builtin_sinf(param1 * M_PIF);
+  return __builtin_sinf(param1 * M_PI_F);
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_sinpi, RecursiveSplit<[{
@@ -788,7 +788,7 @@ def : OCLBuiltinImpl<blt_tanh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_tanpi, RecursiveSplit<[{
-  return __builtin_tanf(param1 * M_PIF);
+  return __builtin_tanf(param1 * M_PI_F);
 }]>, "ff">;
 
 def : OCLBuiltinImpl<blt_tanpi, RecursiveSplit<[{
@@ -831,7 +831,7 @@ def : OCLBuiltinImpl<blt_atan2, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atan2pi, RecursiveSplit<[{
-  return __builtin_atan2f(param1, param2)/M_PIF;
+  return __builtin_atan2f(param1, param2)/M_PI_F;
 }]>, "fff">;
 
 def : OCLBuiltinImpl<blt_atan2pi, RecursiveSplit<[{
@@ -1051,9 +1051,9 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
       return HUGE_VALF;
     }
     *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PIF * f);
+    s = __builtin_sinf(M_PI_F * f);
     if (s < 0) s = -s;
-      return LOG_PIF - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
+      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgammaf(param1);
@@ -1068,9 +1068,9 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
       return HUGE_VALF;
     }
     *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PIF * f);
+    s = __builtin_sinf(M_PI_F * f);
     if (s < 0) s = -s;
-      return LOG_PIF - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
+      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgammaf(param1);
@@ -1085,9 +1085,9 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
       return HUGE_VALF;
     }
     *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PIF * f);
+    s = __builtin_sinf(M_PI_F * f);
     if (s < 0) s = -s;
-      return LOG_PIF - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
+      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgammaf(param1);
@@ -1104,7 +1104,7 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
     *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
     s = __builtin_sin(M_PI * f);
     if (s < 0) s = -s;
-      return LOG_PI - __builtin_log(s) - __builtin_lgamma(1 - param1);
+      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgamma(param1);
@@ -1121,7 +1121,7 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
     *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
     s = __builtin_sin(M_PI * f);
     if (s < 0) s = -s;
-      return LOG_PI - __builtin_log(s) - __builtin_lgamma(1 - param1);
+      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgamma(param1);
@@ -1138,7 +1138,7 @@ def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
     *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
     s = __builtin_sin(M_PI * f);
     if (s < 0) s = -s;
-      return LOG_PI - __builtin_log(s) - __builtin_lgamma(1 - param1);
+      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
   }
   *param2 = 1;
   return __builtin_lgamma(param1);
