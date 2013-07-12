@@ -16,13 +16,7 @@ Platform &opencrun::GetOpenCRunPlatform() {
 }
 
 static void __init_runtime(void) __attribute__((constructor));
-static void __finalize_runtime(void) __attribute__((destructor));
 
 void __init_runtime(void) {
   llvm::llvm_start_multithreaded();
 }
-
-void __finalize_runtime(void) {
-  llvm::llvm_shutdown();
-}
-
