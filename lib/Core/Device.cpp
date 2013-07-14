@@ -1,8 +1,9 @@
 #include "opencrun/Core/Device.h"
 #include "opencrun/Device/CPU/CPUDevice.h"
+#include "opencrun/Util/EmitCustomLLVMOnlyAction.h"
 
 #include "clang/Basic/Version.h"
-#include "clang/CodeGen/CodeGenAction.h"
+#include "clang/Parse/ParseAST.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/system_error.h"
@@ -50,10 +51,11 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   Compiler.setInvocation(Invocation);
 
   // Launch compiler.
-  clang::EmitLLVMOnlyAction ToBitCode(&LLVMCtx);
+  EmitCustomLLVMOnlyAction ToBitCode(&LLVMCtx);
   bool Success = Compiler.ExecuteAction(ToBitCode);
 
   Mod = ToBitCode.takeModule();
+  ToBitCode.AddKernelArgMetadata(*Mod, *ToBitCode.takeLLVMContext());
   Success = Success && !Mod->MaterializeAll();
 
   return Success;
