@@ -43,7 +43,10 @@ public:
           KernToAS[KernelFnName].push_back(AS);
           
         KernToAS[KernelFnName].push_back(OpenCRunAddrSpaceMap[AS - clang::LangAS::Offset]);
-      }
+      } 
+      else
+        KernToAS[KernelFnName].push_back(0);
+        
     }
 
     return true;
