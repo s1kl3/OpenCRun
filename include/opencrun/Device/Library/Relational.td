@@ -253,19 +253,8 @@ def : OCLBuiltinImpl<blt_all, RecursiveSplitReduction<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
-  TYPE RetValue = (TYPE) 0;
-
-  for (unsigned int i = 0; i < (unsigned int) sizeof(TYPE); ++i) {
-    TYPE bit_i = param3 & (1 << i);
-
-    if (bit_i == 0)
-      RetValue |= param1 & (1 << i);
-    else if (bit_i == 1)
-      RetValue |= param2 & (1 << i);
-  }
-
-  return RetValue;
-}], [TypedefId<"TYPE", Id<0>>]>, "iiii">;
+  return (param1 & ~param3) | (param2 & param3);
+}]>, "iiii">;
 
 def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
   typedef union _float_bits {
@@ -282,14 +271,8 @@ def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
 
   RetValue.f = 0.0f;
 
-  for (unsigned int i = 0; i < 32; ++i) {
-    int bit_i = param3_bits.i & (1 << i);
-
-    if (bit_i == 0)
-      RetValue.i |= param1_bits.i & (1 << i);
-    else if (bit_i == 1)
-      RetValue.i |= param2_bits.i & (1 << i);
-  }
+  RetValue.i = (param1_bits.i & ~param3_bits.i) | 
+               (param2_bits.i & param3_bits.i);
 
   return RetValue.f;
 }]>, "ffff">;
@@ -309,17 +292,10 @@ def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
 
   RetValue.d = 0.0;
 
-  for (unsigned int i = 0; i < 64; ++i) {
-    long bit_i = param3_bits.l & (1 << i);
-
-    if (bit_i == 0)
-      RetValue.l |= param1_bits.l & (1 << i);
-    else if (bit_i == 1)
-      RetValue.l |= param2_bits.l & (1 << i);
-  }
+  RetValue.l = (param1_bits.l & ~param3_bits.l) |
+               (param2_bits.l & param3_bits.l);
 
   return RetValue.d;
-
 }]>, "dddd">;
 
 //----------------------------------------------------------------------------//
