@@ -53,6 +53,21 @@ private:
 };
 
 class BuildInformation {
+public:
+  typedef OpenCLMetadataHandler::kernel_iterator kernel_iterator;
+
+public:
+  kernel_iterator kernel_begin() {
+    OpenCLMetadataHandler MDHandler(*BitCode);
+
+    return MDHandler.kernel_begin();
+  }
+
+  kernel_iterator kernel_end() {
+    OpenCLMetadataHandler MDHandler(*BitCode);
+
+    return MDHandler.kernel_end();
+  }
 
 public:
   BuildInformation() : BuildStatus(CL_BUILD_NONE) { }
@@ -133,6 +148,11 @@ public:
                CompilerCallbackClojure &CompilerNotify);
 
   Kernel *CreateKernel(llvm::StringRef KernName, cl_int *ErrCode);
+
+  cl_int CreateKernelsInProgram(cl_uint NumKernels, 
+                                cl_kernel *Kernels, 
+                                cl_uint *NumKernelsRet);
+
 
   void UnregisterKernel(Kernel &Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);

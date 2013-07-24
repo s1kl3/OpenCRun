@@ -119,6 +119,74 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
   return Kern;
 }
 
+cl_int Program::CreateKernelsInProgram(cl_uint num_kernels, 
+                                       cl_kernel *kernels, 
+                                       cl_uint *num_kernels_ret) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  if(BuildInfo.empty())
+    return CL_INVALID_PROGRAM_EXECUTABLE;
+
+  typedef llvm::SmallVector<std::pair<Device *, llvm::Function * >,
+                            4> DeviceFunctionVector;
+
+  typedef std::map<llvm::StringRef,
+                   DeviceFunctionVector> SignaturesMap;
+      
+  SignaturesMap SignMap;
+
+  BuildInformationContainer::iterator BI = BuildInfo.begin(),
+                                      BE = BuildInfo.end();
+
+  for(; BI != BE; ++BI) {
+    Device &Dev = *BI->first;
+    BuildInformation &Cur = *BI->second;
+
+    if(!Cur.IsBuilt())
+      continue;
+
+    BuildInformation::kernel_iterator KI = Cur.kernel_begin(),
+                                      KE = Cur.kernel_end();
+
+    for(; KI != KE; ++KI) {
+      llvm::StringRef KernName = KI->getName();
+      SignMap[KernName].push_back(std::make_pair(&Dev, &*KI));
+    }
+  }
+
+  if(kernels) {
+    if(num_kernels < SignMap.size())
+      return CL_INVALID_VALUE;
+
+    // This will contain the created Kernel objects.
+    llvm::SmallVector<opencrun::Kernel *, 4> Kernels;
+
+    SignaturesMap::iterator SI = SignMap.begin(),
+      SE = SignMap.end();
+
+    for(; SI != SE; ++SI) {
+      Kernel::CodesContainer Codes;
+
+      DeviceFunctionVector &DevFun = SI->second;
+
+      for(unsigned I = 0; I < DevFun.size(); ++I)
+        Codes[DevFun[I].first] = DevFun[I].second;
+
+      Kernel *Kern = new Kernel(*this, Codes);
+      RegisterKernel(*Kern);
+      Kernels.push_back(Kern);
+    }
+
+    for(unsigned I = 0; I < num_kernels && I < Kernels.size(); ++I)
+      *kernels++ = Kernels[I];
+  }
+
+  if(num_kernels_ret)
+    *num_kernels_ret = SignMap.size();
+
+  return CL_SUCCESS;
+}
+
 // Switch again, only to keep naming convention consistent.
 
 #undef RETURN_WITH_ERROR

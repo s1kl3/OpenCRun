@@ -38,8 +38,12 @@ clCreateKernelsInProgram(cl_program program,
                          cl_uint num_kernels,
                          cl_kernel *kernels,
                          cl_uint *num_kernels_ret) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+  if(!program)
+    return CL_INVALID_PROGRAM;
+
+  opencrun::Program &Prog = *llvm::cast<opencrun::Program>(program);
+
+  return Prog.CreateKernelsInProgram(num_kernels, kernels, num_kernels_ret);
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
