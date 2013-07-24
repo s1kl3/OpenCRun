@@ -102,4 +102,84 @@ all-local:: $(OBJHEADERS)
 
 install-local:: $(INSTHEADERS)
 
+uninstall-local:: 
+	$(Echo) Uninstalling compiler include files
+	$(Verb) if [ -d "$(PROJ_headers)" ] ; then \
+	  $(RM) -rf $(DESTDIR)$(PROJ_prefix)/lib/opencrun ; \
+	fi
+
+endif
+
+#------------------------------------------------------------------------
+# Temporary fix to remove all installed loadable modules
+#------------------------------------------------------------------------
+ifdef LOADABLE_MODULE
+ifdef LIBRARYNAME
+
+uninstall-local:: 
+	$(Echo) Uninstalling loadable module $(LIBRARYNAME).so
+	$(Verb) if [ -f "$(DestSharedLibDir)/$(LIBRARYNAME).so" ] ; then \
+	  $(RM) -rf $(DestSharedLibDir)/$(LIBRARYNAME).so ; \
+	fi
+
+endif
+endif
+
+#------------------------------------------------------------------------
+# Install support for the project's C++ include files:
+#------------------------------------------------------------------------
+ifeq ($(LEVEL),.)
+
+ifdef NO_INSTALL
+install-local::
+	$(Echo) Install circumvented with NO_INSTALL
+uninstall-local::
+	$(Echo) Uninstall circumvented with NO_INSTALL
+else
+install-local::
+	$(Verb) if test -d "$(PROJ_SRC_ROOT)/include" ; then \
+	  cd $(PROJ_SRC_ROOT)/include && \
+	  for hdr in `find . -type f \
+	       -name '*.hpp' \
+	       -print | grep -v CVS | \
+	      grep -v .svn` ; do \
+	    instdir=`dirname "$(DESTDIR)$(PROJ_includedir)/$$hdr"` ; \
+	    if test \! -d "$$instdir" ; then \
+	      $(EchoCmd) Making install directory $$instdir ; \
+	      $(MKDIR) $$instdir ;\
+	    fi ; \
+	    $(DataInstall) $$hdr $(DESTDIR)$(PROJ_includedir)/$$hdr ; \
+	  done ; \
+	fi
+ifneq ($(PROJ_SRC_ROOT),$(PROJ_OBJ_ROOT))
+	$(Verb) if test -d "$(PROJ_OBJ_ROOT)/include" ; then \
+	  cd $(PROJ_OBJ_ROOT)/include && \
+	  for hdr in `find . -type f \
+	       -o -name '*.hpp' \
+           -print | grep -v CVS | \
+	      grep -v .svn` ; do \
+	    instdir=`dirname "$(DESTDIR)$(PROJ_includedir)/$$hdr"` ; \
+	    if test \! -d "$$instdir" ; then \
+	      $(EchoCmd) Making install directory $$instdir ; \
+	      $(MKDIR) $$instdir ;\
+	    fi ; \
+	    $(DataInstall) $$hdr $(DESTDIR)$(PROJ_includedir)/$$hdr ; \
+	  done ; \
+	fi
+endif
+
+uninstall-local::
+	$(Verb) if [ -d "$(PROJ_SRC_ROOT)/include" ] ; then \
+	  cd $(PROJ_SRC_ROOT)/include && \
+	  for hdrdir in `find . -mindepth 1 -maxdepth 1 \
+			-type d | sed 's#^./##'` ; do \
+		instdir="$(DESTDIR)$(PROJ_includedir)/$$hdrdir" ; \
+		if [ -d "$$instdir" ] ; then \
+		  $(EchoCmd) Removing include files directory $$instdir ; \
+		  $(RM) -rf $$instdir ; \
+		fi ; \
+	  done ; \
+	fi
+endif
+
 endif
