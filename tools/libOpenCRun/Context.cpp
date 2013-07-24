@@ -38,17 +38,24 @@ clCreateContext(const cl_context_properties *properties,
                                                size_t, void *),
                 void *user_data,
                 cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_0 {
-  if(!properties)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_PLATFORM);
+  opencrun::Platform *Plat;
 
-  std::map<cl_context_properties, cl_context_properties> Props;
+  if(!properties) {
+    // Get the default platform.
+    Plat = &opencrun::GetOpenCRunPlatform();
+    if(!Plat)
+      RETURN_WITH_ERROR(errcode_ret, CL_INVALID_PLATFORM);
+  } else {
+    std::map<cl_context_properties, cl_context_properties> Props;
 
-  // Error signalling performed inside clParseProperties.
-  if(!clParseProperties(Props, properties, errcode_ret))
-    return NULL;
+    // Error signalling performed inside clParseProperties.
+    if(!clParseProperties(Props, properties, errcode_ret))
+      return NULL;
 
-  opencrun::Platform &Plat = *reinterpret_cast<opencrun::Platform *>(
-                                Props[CL_CONTEXT_PLATFORM]);
+    // Override default platform with the provided one.
+    Plat = reinterpret_cast<opencrun::Platform *>(
+        Props[CL_CONTEXT_PLATFORM]);
+  }
 
   if(!devices || num_devices == 0 || (!pfn_notify && user_data))
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
@@ -66,7 +73,7 @@ clCreateContext(const cl_context_properties *properties,
   if(errcode_ret)
     *errcode_ret = CL_SUCCESS;
 
-  opencrun::Context *Ctx = new opencrun::Context(Plat, Devs, Callback);
+  opencrun::Context *Ctx = new opencrun::Context(*Plat, Devs, Callback);
   Ctx->Retain();
 
   return Ctx;
