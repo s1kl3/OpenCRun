@@ -15,7 +15,7 @@ clGetPlatformIDs(cl_uint num_entries,
   if(num_platforms)
     *num_platforms = 1;
 
-  if(num_entries)
+  if(num_entries && platforms)
     platforms[0] = &opencrun::GetOpenCRunPlatform();
 
   return CL_SUCCESS;
