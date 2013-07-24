@@ -176,7 +176,7 @@ public:
     return NativeHalfVectorWidth;
   }
   unsigned GetMaxClockFrequency() const { return MaxClockFrequency; }
-  long GetAddressBits() const { return AddressBits; }
+  unsigned GetAddressBits() const { return AddressBits; }
 
   size_t GetMaxMemoryAllocSize() const { return MaxMemoryAllocSize; }
 
@@ -275,7 +275,7 @@ protected:
   unsigned NativeHalfVectorWidth;
 
   unsigned MaxClockFrequency;
-  long AddressBits;
+  unsigned AddressBits;
   size_t MaxMemoryAllocSize;
 
   bool SupportImages;
