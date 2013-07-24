@@ -1,9 +1,9 @@
-
 #include "opencrun/Core/Device.h"
 #include "opencrun/Device/CPU/CPUDevice.h"
+#include "opencrun/Util/EmitCustomLLVMOnlyAction.h"
 
 #include "clang/Basic/Version.h"
-#include "clang/CodeGen/CodeGenAction.h"
+#include "clang/Parse/ParseAST.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/system_error.h"
@@ -51,10 +51,11 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   Compiler.setInvocation(Invocation);
 
   // Launch compiler.
-  clang::EmitLLVMOnlyAction ToBitCode(&LLVMCtx);
+  EmitCustomLLVMOnlyAction ToBitCode(&LLVMCtx);
   bool Success = Compiler.ExecuteAction(ToBitCode);
 
   Mod = ToBitCode.takeModule();
+  ToBitCode.AddKernelArgMetadata(*Mod, *ToBitCode.takeLLVMContext());
   Success = Success && !Mod->MaterializeAll();
 
   return Success;
@@ -129,17 +130,17 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
                                              clang::IK_OpenCL,
                                             clang::LangStandard::lang_opencl11);
 
-  // Force usage of fake address space map, see clang/lib/AST/ASTContext.cpp
-  clang::LangOptions &LangOpts = *Invocation.getLangOpts();
-  LangOpts.FakeAddressSpaceMap = true;
-
   // Remap file to in-memory buffer.
   clang::PreprocessorOptions &PreprocOpts = Invocation.getPreprocessorOpts();
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
   PreprocOpts.RetainRemappedFileBuffers = true;
 
-  // Implicit include of 'ocldef.h'
-  PreprocOpts.Includes.push_back("ocldef.h");
+  // Implicit target include
+  llvm::SmallString<16> InclName("ocltarget.");
+  InclName += Name;
+  InclName += ".h";
+  PreprocOpts.Includes.push_back(InclName.str());
+
 
   // Add include paths.
   clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();
@@ -158,6 +159,7 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   else
     llvm::sys::path::append(Path, LLVM_PREFIX, "lib", "opencrun", "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Quoted, false, false);
+  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 
   // Set target triple.
   clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();

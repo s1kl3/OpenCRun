@@ -1,34 +1,105 @@
+#------------------------------------------------------------------------------#
 # Setup clang default paths
+#------------------------------------------------------------------------------#
+
 CLANG_SRC_ROOT = $(LLVM_SRC_ROOT)/tools/clang
 CLANG_OBJ_ROOT = $(LLVM_OBJ_ROOT)/tools/clang
 
+#------------------------------------------------------------------------------#
 # Add include path for clang
+#------------------------------------------------------------------------------#
+
 CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
+
+
+#------------------------------------------------------------------------------#
+# Builtins and OCLGen 
+#------------------------------------------------------------------------------#
+
+LIBRARY_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
 
 OCLGENTool = $(ToolDir)/oclgen
 
-OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_DIR)) \
-         -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+
+NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
 
 BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
                 $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
-                -I$(LibDir)/opencrun/include -include "ocldef.h"
+                -I$(HeaderDir) -Wno-empty-translation-unit -Wgnu
 
-# Provide rule sets for when dependency generation is enabled.
+HeaderDir := $(LibDir)/opencrun/include
+
+PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
+
+ifdef OPENCRUN_TARGET
+
+HEADERS = oclconst.$(OPENCRUN_TARGET).h ocltype.$(OPENCRUN_TARGET).h ocltarget.$(OPENCRUN_TARGET).h
+
+TargetRequire = $(addprefix $(HeaderDir)/, $(HEADERS))
+TargetCommonOpts = -DOPENCRUN_LIB_IMPL -include "$(HeaderDir)/ocltarget.$(OPENCRUN_TARGET).h"
+
+
+endif
+
 ifndef DISABLE_AUTO_DEPENDENCIES
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
 	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
                                     $(LLVMCC_EMITIR_FLAG) \
                                     $< -o $(ObjDir)/$*.ll -S; \
                   $(BC_DEPEND_MOVEFILE)
-
-# Provide alternate rule sets if dependencies are disabled.
 else
 
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(LibDir)/opencrun/include/ocldef.h
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
-	$(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
+	$(Verb) $(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
+
+endif
+
+ifdef TABLEGEN_INC_FILES_COMMON
+ifdef OPENCRUN_TARGET
+
+$(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL target library definition for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-constants-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL target types definition for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-types-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocltarget.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL target definitions for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-target-defs -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/Builtins.$(OPENCRUN_TARGET).inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+	$(Echo) Generating OCL builtins library implementation for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-builtin-impls -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+endif
+endif
+
+ifdef HEADERS
+
+OBJHEADERS := $(addprefix $(HeaderDir)/, $(HEADERS))
+
+$(OBJHEADERS) : $(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $@) to build dir
+
+
+$(PROJ_headers):
+	$(Verb) $(MKDIR) $@
+
+INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
+
+$(INSTHEADERS) : $(PROJ_headers)/%.h : $(HeaderDir)/%.h | $(PROJ_headers)
+	$(Verb) $(DataInstall) $< $(PROJ_headers)
+	$(Echo) Installing compiler include file: $(notdir $<)
+
+all-local:: $(OBJHEADERS)
+
+install-local:: $(INSTHEADERS)
 
 endif

@@ -1,43 +1,73 @@
-//===- TableGen.cpp - Top-Level TableGen implementation -------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Simple TableGen tool to automate library building in OpenCRun.
-//
-//===----------------------------------------------------------------------===//
+#include "OCLEmitter.h"
+#include "OCLGen.h"
 
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/TableGen/Main.h"
 
-#include "OCLLibEmitter.h"
 
 using namespace opencrun;
 
 enum ActionType {
-  GenOCLDef,
-  GenOCLLibImpl
+  GenOCLConstants,
+  GenOCLConstantsTarget,
+  GenOCLTypeDefs,
+  GenOCLTypeDefsTarget,
+  GenOCLBuiltinDefs,
+  GenOCLBuiltinImpls,
+  GenOCLTargetDefs
 };
 
-namespace {
-
 llvm::cl::opt<ActionType>
-Action(llvm::cl::desc("Action to perform:"),
-       llvm::cl::values(clEnumValN(GenOCLDef, "gen-ocldef",
-                                   "Generate ocldef.h"),
-                        clEnumValN(GenOCLLibImpl, "gen-ocl-lib-impl",
-                                   "Generate OpenCL C library implementation"),
+Action(llvm::cl::desc("Action to perform"),
+       llvm::cl::values(
+                        clEnumValN(GenOCLConstants, 
+                                   "gen-ocl-constants", 
+                                   "Generate 'oclconst.h' header file"),
+                        clEnumValN(GenOCLConstantsTarget, 
+                                   "gen-ocl-constants-target", 
+                                   "Generate 'oclconst.TARGET.h' header file"),
+                        clEnumValN(GenOCLTypeDefs, 
+                                   "gen-ocl-types", 
+                                   "Generate 'ocltype.h' header file"),
+                        clEnumValN(GenOCLTypeDefsTarget, 
+                                   "gen-ocl-types-target", 
+                                   "Generate 'ocltype.TARGET.h' header file"),
+                        clEnumValN(GenOCLBuiltinDefs,
+                                   "gen-ocl-builtin-defs",
+                                   "Generate 'oclbuiltin.h' header file"),
+                        clEnumValN(GenOCLTargetDefs,
+                                   "gen-ocl-target-defs",
+                                   "Generate 'ocldef.TARGET.h' header file"),
+                        clEnumValN(GenOCLBuiltinImpls,
+                                   "gen-ocl-builtin-impls",
+                                   "Generate OpenCL builtins implementation"),
                         clEnumValEnd));
 
-bool OCLGenMain(llvm::raw_ostream &OS, llvm::RecordKeeper &R);
+llvm::cl::opt<std::string> TargetName("target",
+                                      llvm::cl::desc("Reference target name"), 
+                                      llvm::cl::init(""));
 
-} // End anonymous namespace.
+static bool OCLGenMain(llvm::raw_ostream &OS, llvm::RecordKeeper &R) {
+  switch (Action) {
+  default: break;
+  case GenOCLConstants:
+    return EmitOCLConstantDefs(OS, R);
+  case GenOCLConstantsTarget:
+    return EmitOCLConstantDefsTarget(OS, R);
+  case GenOCLTypeDefs:
+    return EmitOCLTypeDefs(OS, R);
+  case GenOCLTypeDefsTarget:
+    return EmitOCLTypeDefsTarget(OS, R);
+  case GenOCLBuiltinDefs:
+    return EmitOCLBuiltinDefs(OS, R);
+  case GenOCLTargetDefs:
+    return EmitOCLTargetDefs(OS, R);
+  case GenOCLBuiltinImpls:
+    return EmitOCLBuiltinImpls(OS, R);
+  }
+  return false;
+}
 
 int main(int argc, char *argv[]) {
   llvm::PrettyStackTraceProgram X(argc, argv);
@@ -47,21 +77,3 @@ int main(int argc, char *argv[]) {
 
   return llvm::TableGenMain(argv[0], OCLGenMain);
 }
-
-namespace {
-
-bool OCLGenMain(llvm::raw_ostream &OS, llvm::RecordKeeper &R) {
-  switch (Action) {
-  case GenOCLDef:
-    EmitOCLDef(OS, R);
-    break;
-
-  case GenOCLLibImpl:
-    EmitOCLLibImpl(OS, R);
-    break;
-  }
-
-  return false;
-}
-
-} // End anonymous namespace.

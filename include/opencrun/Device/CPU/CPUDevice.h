@@ -31,6 +31,9 @@ public:
   ~CPUDevice();
 
 public:
+  virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
+                                          WorkSizes &LW) const;
+
   virtual bool CreateHostBuffer(HostBuffer &Buf);
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf);

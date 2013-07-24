@@ -40,6 +40,25 @@ CPUDevice::~CPUDevice() {
   DestroyJIT();
 }
 
+bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
+                                           WorkSizes &LW) const {
+  static const size_t Presets[3][3] = {
+    {1024, 0, 0}, {32, 32, 0}, {16, 8, 8}
+  };
+
+  size_t N = GW.size();
+
+  for (unsigned i = 0; i != N; ++i) {
+    size_t Dim = GW[i];
+    if (Presets[N][i] < Dim)
+      Dim = llvm::GreatestCommonDivisor64(Dim, Presets[N][i]);
+
+    LW.push_back(Dim);
+  }
+
+  return true;
+}
+
 bool CPUDevice::CreateHostBuffer(HostBuffer &Buf) {
   return false;
 }

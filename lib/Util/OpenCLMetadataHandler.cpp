@@ -367,7 +367,7 @@ OpenCLMetadataHandler::GetArgAddressSpace(llvm::Function &Kern, unsigned I) {
       llvm::MDString *InfoKind = 
         llvm::cast<llvm::MDString>(ArgsMD->getOperand(0));
 
-      if (InfoKind->getString() != "kernel_arg_addr_space") continue;
+      if (InfoKind->getString() != "opencrun_kernel_arg_addr_space") continue;
 
       // The translation is based on the FakeAddressSpaceMap defined in 
       // clang/lib/AST/ASTContext.cpp

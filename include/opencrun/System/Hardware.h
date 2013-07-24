@@ -103,7 +103,8 @@ public:
                                         ++I)
           if(!Visited.count(*I))
             ToVisit.push(*I);
-      } while(!ToVisit.empty() && !llvm::isa<Ty>(ToVisit.top()));
+      } while(!ToVisit.empty() && 
+              (!llvm::isa<Ty>(ToVisit.top()) || Visited.count(ToVisit.top())));
     }
 
   private:
