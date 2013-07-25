@@ -20,7 +20,8 @@ LIBRARY_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
 
 OCLGENTool = $(ToolDir)/oclgen
 
-OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include) \
+         -I $(call SYSPATH, $(PROJ_SRC_DIR))
 
 NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
 
@@ -38,7 +39,6 @@ HEADERS = oclconst.$(OPENCRUN_TARGET).h ocltype.$(OPENCRUN_TARGET).h ocltarget.$
 
 TargetRequire = $(addprefix $(HeaderDir)/, $(HEADERS))
 TargetCommonOpts = -DOPENCRUN_LIB_IMPL -include "$(HeaderDir)/ocltarget.$(OPENCRUN_TARGET).h"
-
 
 endif
 
