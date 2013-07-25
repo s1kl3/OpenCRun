@@ -12,8 +12,6 @@ extern "C" void LinkInOpenCRunPasses() {
 
   // Transform.
   CreateAggressiveInlinerPass();
-
-  CreateAsyncCopySpecializationPass();
 }
 
 namespace {
@@ -26,8 +24,6 @@ public:
     initializeFootprintEstimatePass(Registry);
 
     initializeAggressiveInlinerPass(Registry);
-
-    initializeAsyncCopySpecializationPass(Registry);
   }
 };
 

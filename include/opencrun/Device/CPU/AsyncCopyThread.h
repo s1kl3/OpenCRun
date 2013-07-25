@@ -2,7 +2,7 @@
 #ifndef OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 #define OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 
-#include "opencrun/Device/CPU/OCLTypes.h"
+#include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPU/ThreadPool.h"
 
 namespace opencrun {
@@ -25,8 +25,8 @@ public:
 
     size_t sz_gentype;          // Size of each gentype element.
 
-    size_t dst_stride;          // Destination stride (for strided async copies).
-    size_t src_stride;          // Source stride (for strided async copies).
+    size_t dst_stride;          // Destination stride (expressed in gentype elements).
+    size_t src_stride;          // Source stride (expressed in gentype elements).
 
     event_t event;              // Event to be notified of Job completion.
 

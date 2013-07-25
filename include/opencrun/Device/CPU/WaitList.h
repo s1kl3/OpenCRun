@@ -2,7 +2,7 @@
 #ifndef OPENCRUN_DEVICE_CPU_WAITLIST_H
 #define OPENCRUN_DEVICE_CPU_WAITLIST_H
 
-#include "opencrun/Device/CPU/OCLTypes.h"
+#include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/System/Monitor.h"
 
 #include "llvm/ADT/SmallVector.h"

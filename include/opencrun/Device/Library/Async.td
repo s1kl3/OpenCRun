@@ -47,7 +47,7 @@ class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLMultiBuiltin<name, [
     ocl_event_t
   ],
   [isSameAs<Pointee<1>, Pointee<2>>],
-  "eP2gP1gze">,
+  "eP2gP1gzze">,
   OCLBuiltinVariant<[
     ocl_event_t,
     OCLPointerType<ocl_gentype, ocl_as_global, []>,
@@ -57,7 +57,7 @@ class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLMultiBuiltin<name, [
     ocl_event_t
   ],
   [isSameAs<Pointee<1>, Pointee<2>>],
-  "eP1gP2gze">
+  "eP1gP2gzze">
 ]>;
 
 }

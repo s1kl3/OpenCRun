@@ -34,11 +34,9 @@ public:
   void SetLongPrefix() { Long = true; }
   void SetShortPrefix() { Short = true; }
   void SetPointerPrefix() { Pointer = true; }
-  void SetVectorPrefix(size_t v_size) { Vector = true; this->v_size = v_size; }
 
   void SetChar() { Char = true; }
   void SetInteger() { Integer = true; }
-  void SetFloat() { Float = true; }
   void SetSizeT() { SizeT = true; }
   void SetVoid() { Void = true; }
   void SetEventT() { EventT = true; }
@@ -47,131 +45,45 @@ public:
     llvm::Type *Ty;
 
     if(Char && Unsigned) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetUCharTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetUCharTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetUCharTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetUCharTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetUCharTy());
+      else if(!Pointer)
+        Ty = GetUCharTy();
     } else if(Char && !Unsigned) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetCharTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetCharTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetCharTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetCharTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetCharTy());
+      else if(!Pointer)
+        Ty = GetCharTy();
     } else if(Integer && Unsigned && Short) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetUShortTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetUShortTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetUShortTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetUShortTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetUShortTy());
+      else if(!Pointer)
+        Ty = GetUShortTy();
     } else if(Integer && !Unsigned && Short) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetShortTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetShortTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetShortTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetShortTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetShortTy());
+      else if(!Pointer)
+        Ty = GetShortTy();
     } else if(Integer && Unsigned && !Long && !Short) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetUIntTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetUIntTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetUIntTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetUIntTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetUIntTy());
+      else if(!Pointer)
+        Ty = GetUIntTy();
     } else if(Integer && !Unsigned && !Long && !Short) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetIntTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetIntTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetIntTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetIntTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetIntTy());
+      else if(!Pointer)
+        Ty = GetIntTy();
     } else if(Integer && Unsigned && Long) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetULongTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetULongTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetULongTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetULongTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetULongTy());
+      else if(!Pointer)
+        Ty = GetULongTy();
     } else if(Integer && !Unsigned && Long) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetLongTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetLongTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetLongTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetLongTy();
-        }
-      }
-    } else if(Float) {
-      if(Pointer) {
-        if(Vector) {
-          Ty = GetPointerTy(GetVectorTy(GetFloatTy(), v_size));
-        } else if(!Vector) {
-          Ty = GetPointerTy(GetFloatTy());
-        }
-      } else if(!Pointer) {
-        if(Vector) {
-          Ty = GetVectorTy(GetFloatTy(), v_size);
-        } else if(!Vector) {
-          Ty = GetFloatTy();
-        }
-      }
+      if(Pointer)
+        Ty = GetPointerTy(GetLongTy());
+      else if(!Pointer)
+        Ty = GetLongTy();
     } else if(EventT) {
       if(Pointer)
         Ty = GetPointerTy(GetEventTTy());
@@ -209,9 +121,8 @@ public:
 
 private: 
   void ResetState() {
-    Unsigned = Long = Short = Pointer = Vector = false;
-    Char = Integer = Float = SizeT = Void = EventT = false;
-    v_size = 1;    
+    Unsigned = Long = Short = Pointer = false;
+    Char = Integer = SizeT = Void = EventT = false;
   }
 
   void InitTargetInfo() {
@@ -234,7 +145,7 @@ private:
   llvm::Type *GetCharTy() {
     return llvm::Type::getInt8Ty(Mod.getContext());
   }
-
+  
   llvm::Type *GetUShortTy() {
     return llvm::Type::getInt16Ty(Mod.getContext());
   }
@@ -259,10 +170,6 @@ private:
     return llvm::Type::getInt64Ty(Mod.getContext());
   }
 
-  llvm::Type *GetFloatTy() {
-    return llvm::Type::getFloatTy(Mod.getContext());
-  }
-
   llvm::Type *GetSizeTTy() {
     return llvm::Type::getIntNTy(Mod.getContext(), TargetInfo->getSizeType());
   }
@@ -279,20 +186,15 @@ private:
     return llvm::PointerType::get(ElementType, 0);
   }
 
-  llvm::Type *GetVectorTy(llvm::Type *ElementType, size_t NumElements) {
-    return llvm::ArrayType::get(ElementType, (uint64_t)NumElements);
-  }
-
 private:
   const llvm::StringRef Name;
   llvm::Module &Mod;
 
   // Prefixes.
-  bool Unsigned, Long, Short, Pointer, Vector;
-  size_t v_size;
+  bool Unsigned, Long, Short, Pointer;
 
   // Types.
-  bool Char, Integer, Float, SizeT, Void, EventT;
+  bool Char, Integer, SizeT, Void, EventT;
 
   TypesContainer Types;
 
@@ -439,40 +341,6 @@ OpenCLMetadataHandler::BuildBuiltin(const llvm::StringRef Name,
       Bld.SetPointerPrefix();
     }
 
-    if(*I == 'V') {
-      I++;
-      size_t v_size = 1;
-
-      switch(*I++) {
-        case '2':
-          v_size = 2;
-          break;
-
-        case '3':
-          v_size = 3;
-          break;
-
-        case '4':
-          v_size = 4;
-          break;
-
-        case '8':
-          v_size = 8;
-          break;
-
-        case '1':
-          I++;
-          if(*I == '6')
-            v_size = 16;
-          break;
-
-        default:
-          llvm_unreachable("Unsupported vector type size");
-      }
-
-      Bld.SetVectorPrefix(v_size);
-    }
-
     if(*I == 'U') {
       I++;
       Bld.SetUnsignedPrefix();
@@ -499,20 +367,16 @@ OpenCLMetadataHandler::BuildBuiltin(const llvm::StringRef Name,
       Bld.SetInteger();
       break;
 
-    case 'f':
-      Bld.SetFloat();
-      break;
-
     case 'z':
       Bld.SetSizeT();
       break;
 
-    case 'e':
-      Bld.SetEventT();
-      break;
-
     case 'v':
       Bld.SetVoid();
+      break;
+
+    case 'e':
+      Bld.SetEventT();
       break;
 
     default:

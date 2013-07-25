@@ -2,6 +2,7 @@
 #include "opencrun/Device/CPU/WaitList.h"
 
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;
@@ -28,9 +29,11 @@ event_t WaitList::GetEvent(const event_t evt) {
 
   // The pre-existing event evt must store a reference
   // to the newly inserted event.
+  if(events.count(evt))
+    llvm_unreachable("Non existant event");
+  
   events[evt].second.push_back(new_evt);
 
-  // The pre-existing event_t is returned.
   return new_evt;
 
 }
