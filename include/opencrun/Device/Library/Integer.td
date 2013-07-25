@@ -4,13 +4,13 @@
 
 let Group = "INTEGER" in {
 
-class IntegerBuiltin_ii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_ii<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_integer, ocl_gentype_integer], 
   [isSameAs<Id<0>, Id<1>>]
 >;
 
-class IntegerBuiltin_Uiii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_Uiii<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_u_integer, ocl_gentype_integer, ocl_gentype_integer],
   [
@@ -21,19 +21,19 @@ class IntegerBuiltin_Uiii<string name> : OCLSimpleBuiltin<
   ]
 >;
 
-class IntegerBuiltin_iii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_iii<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_integer, ocl_gentype_integer, ocl_gentype_integer],
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
 >;
 
-class IntegerBuiltin_fast_iii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_fast_iii<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_integer_int, ocl_gentype_integer_int, ocl_gentype_integer_int],
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
 >;
 
-class IntegerBuiltin_iiii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_iiii<string name> : OCLGenericBuiltinSimple<
   name, 
   [
     ocl_gentype_integer, ocl_gentype_integer, 
@@ -42,7 +42,7 @@ class IntegerBuiltin_iiii<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
 >;
 
-class IntegerBuiltin_fast_iiii<string name> : OCLSimpleBuiltin<
+class IntegerBuiltin_fast_iiii<string name> : OCLGenericBuiltinSimple<
   name, 
   [
     ocl_gentype_integer_int, ocl_gentype_integer_int, 
@@ -51,7 +51,7 @@ class IntegerBuiltin_fast_iiii<string name> : OCLSimpleBuiltin<
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
 >;
 
-class IntegerBuiltin_UiUi_UiSi<string name> : OCLMultiBuiltin<name, [
+class IntegerBuiltin_UiUi_UiSi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_u_integer, 
     ocl_gentype_u_integer
@@ -66,7 +66,7 @@ class IntegerBuiltin_UiUi_UiSi<string name> : OCLMultiBuiltin<name, [
   "UiSi">
 ]>;
 
-class IntegerBuiltin_UiUiUi_SiSiSi<string name> : OCLMultiBuiltin<name, [
+class IntegerBuiltin_UiUiUi_SiSiSi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_u_integer,
     ocl_gentype_u_integer,
@@ -83,7 +83,7 @@ class IntegerBuiltin_UiUiUi_SiSiSi<string name> : OCLMultiBuiltin<name, [
   "SiSiSi">
 ]>;
 
-class IntegerBuiltin_UiUiUiUi_SiSiSiSi<string name> : OCLMultiBuiltin<name, [
+class IntegerBuiltin_UiUiUiUi_SiSiSiSi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_u_integer,
     ocl_gentype_u_integer,
@@ -102,7 +102,7 @@ class IntegerBuiltin_UiUiUiUi_SiSiSiSi<string name> : OCLMultiBuiltin<name, [
   "SiSiSiSi">
 ]>;
 
-class IntegerBuiltin_iii_ViViCi<string name> : OCLMultiBuiltin<name, [
+class IntegerBuiltin_iii_ViViCi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_integer,
     ocl_gentype_integer,
@@ -120,7 +120,7 @@ class IntegerBuiltin_iii_ViViCi<string name> : OCLMultiBuiltin<name, [
 ]>;
 
 class IntegerBuiltin_SsScUc_UsUcUc_SiSsUs_UiUsUs_SlSiUi_UlUiUi<string name> : 
-OCLMultiBuiltin<name, [
+OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_s_short,
     ocl_s_char,
@@ -183,7 +183,7 @@ OCLMultiBuiltin<name, [
   "UlUiUi">
 ]>;
 
-class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLMultiBuiltin<name, [
+class IntegerBuiltin_iiii_ViViCiCi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_integer,
     ocl_gentype_integer,

@@ -4,31 +4,31 @@
 
 let Group = "GEOMETRIC" in {
 
-class GeometricBuiltin_ff<string name> : OCLSimpleBuiltin<
+class GeometricBuiltin_ff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_float_geom, ocl_gentype_float_geom], 
   [isSameAs<Id<0>, Id<1>>]
 >;
 
-class GeometricBuiltin_Cff<string name> : OCLSimpleBuiltin<
+class GeometricBuiltin_Cff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_float, ocl_gentype_float_geom], 
   []
 >;
 
-class GeometricBuiltin_Cfff<string name> : OCLSimpleBuiltin<
+class GeometricBuiltin_Cfff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_float, ocl_gentype_float_geom, ocl_gentype_float_geom], 
   [isSameAs<Id<1>, Id<2>>]
 >;
 
-class GeometricBuiltin_Crrr<string name> : OCLSimpleBuiltin<
+class GeometricBuiltin_Crrr<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_sgentype_real, ocl_gentype_real_geom, ocl_gentype_real_geom],
   [isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>,Id<1>>]
 >;
 
-class GeometricBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
+class GeometricBuiltin_ff_dd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float_geom,
     ocl_gentype_float_geom
@@ -43,7 +43,7 @@ class GeometricBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
   "dd">
 ]>;
 
-class GeometricBuiltin_Cff_Cdd<string name> : OCLMultiBuiltin<name, [
+class GeometricBuiltin_Cff_Cdd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_float,
     ocl_gentype_float_geom
@@ -58,7 +58,7 @@ class GeometricBuiltin_Cff_Cdd<string name> : OCLMultiBuiltin<name, [
   "Cdd">
 ]>;
 
-class GeometricBuiltin_Cfff_Cddd<string name> : OCLMultiBuiltin<name, [
+class GeometricBuiltin_Cfff_Cddd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_float,
     ocl_gentype_float_geom,
@@ -76,7 +76,7 @@ class GeometricBuiltin_Cfff_Cddd<string name> : OCLMultiBuiltin<name, [
 ]>;
 
 class GeometricBuiltin_V3fV3fV3f_V4fV4fV4f_V3dV3dV3d_V4dV4dV4d<string name> : 
-OCLMultiBuiltin<name, [
+OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_float_3,
     ocl_float_3,

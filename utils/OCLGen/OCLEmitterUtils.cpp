@@ -20,6 +20,30 @@ const char *opencrun::AddressSpaceQualifier(AddressSpaceKind AS) {
   return 0;
 }
 
+PredicateSet opencrun::ComputePredicates(const BuiltinSign &Sign, 
+                                         bool IgnoreAS) {
+  PredicateSet Preds;
+  for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
+    const OCLBasicType *B = Sign[i];
+
+    while (llvm::isa<OCLPointerType>(B)) {
+      const OCLPointerType *P = llvm::cast<OCLPointerType>(B);
+      Preds.insert(P->getPredicates().begin(), P->getPredicates().end());
+      B = llvm::cast<OCLBasicType>(&P->getBaseType());
+    }
+
+    if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
+      B = &V->getBaseType();
+
+    Preds.insert(B->getPredicates().begin(), B->getPredicates().end());
+  }
+  if (IgnoreAS) {
+    for (unsigned i = AS_Begin; i != AS_End; ++i)
+      Preds.erase(OCLPredicatesTable::getAddressSpace(AddressSpaceKind(i)));
+  }
+  return Preds;
+}
+
 void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                                     std::string Name) {
   if (llvm::isa<OCLGroupType>(&T)) 
@@ -48,31 +72,60 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << " " << Name;
 }
 
-void opencrun::ComputePredicates(const BuiltinSignature &Sign, 
-                                 PredicateSet &Preds, bool IgnoreAS) {
-  Preds.clear();
-  for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
-    const OCLBasicType *B = Sign[i];
+std::string OCLBuiltinDecorator::
+getExternalName(const BuiltinSign *S, bool NoRound) const {
+  if (const OCLCastBuiltin *CB =llvm::dyn_cast<OCLCastBuiltin>(&Builtin)) {
+    assert(S);
+    std::string buf;
+    llvm::raw_string_ostream OS(buf);
+    OS << CB->getName() << "_";
+    EmitOCLTypeSignature(OS, *(*S)[0]);
 
-    while (llvm::isa<OCLPointerType>(B)) {
-      const OCLPointerType *P = llvm::cast<OCLPointerType>(B);
-      Preds.insert(P->getPredicates().begin(), P->getPredicates().end());
-      B = llvm::cast<OCLBasicType>(&P->getBaseType());
+    if (const OCLConvertBuiltin *CV = llvm::dyn_cast<OCLConvertBuiltin>(CB)) {
+      if (CV->hasSaturation()) OS << "_sat";
+      if (!NoRound) OS << "_" << CV->getRoundingMode();
     }
 
-    if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
-      B = &V->getBaseType();
-
-    Preds.insert(B->getPredicates().begin(), B->getPredicates().end());
+    return OS.str();
   }
-  if (IgnoreAS) {
-    for (unsigned i = AS_Begin; i != AS_End; ++i)
-      Preds.erase(OCLPredicatesTable::getAddressSpace(AddressSpaceKind(i)));
-  }
+  return Builtin.getName();
 }
 
-void opencrun::EmitPredicatesBegin(llvm::raw_ostream &OS, 
-                                    const PredicateSet &Preds) {
+std::string OCLBuiltinDecorator::
+getInternalName(const BuiltinSign *S, bool NoRound) const {
+  return "__builtin_ocl_" + getExternalName(S);
+}
+
+static void EmitGroupGuardBegin(llvm::raw_ostream &OS, llvm::StringRef Group) {
+  if (!Group.size()) return;
+  OS << "#ifdef OPENCRUN_BUILTIN_" << Group << "\n\n";
+}
+
+static void EmitGroupGuardEnd(llvm::raw_ostream &OS, llvm::StringRef Group) {
+  if (!Group.size()) return;
+  OS << "#endif // OPENCRUN_BUILTIN_" << Group << "\n\n";
+}
+
+
+void GroupGuardEmitter::Push(llvm::StringRef Group) {
+  if (Group == Current) return;
+
+  EmitGroupGuardEnd(OS, Current);
+
+  Old = Current;
+  Current = Group;
+
+  EmitGroupGuardBegin(OS, Current);
+}
+
+void GroupGuardEmitter::Finalize() {
+  EmitGroupGuardEnd(OS, Current);
+
+  Old = Current = "";
+}
+
+static void EmitPredicatesBegin(llvm::raw_ostream &OS, 
+                                const PredicateSet &Preds) {
   if (Preds.empty()) return;
 
   llvm::SmallVector<llvm::StringRef, 4> ExtNames;
@@ -91,12 +144,12 @@ void opencrun::EmitPredicatesBegin(llvm::raw_ostream &OS,
   if (ExtNames.size()) {
     for (unsigned i = 0, e = ExtNames.size(); i != e; ++i)
       OS << "#pragma OPENCL EXTENSION " << ExtNames[i] << " : enable\n";
-    OS << "\n";
   }
+  OS << "\n";
 }
 
-void opencrun::EmitPredicatesEnd(llvm::raw_ostream &OS, 
-                                  const PredicateSet &Preds) {
+static void EmitPredicatesEnd(llvm::raw_ostream &OS, 
+                              const PredicateSet &Preds) {
   if (Preds.empty()) return;
   
   for (PredicateSet::iterator I = Preds.begin(), E = Preds.end(); I != E; ++I)
@@ -105,14 +158,20 @@ void opencrun::EmitPredicatesEnd(llvm::raw_ostream &OS,
   OS << "#endif\n\n";
 }
 
-void opencrun::EmitBuiltinGroupBegin(llvm::raw_ostream &OS, 
-                                     llvm::StringRef Group) {
-  if (!Group.size()) return;
-  OS << "#ifdef OPENCRUN_BUILTIN_" << Group << "\n\n";
+void PredicatesGuardEmitter::Push(const PredicateSet &Preds) {
+  if (Preds == Current) return;
+
+  EmitPredicatesEnd(OS, Current);
+
+  Old = Current;
+  Current = Preds;
+
+  EmitPredicatesBegin(OS, Current);
 }
 
-void opencrun::EmitBuiltinGroupEnd(llvm::raw_ostream &OS, 
-                                   llvm::StringRef Group) {
-  if (!Group.size()) return;
-  OS << "#endif // OPENCRUN_BUILTIN_" << Group << "\n";
+void PredicatesGuardEmitter::Finalize() {
+  EmitPredicatesEnd(OS, Current);
+
+  Old.clear();
+  Current.clear();
 }

@@ -4,47 +4,47 @@
 
 let Group = "MATH" in {
 
-class MathBuiltin_rr<string name> : OCLSimpleBuiltin<
+class MathBuiltin_rr<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_real, ocl_gentype_real], 
   [isSameAs<Id<0>, Id<1>>]
 >;
 
-class MathBuiltin_ff<string name> : OCLSimpleBuiltin<
+class MathBuiltin_ff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_float, ocl_gentype_float], 
   [isSameAs<Id<0>, Id<1>>]
 >;
 
-class MathBuiltin_rrr<string name> : OCLSimpleBuiltin<
+class MathBuiltin_rrr<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_real, ocl_gentype_real, ocl_gentype_real], 
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
 >;
 
-class MathBuiltin_fff<string name> : OCLSimpleBuiltin<
+class MathBuiltin_fff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_float, ocl_gentype_float, ocl_gentype_float], 
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>]
 >;
 
-class MathBuiltin_rrrr<string name> : OCLSimpleBuiltin<
+class MathBuiltin_rrrr<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_real, ocl_gentype_real, ocl_gentype_real, ocl_gentype_real], 
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>]
 >;
 
-class MathBuiltin_rrSn<string name> : OCLSimpleBuiltin<name,
+class MathBuiltin_rrSn<string name> : OCLGenericBuiltinSimple<name,
   [ocl_gentype_real, ocl_gentype_real, ocl_s_int], 
   [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>]
 >;
 
-class MathBuiltin_Snr<string name> : OCLSimpleBuiltin<name, 
+class MathBuiltin_Snr<string name> : OCLGenericBuiltinSimple<name, 
   [ocl_s_int, ocl_gentype_real], 
   [isSameDimAs<Id<0>, Id<1>>]
 >;
 
-class MathBuiltin_fUn_dUl<string name> : OCLMultiBuiltin<name, [ 
+class MathBuiltin_fUn_dUl<string name> : OCLGenericBuiltin<name, [ 
   OCLBuiltinVariant<[
     ocl_gentype_float, 
     ocl_u_int
@@ -57,7 +57,7 @@ class MathBuiltin_fUn_dUl<string name> : OCLMultiBuiltin<name, [
   [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "dUl">
 ]>;
 
-class MathBuiltin_ffSn_ddSn<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_ffSn_ddSn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float, 
     ocl_gentype_float, 
@@ -72,7 +72,7 @@ class MathBuiltin_ffSn_ddSn<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ddSn">
 ]>;
 
-class MathBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_ff_dd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float,
     ocl_gentype_float
@@ -85,7 +85,7 @@ class MathBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>], "dd">
 ]>;
 
-class MathBuiltin_fff_ddd<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_fff_ddd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float,
     ocl_gentype_float,
@@ -100,7 +100,7 @@ class MathBuiltin_fff_ddd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "ddd">
 ]>;
 
-class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real,
     ocl_gentype_real,
@@ -121,7 +121,7 @@ class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>], "ddCd">
 ]>;
 
-class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
@@ -140,7 +140,7 @@ class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLMultiBuiltin<name, [
 ]>;
 
 class MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<string name> : 
-OCLMultiBuiltin<name, [
+OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_gentype_float, 
      ocl_gentype_float, 
@@ -173,7 +173,7 @@ OCLMultiBuiltin<name, [
   ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP4Sn">
 ]>;
 
-class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_gentype_real, 
      ocl_gentype_real, 
@@ -197,7 +197,7 @@ class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLMultiBuiltin<name, [
       isSameDimAs<Id<2>, Pointee<3>>], "rrrP4Sn">
 ]>;
 
-class MathBuiltin_VrVrCn_rrSn<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_VrVrCn_rrSn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_real, 
      ocl_vgentype_real, 
@@ -210,7 +210,7 @@ class MathBuiltin_VrVrCn_rrSn<string name> : OCLMultiBuiltin<name, [
   ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "rrSn">
 ]>;
 
-class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
+class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real,
     ocl_gentype_real,
@@ -229,7 +229,7 @@ class MathBuiltin_rrP1r_rrP2r_rrP4r<string name> : OCLMultiBuiltin<name, [
 ]>;
 
 class MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<string name> : 
-OCLMultiBuiltin<name, [
+OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float,
     ocl_gentype_float,

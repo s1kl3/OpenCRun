@@ -34,7 +34,20 @@ class isSameBaseSizeAs<OCLParam op1, OCLParam op2>
 class isSameBaseKindAs<OCLParam op1, OCLParam op2>
  : OCLBinaryTypeConstraint<op1, op2>;
 
+class Not<OCLTypeConstraint c> : OCLTypeConstraint {
+  OCLTypeConstraint Basic = c;
+}
+
 //----------------------------------------------------------------------------//
+
+class OCLRoundingMode<string name> {
+  string Name = name;
+}
+
+def ocl_rm_rtz : OCLRoundingMode<"rtz">;
+def ocl_rm_rtp : OCLRoundingMode<"rtp">;
+def ocl_rm_rtn : OCLRoundingMode<"rtn">;
+def ocl_rm_rte : OCLRoundingMode<"rte">;
 
 class OCLBuiltinVariant<list<OCLType> ops, list<OCLTypeConstraint> constrs,
                         string name> {
@@ -43,19 +56,36 @@ class OCLBuiltinVariant<list<OCLType> ops, list<OCLTypeConstraint> constrs,
   list<OCLTypeConstraint> Constraints = constrs;
 }
 
-class OCLBuiltin<string name> {
+class OCLBuiltin<string name, list<OCLBuiltinVariant> var> {
   string Name = name;
   string Group = "";
-}
-
-class OCLSimpleBuiltin<string name, list<OCLType> ops, 
-                       list<OCLTypeConstraint> constrs>
-  : OCLBuiltin<name>, OCLBuiltinVariant<ops, constrs, "">;
-
-class OCLMultiBuiltin<string name, list<OCLBuiltinVariant> var>
- : OCLBuiltin<name> {
   list<OCLBuiltinVariant> Variants = var;
 }
+
+class OCLGenericBuiltin<string name, list<OCLBuiltinVariant> var>
+ : OCLBuiltin<name, var>;
+
+class OCLConvertBuiltin<OCLRoundingMode round, bit sat, 
+                        list<OCLBuiltinVariant> var>
+ : OCLBuiltin<"convert", var> {
+  string Rounding = round.Name;
+  bit Saturation = sat;
+}
+
+class OCLReinterpretBuiltin<list<OCLBuiltinVariant> var>
+ : OCLBuiltin<"as", var>;
+
+class OCLGenericBuiltinSimple<string name, list<OCLType> ops, 
+                              list<OCLTypeConstraint> constrs>
+  : OCLGenericBuiltin<name, []>, OCLBuiltinVariant<ops, constrs, "">;
+
+class OCLConvertBuiltinSimple<OCLRoundingMode round, bit sat, list<OCLType> ops,
+                              list<OCLTypeConstraint> constrs>
+  : OCLConvertBuiltin<round, sat, []>, OCLBuiltinVariant<ops, constrs, "">;
+
+class OCLReinterpretBuiltinSimple<list<OCLType> ops, 
+                                  list<OCLTypeConstraint> constrs>
+  : OCLReinterpretBuiltin<[]>, OCLBuiltinVariant<ops, constrs, "">;
 
 //----------------------------------------------------------------------------//
 
@@ -72,6 +102,16 @@ class TypedefId<string typename, OCLParam param>
 class TypedefUnsigned<string typename, OCLParam param>
  : OCLTypedef<typename, param>;
 
+class OCLTypeValue<string id, OCLParam param> : OCLDeclaration {
+  string ID = id;
+  OCLParam Param = param;
+}
+
+class MinValue<string id, OCLParam param>
+ : OCLTypeValue<id, param>;
+
+class MaxValue<string id, OCLParam param>
+ : OCLTypeValue<id, param>;
 
 class OCLStrategy<list<OCLDeclaration> decls> {
   list<OCLDeclaration> Declarations = decls;

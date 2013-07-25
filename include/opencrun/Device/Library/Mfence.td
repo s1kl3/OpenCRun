@@ -4,7 +4,7 @@
 
 let Group = "MFENCE" in {
 
-class MfenceBuiltin_vCUn<string name> : OCLSimpleBuiltin<
+class MfenceBuiltin_vCUn<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_void, ocl_mem_fence_flags],
   []

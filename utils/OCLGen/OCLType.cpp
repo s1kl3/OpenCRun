@@ -71,9 +71,6 @@ bool OCLVectorType::compareLess(const OCLType *T) const {
   if (llvm::isa<OCLScalarType>(T))
     return getBaseType().compareLess(T);
   if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(T))
-    //return getWidth() < V->getWidth() ||
-    //       (getWidth() == V->getWidth() && 
-    //        getBaseType().compareLess(&(V->getBaseType())));
     return getBaseType().compareLess(&(V->getBaseType())) ||
            (&getBaseType() == &V->getBaseType() && getWidth() < V->getWidth());
 
@@ -179,7 +176,7 @@ private:
     for (unsigned i = 0, e = Predicates.size(); i != e; ++i) {
       const OCLPredicate &P = OCLPredicatesTable::get(*Predicates[i]);
 
-      if (&P != OCLPredicatesTable::getAddressSpace(AS_Private))
+      if (!llvm::isa<OCLAddressSpace>(&P))
         Preds.insert(&P);
     }
     return Preds;
@@ -253,9 +250,6 @@ private:
                                             : Base;
 
     OCLPointerType *P = new OCLPointerType(B, PtrS[0].first, PtrS[0].second);
-    PredicateSet Preds;
-    Preds.insert(OCLPredicatesTable::getAddressSpace(PtrS[0].first));
-    P->setPredicates(Preds);
     Ptrs[OCLPointerId(&Base, PtrS)] = P;
   }
 

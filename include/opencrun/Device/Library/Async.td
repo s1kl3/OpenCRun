@@ -4,19 +4,19 @@
 
 let Group = "ASYNC" in {
 
-class AsyncBuiltin_vP1gz<string name> : OCLSimpleBuiltin<
+class AsyncBuiltin_vP1gz<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_void, OCLPointerType<ocl_gentype, ocl_as_global, [ocl_mod_const]>],
   []
 >;
 
-class AsyncBuiltin_vCnPe<string name> : OCLSimpleBuiltin<
+class AsyncBuiltin_vCnPe<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_void, ocl_int, OCLPointerType<ocl_event_t, ocl_as_private, []>],
   []
 >;
 
-class AsyncBuiltin_eP2gP1gze_eP1gP2gze<string name> : OCLMultiBuiltin<name, [
+class AsyncBuiltin_eP2gP1gze_eP1gP2gze<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_event_t,
     OCLPointerType<ocl_gentype, ocl_as_local, []>,
@@ -37,7 +37,7 @@ class AsyncBuiltin_eP2gP1gze_eP1gP2gze<string name> : OCLMultiBuiltin<name, [
   "eP1gP2gze">
 ]>;
 
-class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLMultiBuiltin<name, [
+class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_event_t,
     OCLPointerType<ocl_gentype, ocl_as_local, []>,

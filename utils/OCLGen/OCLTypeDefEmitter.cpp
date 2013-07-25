@@ -41,34 +41,29 @@ void EmitOCLScalarTypes(llvm::raw_ostream &OS) {
 }
 
 void EmitOCLVectorTypes(llvm::raw_ostream &OS) {
-  PredicateSet GroupPreds;
+  PredicatesGuardEmitter Preds(OS);
   for (unsigned i = 0, e = OCLTypes.size(); i != e; ++i) {
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(OCLTypes[i])) {
-      const PredicateSet &Preds = V->getBaseType().getPredicates();
-      if (Preds != GroupPreds) {
-        EmitPredicatesEnd(OS, GroupPreds);
-        OS << "\n";
-        GroupPreds = Preds;
-        EmitPredicatesBegin(OS, GroupPreds); 
-      }
+      Preds.Push(V->getBaseType().getPredicates());
 
       OS << "typedef " << V->getBaseType().getName()
          << " __attribute__((ext_vector_type(" << V->getWidth() << "))) "
          << V->getName() << ";\n";
     }
   }
-  EmitPredicatesEnd(OS, GroupPreds);
+  Preds.Finalize();
 }
 
 void EmitOCLOpaqueTypeDefs(llvm::raw_ostream &OS, bool TargetDefs) {
+  PredicatesGuardEmitter Preds(OS);
   for (unsigned i = 0, e = OCLOpaqueTypeDefs.size(); i != e; ++i) {
     const OCLOpaqueTypeDef &D = *OCLOpaqueTypeDefs[i];
     if (D.isTarget() != TargetDefs) continue;
 
-    EmitPredicatesBegin(OS, D.getPredicates());
+    Preds.Push(D.getPredicates());
     OS << "typedef " << D.getDef() << " " << D.getType() << ";\n";
-    EmitPredicatesEnd(OS, D.getPredicates());
   }
+  Preds.Finalize();
 }
 
 bool opencrun::EmitOCLTypeDefs(llvm::raw_ostream &OS, 

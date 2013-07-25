@@ -9,17 +9,17 @@
 namespace opencrun {
 
 //===----------------------------------------------------------------------===//
-// BuiltinSignature utils
+// BuiltinSign utils
 //===----------------------------------------------------------------------===//
 class OCLBuiltinVariant;
 
-typedef std::vector<const OCLBasicType *> BuiltinSignature;
-typedef std::list<BuiltinSignature> BuiltinSignatureList;
+typedef std::vector<const OCLBasicType *> BuiltinSign;
+typedef std::list<BuiltinSign> BuiltinSignList;
 
-void ExpandSignature(const OCLBuiltinVariant &B, BuiltinSignatureList &R);
+void ExpandSigns(const OCLBuiltinVariant &B, BuiltinSignList &R);
 
-struct BuiltinSignatureCompare {
-  bool operator()(const BuiltinSignature &B1, const BuiltinSignature &B2) const;
+struct BuiltinSignCompare {
+  bool operator()(const BuiltinSign &B1, const BuiltinSign &B2) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -40,7 +40,7 @@ public:
   virtual ~OCLParam();
   ParamKind getKind() const { return Kind; }
   unsigned getOperand() const { return Operand; }
-  virtual const OCLBasicType *get(const BuiltinSignature &Ops) const = 0;
+  virtual const OCLBasicType *get(const BuiltinSign &Ops) const = 0;
 
 private:
   ParamKind Kind;
@@ -56,7 +56,7 @@ public:
 public:
   OCLParamId(unsigned op) : OCLParam(PK_Id, op) {}
 
-  virtual const OCLBasicType *get(const BuiltinSignature &Ops) const;
+  virtual const OCLBasicType *get(const BuiltinSign &Ops) const;
 };
 
 class OCLParamPointee : public OCLParam {
@@ -68,7 +68,7 @@ public:
 public:
   OCLParamPointee(unsigned op, unsigned n) : OCLParam(PK_Pointee, op), Nest(n) {}
 
-  virtual const OCLBasicType *get(const BuiltinSignature &Ops) const;
+  virtual const OCLBasicType *get(const BuiltinSign &Ops) const;
 
 private:
   unsigned Nest;
@@ -81,6 +81,7 @@ private:
 class OCLTypeConstraint {
 public:
   enum ConstraintKind {
+    CK_Not,
     CK_Binary,
     CK_Same,
     CK_SameDim,
@@ -96,13 +97,33 @@ public:
   virtual ~OCLTypeConstraint();
 
   ConstraintKind getKind() const { return Kind; }
-  virtual bool apply(const BuiltinSignature &Ops) const = 0;
+  virtual bool apply(const BuiltinSign &Ops) const = 0;
   unsigned getMaxOperand() const { return MaxOperand; }
 
 private:
   ConstraintKind Kind;
 protected:
   unsigned MaxOperand;
+};
+
+class OCLNotTypeConstraint : public OCLTypeConstraint {
+public:
+  static bool classof(const OCLTypeConstraint *C) {
+    return C->getKind() == CK_Not;
+  }
+
+public:
+  OCLNotTypeConstraint(const OCLTypeConstraint &BC)
+   : OCLTypeConstraint(CK_Not), Basic(BC) {
+    MaxOperand = BC.getMaxOperand();
+  }
+
+  virtual bool apply(const BuiltinSign &Ops) const {
+    return !Basic.apply(Ops);
+  }
+
+private:
+  const OCLTypeConstraint &Basic;
 };
 
 class OCLBinaryTypeConstraint : public OCLTypeConstraint {
@@ -117,7 +138,7 @@ public:
   }
 
 public:
-  virtual bool apply(const BuiltinSignature &Ops) const = 0;
+  virtual bool apply(const BuiltinSign &Ops) const = 0;
 
 protected:
   OCLBinaryTypeConstraint(ConstraintKind K, 
@@ -141,7 +162,7 @@ public:
   OCLSameTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_Same, P1, P2) {}
 
-  bool apply(const BuiltinSignature &Ops) const;
+  bool apply(const BuiltinSign &Ops) const;
 };
 
 class OCLSameDimTypeConstraint : public OCLBinaryTypeConstraint {
@@ -154,7 +175,7 @@ public:
   OCLSameDimTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameDim, P1, P2) {}
 
-  bool apply(const BuiltinSignature &Ops) const;
+  bool apply(const BuiltinSign &Ops) const;
 };
 
 class OCLSameBaseTypeConstraint : public OCLBinaryTypeConstraint {
@@ -167,7 +188,7 @@ public:
   OCLSameBaseTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBase, P1, P2) {}
 
-  bool apply(const BuiltinSignature &Ops) const;
+  bool apply(const BuiltinSign &Ops) const;
 };
 
 class OCLSameBaseSizeTypeConstraint : public OCLBinaryTypeConstraint {
@@ -180,7 +201,7 @@ public:
   OCLSameBaseSizeTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBaseSize, P1, P2) {}
 
-  bool apply(const BuiltinSignature &Ops) const;
+  bool apply(const BuiltinSign &Ops) const;
 };
 
 class OCLSameBaseKindTypeConstraint : public OCLBinaryTypeConstraint {
@@ -193,7 +214,7 @@ public:
   OCLSameBaseKindTypeConstraint(const OCLParam &P1, const OCLParam &P2)
    : OCLBinaryTypeConstraint(CK_SameBaseSize, P1, P2) {}
 
-  bool apply(const BuiltinSignature &Ops) const;
+  bool apply(const BuiltinSign &Ops) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -225,16 +246,26 @@ private:
 
 class OCLBuiltin {
 public:
+  enum BuiltinKind {
+    BK_Generic,
+    BK_Convert,
+    BK_Reinterpret
+  };
+
+public:
   typedef std::map<llvm::StringRef, const OCLBuiltinVariant*> VariantsMap;
   typedef VariantsMap::const_iterator iterator;
 
-public:
-  OCLBuiltin(llvm::StringRef name, llvm::StringRef group, const VariantsMap &v)
-   : Name(name), Group(group), Variants(v) {}
+protected:
+  OCLBuiltin(BuiltinKind K, llvm::StringRef group, llvm::StringRef name,
+             const VariantsMap &variants)
+   : Kind(K), Group(group), Name(name), Variants(variants) {}
 
-  ~OCLBuiltin();
+public:
+  virtual ~OCLBuiltin();
 
 public:
+  BuiltinKind getKind() const { return Kind; }
   std::string getName() const { return Name; }
   std::string getGroup() const { return Group; }
   iterator begin() const { return Variants.begin(); }
@@ -242,9 +273,66 @@ public:
   iterator find(llvm::StringRef V) const { return Variants.find(V); }
 
 private:
-  std::string Name;
+  BuiltinKind Kind;
   std::string Group;
+  std::string Name;
   VariantsMap Variants;
+};
+
+class OCLGenericBuiltin : public OCLBuiltin {
+public:
+  static bool classof(const OCLBuiltin *B) {
+    return B->getKind() == BK_Generic;
+  }
+
+public:
+  OCLGenericBuiltin(llvm::StringRef Group, llvm::StringRef Name,
+                    const VariantsMap &Variants)
+   : OCLBuiltin(BK_Generic, Group, Name, Variants) {}
+};
+
+class OCLCastBuiltin : public OCLBuiltin {
+public:
+  static bool classof(const OCLBuiltin *B) {
+    return B->getKind() != BK_Generic;
+  }
+
+protected:
+  OCLCastBuiltin(BuiltinKind K, llvm::StringRef Group, llvm::StringRef Name,
+                 const VariantsMap &Variants) 
+   : OCLBuiltin(K, Group, Name, Variants) {}
+};
+
+class OCLConvertBuiltin : public OCLCastBuiltin {
+public:
+  static bool classof(const OCLBuiltin *B) {
+    return B->getKind() == BK_Convert;
+  }
+
+public:
+  OCLConvertBuiltin(llvm::StringRef Group, llvm::StringRef Name, bool sat,
+                    llvm::StringRef rm, const VariantsMap &Variants)
+   : OCLCastBuiltin(BK_Convert, Group, Name, Variants), RoundingMode(rm), 
+     Saturation(sat) {}
+
+  const std::string &getRoundingMode() const { return RoundingMode; }
+  bool hasSaturation() const { return Saturation; }
+
+private:
+  std::string RoundingMode;
+  bool Saturation;
+};
+
+class OCLReinterpretBuiltin : public OCLCastBuiltin {
+public:
+  static bool classof(const OCLBuiltin *B) {
+    return B->getKind() == BK_Reinterpret;
+  }
+
+public:
+  OCLReinterpretBuiltin(llvm::StringRef Group, llvm::StringRef Name,
+                        const VariantsMap &Variants)
+   : OCLCastBuiltin(BK_Reinterpret, Group, Name, Variants) {}
 };
 
 //===----------------------------------------------------------------------===//
@@ -254,9 +342,10 @@ private:
 class OCLDecl {
 public:
   enum DeclKind {
-    DK_Typedef,
     DK_TypedefId,
-    DK_TypedefUnsigned
+    DK_TypedefUnsigned,
+    DK_MinValue,
+    DK_MaxValue
   };
 
 protected:
@@ -273,7 +362,7 @@ class OCLTypedefDecl : public OCLDecl {
 public:
   static bool classof(const OCLDecl *D) {
     switch (D->getKind()) {
-    case DK_Typedef: case DK_TypedefId: case DK_TypedefUnsigned:
+    case DK_TypedefId: case DK_TypedefUnsigned:
       return true;
     default: return false;
     }
@@ -312,6 +401,51 @@ public:
 public:
   OCLTypedefUnsignedDecl(llvm::StringRef name, const OCLParam &p)
    : OCLTypedefDecl(DK_TypedefUnsigned, name, p) {}
+};
+
+class OCLTypeValueDecl : public OCLDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    switch (D->getKind()) {
+    case DK_MinValue: case DK_MaxValue:
+      return true;
+    default: return false;
+    }
+  }
+
+protected:
+  OCLTypeValueDecl(DeclKind K, llvm::StringRef id, const OCLParam &p)
+   : OCLDecl(K), ID(id), Param(p) {}
+
+public:
+  std::string getID() const { return ID; }
+  const OCLParam &getParam() const { return Param; }
+
+private:
+  std::string ID;
+  const OCLParam &Param;
+};
+
+class OCLMinValueDecl : public OCLTypeValueDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_MinValue;
+  }
+
+public:
+  OCLMinValueDecl(llvm::StringRef id, const OCLParam &p) 
+   : OCLTypeValueDecl(DK_MinValue, id, p) {}
+};
+
+class OCLMaxValueDecl : public OCLTypeValueDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_MaxValue;
+  }
+
+public:
+  OCLMaxValueDecl(llvm::StringRef id, const OCLParam &p) 
+   : OCLTypeValueDecl(DK_MaxValue, id, p) {}
 };
 
 class OCLReduction {

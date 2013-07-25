@@ -19,41 +19,38 @@ OCLBuiltinsContainer OCLBuiltins;
 
 }
 
-void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
-  BuiltinSignatureList Alts;
+void EmitOCLGenericBuiltinPrototype(llvm::raw_ostream &OS, 
+                                    const OCLGenericBuiltin &B) {
+  OCLBuiltinDecorator BD(B);
 
-  OS << "// Builtin: " << B.getName() << "\n\n";
+  OS << "// Builtin: " << BD.getExternalName() << "\n\n";
 
-  OS << "#define " << B.getName() << " __builtin_ocl_" << B.getName() << "\n\n";
+  OS << "#define " << BD.getExternalName() << " " 
+     << BD.getInternalName() << "\n\n";
 
+  BuiltinSignList Alts;
   for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
     const OCLBuiltinVariant &BV = *BI->second;
 
-    ExpandSignature(BV, Alts);
+    ExpandSigns(BV, Alts);
   }
 
-  Alts.sort(BuiltinSignatureCompare());
+  Alts.sort(BuiltinSignCompare());
 
-  PredicateSet GroupPreds;
+  PredicatesGuardEmitter Preds(OS);
 
-  for (BuiltinSignatureList::iterator I = Alts.begin(), 
+  for (BuiltinSignList::const_iterator I = Alts.begin(), 
        E = Alts.end(); I != E; ++I) {
-    BuiltinSignature &S = *I;
+    const BuiltinSign &S = *I;
 
-    PredicateSet Preds;
-    ComputePredicates(S, Preds, true);
-    if (Preds != GroupPreds) {
-      EmitPredicatesEnd(OS, GroupPreds);
-      GroupPreds = Preds;
-      EmitPredicatesBegin(OS, GroupPreds);
-    }
+    Preds.Push(ComputePredicates(S, true));
     
     if (Alts.size() > 1)
       OS << "__opencrun_overload\n";
 
     EmitOCLTypeSignature(OS, *S[0]);
     OS << " ";
-    OS << "__builtin_ocl_" << B.getName();
+    OS << BD.getInternalName();
     OS << "(";
     std::string ParamName = "param";
     for (unsigned i = 1, e = S.size(); i != e; ++i) {
@@ -62,7 +59,55 @@ void EmitOCLBuiltinPrototype(llvm::raw_ostream &OS, const OCLBuiltin &B) {
     }
     OS << ");\n\n";
   }
-  EmitPredicatesEnd(OS, GroupPreds);
+  Preds.Finalize();
+  OS << "\n";
+}
+
+void EmitOCLCastBuiltinPrototype(llvm::raw_ostream &OS, 
+                                 const OCLCastBuiltin &B) {
+  OCLBuiltinDecorator BD(B);
+
+  BuiltinSignList Alts;
+  for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
+    const OCLBuiltinVariant &BV = *BI->second;
+
+    ExpandSigns(BV, Alts);
+  }
+
+  Alts.sort(BuiltinSignCompare());
+
+  std::list<std::pair<unsigned, BuiltinSignList::iterator> > Ranges;
+  ComputeSignsRanges(Alts.begin(), Alts.end(), Ranges);
+
+  PredicatesGuardEmitter Preds(OS);
+
+  for (BuiltinSignList::iterator I = Alts.begin(),
+       E = Alts.end(); I != E; ++I) {
+    const BuiltinSign &S = *I;
+
+    if (Ranges.front().second == I) {
+      Ranges.pop_front();
+      OS << "#define " << BD.getExternalName(&S) << " "
+         << BD.getInternalName(&S) << "\n\n";
+    }
+ 
+    Preds.Push(ComputePredicates(S, true));
+   
+    if (Ranges.front().first > 1)
+      OS << "__opencrun_overload\n";
+
+    EmitOCLTypeSignature(OS, *S[0]);
+    OS << " ";
+    OS << BD.getInternalName(&S);
+    OS << "(";
+    std::string ParamName = "param";
+    for (unsigned i = 1, e = S.size(); i != e; ++i) {
+      EmitOCLTypeSignature(OS, *S[i], ParamName + llvm::Twine(i).str());
+      if (i + 1 != e) OS << ", ";
+    }
+    OS << ");\n\n";
+  }
+  Preds.Finalize();
   OS << "\n";
 }
 
@@ -79,7 +124,13 @@ bool opencrun::EmitOCLBuiltinDefs(llvm::raw_ostream &OS,
   OS << "#define __opencrun_overload __attribute__((overloadable))\n\n";
 
   for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
-    EmitOCLBuiltinPrototype(OS, *OCLBuiltins[i]);
+    const OCLBuiltin *B = OCLBuiltins[i];
+    if (llvm::isa<OCLGenericBuiltin>(B))
+      EmitOCLGenericBuiltinPrototype(OS, *llvm::cast<OCLGenericBuiltin>(B));
+    else if (llvm::isa<OCLCastBuiltin>(B))
+      EmitOCLCastBuiltinPrototype(OS, *llvm::cast<OCLCastBuiltin>(B));
+    else
+      llvm_unreachable(0);
   }
 
   OS << "#ifndef OPENCRUN_LIB_IMPL\n";
