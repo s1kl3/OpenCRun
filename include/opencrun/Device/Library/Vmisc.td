@@ -4,7 +4,7 @@
 
 let Group = "VMISC" in {
 
-// class VmiscBuiltin_Cng_CnVg<string name> : OCLMultiBuiltin<name, [
+// class VmiscBuiltin_Cng_CnVg<string name> : OCLGenericBuiltin<name, [
 //   OCLBuiltinVariant<[
 //     ocl_int,
 //     ocl_gentype_vmisc
@@ -17,7 +17,7 @@ let Group = "VMISC" in {
 //   [], "CnVg">
 // ]>;
 
-class VmiscBuiltin_ggUi<string name> : OCLSimpleBuiltin<name,
+class VmiscBuiltin_ggUi<string name> : OCLGenericBuiltinSimple<name,
   [
      ocl_vgentype_vmisc,
      ocl_vgentype_vmisc,
@@ -30,7 +30,7 @@ class VmiscBuiltin_ggUi<string name> : OCLSimpleBuiltin<name,
   ]
 >;
 
-class VmiscBuiltin_gggUi<string name> : OCLSimpleBuiltin<name,
+class VmiscBuiltin_gggUi<string name> : OCLGenericBuiltinSimple<name,
   [
      ocl_vgentype_vmisc,
      ocl_vgentype_vmisc,

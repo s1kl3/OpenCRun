@@ -5,13 +5,13 @@
 
 let Group = "RELATIONAL" in {
 
-class RelationalBuiltin_CnSi<string name> : OCLSimpleBuiltin<
+class RelationalBuiltin_CnSi<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_int, ocl_gentype_s_integer],
   []
 >;
 
-class RelationalBuiltin_Snf_Sid<string name> : OCLMultiBuiltin<name, [
+class RelationalBuiltin_Snf_Sid<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_s_int,
     ocl_gentype_float
@@ -24,7 +24,7 @@ class RelationalBuiltin_Snf_Sid<string name> : OCLMultiBuiltin<name, [
   [isSameDimAs<Id<0>, Id<1>>], "Sid">
 ]>;
 
-class RelationalBuiltin_Snff_Sidd<string name> : OCLMultiBuiltin<name, [
+class RelationalBuiltin_Snff_Sidd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_s_int,
     ocl_gentype_float,
@@ -39,7 +39,7 @@ class RelationalBuiltin_Snff_Sidd<string name> : OCLMultiBuiltin<name, [
   [isSameAs<Id<1>, Id<2>>, isSameDimAs<Id<0>, Id<1>>], "Sidd">
 ]>;
 
-class RelationalBuiltin_iiii_ffff_dddd<string name> : OCLMultiBuiltin<name, [
+class RelationalBuiltin_iiii_ffff_dddd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_integer,
     ocl_gentype_integer,
@@ -75,7 +75,7 @@ class RelationalBuiltin_iiii_ffff_dddd<string name> : OCLMultiBuiltin<name, [
   ], "dddd">
 ]>;
 
-class RelationalBuiltin_gggSi_gggUi<string name> : OCLMultiBuiltin<name, [
+class RelationalBuiltin_gggSi_gggUi<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype, 
     ocl_gentype,

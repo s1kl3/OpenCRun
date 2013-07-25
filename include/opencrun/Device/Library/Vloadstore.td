@@ -5,7 +5,7 @@
 let Group = "VLOADSTORE" in {
 
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_2<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_2, 
      ocl_size_t, 
@@ -29,7 +29,7 @@ class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_2<string name>
 ]>;
 
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_3<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_3, 
      ocl_size_t, 
@@ -53,7 +53,7 @@ class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_3<string name>
 ]>;
 
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_4<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_4, 
      ocl_size_t, 
@@ -77,7 +77,7 @@ class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_4<string name>
 ]>;
 
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_8<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_8, 
      ocl_size_t, 
@@ -101,7 +101,7 @@ class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_8<string name>
 ]>;
 
 class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_16<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_vgentype_16, 
      ocl_size_t, 
@@ -125,7 +125,7 @@ class VloadstoreBuiltin_VgzP1Sg_VgzP2Sg_VgzP3Sg_VgzP4Sg_16<string name>
 ]>;
 
 class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_2<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_void,
      ocl_vgentype_2,
@@ -147,7 +147,7 @@ class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_2<string name>
 ]>;
 
 class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_3<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_void,
      ocl_vgentype_3,
@@ -169,7 +169,7 @@ class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_3<string name>
 ]>;
 
 class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_4<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_void,
      ocl_vgentype_4,
@@ -191,7 +191,7 @@ class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_4<string name>
 ]>;
 
 class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_8<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_void,
      ocl_vgentype_8,
@@ -213,7 +213,7 @@ class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_8<string name>
 ]>;
 
 class VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_16<string name> 
-: OCLMultiBuiltin<name, [
+: OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
      ocl_void,
      ocl_vgentype_16,

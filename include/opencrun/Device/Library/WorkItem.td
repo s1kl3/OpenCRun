@@ -4,13 +4,13 @@
 
 let Group = "WORKITEM" in {
 
-class WorkItemBuiltin_CUn<string name> : OCLSimpleBuiltin<
+class WorkItemBuiltin_CUn<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_uint],
   []
 >;
 
-class WorkItemBuiltin_zCUn<string name> : OCLSimpleBuiltin<
+class WorkItemBuiltin_zCUn<string name> : OCLGenericBuiltinSimple<
   name,
   [ocl_size_t, ocl_uint],
   []

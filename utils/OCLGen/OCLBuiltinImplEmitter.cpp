@@ -3,8 +3,10 @@
 #include "OCLEmitterUtils.h"
 #include "OCLType.h"
 
-#include "llvm/TableGen/Error.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
 using namespace opencrun;
@@ -19,32 +21,70 @@ OCLBuiltinImplsContainer OCLBuiltinImpls;
 
 typedef std::vector<std::string> IndexesContainer;
 
-static void EmitOCLDecls(llvm::raw_ostream &OS, 
-                         const BuiltinSignature &Sign,
-                         const OCLStrategy &S) {
-  for (OCLStrategy::decl_iterator DI = S.begin(), DE = S.end(); 
-       DI != DE; ++DI) {
-    if (const OCLTypedefDecl *T = llvm::dyn_cast<OCLTypedefDecl>(*DI)) {
-      const OCLBasicType *Ty = T->getParam().get(Sign);
-      OS.indent(2) << "typedef ";
+static void EmitOCLTypeValue(llvm::raw_ostream &OS, const OCLBasicType &T,
+                             const OCLTypeValueDecl &D) {
 
-      if (llvm::isa<OCLTypedefUnsignedDecl>(T)) {
-        if (const OCLIntegerType *I = llvm::dyn_cast<OCLIntegerType>(Ty)) {
-          if (I->isSigned()) OS << "unsigned ";
-        } else
-          llvm::PrintFatalError("Illegal source type for OCLTypedef: " + 
-                                Ty->getName());
-      }
+  bool IsMin = llvm::isa<OCLMinValueDecl>(&D);
 
-      EmitOCLTypeSignature(OS, *Ty);
-      OS << " " << T->getName() << ";\n";
+  if (const OCLIntegerType *I = llvm::dyn_cast<OCLIntegerType>(&T)) {
+    bool IsUnsigned = I->isUnsigned();
+    unsigned BitWidth = I->getBitWidth();
 
-    } else
-      llvm::PrintFatalError("Illegal OCLDecl!");
+    llvm::APInt Value;
+    if (IsMin && IsUnsigned)
+      Value = llvm::APInt::getNullValue(BitWidth);
+    else if (IsUnsigned)
+      Value = llvm::APInt::getMaxValue(BitWidth);
+    else if (IsMin)
+      Value = llvm::APInt::getSignedMinValue(BitWidth);
+    else
+      Value = llvm::APInt::getSignedMaxValue(BitWidth);
+    
+    llvm::SmallString<20> Buffer; 
+    Value.toString(Buffer, 16, !IsUnsigned, true);
+
+    OS << Buffer;
   }
 }
 
-static bool IsScalarSignature(const BuiltinSignature &Sign) {
+static void EmitOCLDecl(llvm::raw_ostream &OS, const OCLDecl *D,
+                        const BuiltinSign &Sign) {
+  if (const OCLTypedefDecl *T = llvm::dyn_cast<OCLTypedefDecl>(D)) {
+    const OCLBasicType *Ty = T->getParam().get(Sign);
+    OS.indent(2) << "typedef ";
+
+    if (llvm::isa<OCLTypedefUnsignedDecl>(T)) {
+      if (const OCLIntegerType *I = llvm::dyn_cast<OCLIntegerType>(Ty)) {
+        if (I->isSigned()) OS << "unsigned ";
+      } else
+        llvm::PrintFatalError("Illegal source type for OCLTypedef: " + 
+                              Ty->getName());
+    }
+
+    EmitOCLTypeSignature(OS, *Ty);
+    OS << " " << T->getName() << ";\n";
+
+  } else if (const OCLTypeValueDecl *T = llvm::dyn_cast<OCLTypeValueDecl>(D)) {
+    const OCLBasicType *Ty = T->getParam().get(Sign);
+    OS.indent(2) << "const ";
+    EmitOCLTypeSignature(OS, *Ty, T->getID());
+    OS << " = ";
+    EmitOCLTypeValue(OS, *Ty, *T);
+    OS << ";\n";
+  } else
+    llvm::PrintFatalError("Illegal OCLDecl!");
+}
+
+static void EmitOCLDecls(llvm::raw_ostream &OS, 
+                         const BuiltinSign &Sign,
+                         const OCLStrategy &S) {
+  for (OCLStrategy::decl_iterator DI = S.begin(), DE = S.end(); 
+       DI != DE; ++DI) {
+    EmitOCLDecl(OS, *DI, Sign);
+  }
+}
+
+static bool IsScalarSignature(const BuiltinSign &Sign) {
   for (unsigned I = 0, E = Sign.size(); I != E; ++I) {
     const OCLType *T = Sign[I];
     if (llvm::isa<const OCLPointerType>(T)) {
@@ -70,7 +110,7 @@ static void EmitSubvector(llvm::raw_ostream &OS,
 
 static void EmitImplementationBody(llvm::raw_ostream &OS,
                                    const OCLBuiltin &B,
-                                   const BuiltinSignature &Sign,
+                                   const BuiltinSign &Sign,
                                    const OCLRecursiveSplit &S) {
   if (IsScalarSignature(Sign)) {
     EmitOCLDecls(OS, Sign, S);
@@ -78,7 +118,7 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
     return;
   }
 
-  BuiltinSignature LeftSign, RightSign;
+  BuiltinSign LeftSign, RightSign;
   std::vector<std::pair<unsigned, unsigned> > LeftRanges, RightRanges;
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
@@ -106,9 +146,11 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
 
   // TODO: check if splitted signatures exists.
 
+  OCLBuiltinDecorator BD(B);
+
   // Left branch
   OS.indent(2) << *LeftSign[0] << " Tmp1 = (" << *LeftSign[0] << ") "
-               << "__builtin_ocl_" << B.getName() << "(\n";
+               << BD.getInternalName(&LeftSign) << "(\n";
   for (unsigned i = 1, e = LeftSign.size(); i != e; ++i) {
     OS.indent(6) << "param" << i;
     EmitSubvector(OS, LeftRanges[i]);
@@ -122,7 +164,7 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
 
   // Right branch
   OS.indent(2) << *RightSign[0] << " Tmp2 = (" << *RightSign[0] << ") "
-               << "__builtin_ocl_" << B.getName() << "(\n";
+               << BD.getInternalName(&RightSign) << "(\n";
   for (unsigned i = 1, e = RightSign.size(); i != e; ++i) {
     OS.indent(6) << "param" << i;
     EmitSubvector(OS, RightRanges[i]);
@@ -153,9 +195,15 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
     llvm::PrintFatalError("Reduction not supported.");
 }
 
+enum DirectSplitKind {
+  DSK_None,
+  DSK_Vector,
+  DSK_PtrVector
+};
+
 static void EmitImplementationBody(llvm::raw_ostream &OS,
                                    const OCLBuiltin &B,
-                                   const BuiltinSignature &Sign,
+                                   const BuiltinSign &Sign,
                                    const OCLDirectSplit &S) {
   if (IsScalarSignature(Sign)) {
     EmitOCLDecls(OS, Sign, S);
@@ -170,38 +218,62 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
 
   unsigned N = RetTy->getWidth();
 
+  // Compute signature of the scalar builtin
+  BuiltinSign ScalarSign;
+  ScalarSign.reserve(Sign.size());
+  std::vector<unsigned> SKs(Sign.size(), DSK_None);
+  for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
+    const OCLBasicType *Ty = Sign[i];
+    if (llvm::isa<OCLScalarType>(Ty)) {
+      ScalarSign.push_back(Ty);
+    } else if (llvm::isa<OCLVectorType>(Ty)) {
+      const OCLVectorType *V = llvm::cast<OCLVectorType>(Ty);
+      assert(V->getWidth() == N);
+      ScalarSign.push_back(&V->getBaseType());
+      SKs[i] = DSK_Vector;
+    } else {
+      assert(llvm::isa<OCLPointerType>(Ty));
+      const OCLPointerType *PtrTy = llvm::cast<OCLPointerType>(Ty);
+      const OCLType *PointeeTy = &PtrTy->getBaseType();
+      
+      if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(PointeeTy)) {
+        OCLPtrStructure PtrS;
+        PtrS.push_back(OCLPtrDesc(PtrTy->getAddressSpace(),
+                                  PtrTy->getModifierFlags()));
+        const OCLPointerType *CastTy =
+          &OCLTypesTable::getPointerType(V->getBaseType(), PtrS);
+
+        ScalarSign.push_back(CastTy);
+        SKs[i] = DSK_PtrVector;
+      } else
+        llvm::PrintFatalError("Type not supported by DirectSplit strategy!");
+    }
+  }
+
+  OCLBuiltinDecorator BD(B);
+
   OS.indent(2) << "return (" << *RetTy << ")(\n";
 
   for (unsigned i = 0; i != N; ++i) {
-    OS.indent(6) << "__builtin_ocl_" << B.getName() << "(\n";
-    for (unsigned PI = 1, PE = Sign.size(); PI != PE; ++PI) {
-      const OCLBasicType *ArgTy = Sign[PI];
-      if (llvm::isa<OCLScalarType>(ArgTy)) {
-        OS.indent(8) << "param" << PI;
-      } else if (llvm::isa<OCLVectorType>(ArgTy)) {
-        OS.indent(8) << "param" << PI << ".s";
+    OS.indent(6) << BD.getInternalName(&ScalarSign) << "(\n";
+    for (unsigned PI = 1, PE = ScalarSign.size(); PI != PE; ++PI) {
+      OS.indent(8);
+      switch (SKs[PI]) {
+      case DSK_None:
+        OS << "param" << PI;
+        break;
+      case DSK_Vector:
+        OS << "param" << PI << ".s";
         OS.write_hex(i);
-      } else {
-        assert(llvm::isa<OCLPointerType>(ArgTy));
-        const OCLPointerType *PtrTy = llvm::cast<OCLPointerType>(ArgTy);
-        const OCLType &PTy = PtrTy->getBaseType();
-
-        if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(&PTy)) {
-          OS.indent(8) << "(";
-
-          OCLPtrStructure PtrS;
-          PtrS.push_back(OCLPtrDesc(PtrTy->getAddressSpace(), 
-                                    PtrTy->getModifierFlags()));
-          const OCLType &CastTy = 
-            OCLTypesTable::getPointerType(V->getBaseType(), PtrS);
-          EmitOCLTypeSignature(OS, CastTy, "");
-
-          OS << ") param" << PI;
-          if (i > 0) OS << " + " << i;
-        } else if (llvm::isa<OCLPointerType>(&PTy)) {
-          OS.indent(8) << "param" << PI;
-        } else
-          llvm::PrintFatalError("Type not supported by DirectSplit strategy!");
+        break;
+      case DSK_PtrVector:
+        OS << "(";
+        EmitOCLTypeSignature(OS, *ScalarSign[PI]);
+        OS << ") param" << PI;
+        if (i > 0) OS << " + " << i;
+        break;
+      default:
+        llvm_unreachable(0);
       }
       if (PI + 1 != PE) OS << ",";
       OS << "\n";
@@ -217,28 +289,16 @@ static void EmitImplementationBody(llvm::raw_ostream &OS,
 
 static void EmitImplementationBody(llvm::raw_ostream &OS,
                                    const OCLBuiltin &B, 
-                                   const BuiltinSignature &Sign,
+                                   const BuiltinSign &Sign,
                                    const OCLTemplateStrategy &S) {
   EmitOCLDecls(OS, Sign, S);
   OS << S.getTemplateImpl() << "\n";
 }
 
-static void EmitImplementation(llvm::raw_ostream &OS,
-                               const OCLBuiltin &B,
-                               const BuiltinSignature &Sign,
-                               const OCLStrategy &S) {
-  OS << "__opencrun_overload\n";
-  EmitOCLTypeSignature(OS, *Sign[0]);
-  OS << " ";
-  OS << "__builtin_ocl_" << B.getName();
-  OS << "(";
-  std::string ParamName = "param";
-  for (unsigned i = 1, e = Sign.size(); i != e; ++i) {
-    EmitOCLTypeSignature(OS, *Sign[i], ParamName + llvm::Twine(i).str());
-    if (i + 1 != e) OS << ", ";
-  }
-  OS << ") {\n";
-
+static void EmitImplementationBody(llvm::raw_ostream &OS,
+                                   const OCLBuiltin &B,
+                                   const BuiltinSign &Sign,
+                                   const OCLStrategy &S) {
   if (const OCLRecursiveSplit *RS = llvm::dyn_cast<OCLRecursiveSplit>(&S))
     EmitImplementationBody(OS, B, Sign, *RS);
   else if (const OCLDirectSplit *DS = llvm::dyn_cast<OCLDirectSplit>(&S))
@@ -248,8 +308,87 @@ static void EmitImplementation(llvm::raw_ostream &OS,
     EmitImplementationBody(OS, B, Sign, *TS);
   else
     llvm::PrintFatalError("Illegal strategy!");
+}
 
-  OS << "}\n";
+typedef std::map<BuiltinSign, const OCLBuiltinImpl *, 
+                 BuiltinSignCompare> SignatureImplMap;
+typedef std::map<const OCLBuiltin *, SignatureImplMap> BuiltinImplMap;
+
+typedef std::map<const OCLBuiltin *, BuiltinSignList> BuiltinSignMap;
+
+static void EmitOCLGenericBuiltinImpls(llvm::raw_ostream &OS,
+                                       const OCLGenericBuiltin &B,
+                                       const SignatureImplMap &M) {
+  OCLBuiltinDecorator BD(B);
+
+  PredicatesGuardEmitter Preds(OS);
+  for (SignatureImplMap::const_iterator
+       SI = M.begin(), SE = M.end(); SI != SE; ++SI) {
+    const BuiltinSign &Sign = SI->first;
+    const OCLStrategy &Strategy = SI->second->getStrategy();
+
+    Preds.Push(ComputePredicates(Sign));
+
+    if (M.size() > 1)
+      OS << "__opencrun_overload\n";
+
+    EmitOCLTypeSignature(OS, *Sign[0]);
+    OS << " ";
+    OS << BD.getInternalName();
+    OS << "(";
+    std::string ParamName = "param";
+    for (unsigned i = 1, e = Sign.size(); i != e; ++i) {
+      EmitOCLTypeSignature(OS, *Sign[i], ParamName + llvm::Twine(i).str());
+      if (i + 1 != e) OS << ", ";
+    }
+    OS << ") {\n";
+
+    EmitImplementationBody(OS, B, Sign, Strategy);
+
+    OS << "}\n\n";
+  }
+  Preds.Finalize();
+}
+
+static void EmitOCLCastBuiltinImpls(llvm::raw_ostream &OS,
+                                    const OCLCastBuiltin &B,
+                                    const SignatureImplMap &M) {
+  OCLBuiltinDecorator BD(B);
+
+  typedef MapKeyIterator<BuiltinSign, const OCLBuiltinImpl *> ImplMapKeyIter;
+  std::list<std::pair<unsigned, ImplMapKeyIter> > Ranges;
+  ComputeSignsRanges(ImplMapKeyIter(M.begin()), ImplMapKeyIter(M.end()),
+                     Ranges);
+
+  PredicatesGuardEmitter Preds(OS);
+  for (SignatureImplMap::const_iterator
+       SI = M.begin(), SE = M.end(); SI != SE; ++SI) {
+    const BuiltinSign &Sign = SI->first;
+    const OCLStrategy &Strategy = SI->second->getStrategy();
+
+    if (Ranges.front().second == ImplMapKeyIter(SI)) Ranges.pop_front();
+
+    Preds.Push(ComputePredicates(Sign));
+
+    if (Ranges.front().first > 1)
+      OS << "__opencrun_overload\n";
+
+    EmitOCLTypeSignature(OS, *Sign[0]);
+    OS << " ";
+    OS << BD.getInternalName(&Sign);
+    OS << "(";
+    std::string ParamName = "param";
+    for (unsigned i = 1, e = Sign.size(); i != e; ++i) {
+      EmitOCLTypeSignature(OS, *Sign[i], ParamName + llvm::Twine(i).str());
+      if (i + 1 != e) OS << ", ";
+    }
+    OS << ") {\n";
+
+    EmitImplementationBody(OS, B, Sign, Strategy);
+
+    OS << "}\n\n";
+  }
+  Preds.Finalize();
 }
 
 bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS, 
@@ -258,11 +397,8 @@ bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS,
   LoadOCLBuiltins(R, OCLBuiltins);
   LoadOCLBuiltinImpls(R, OCLBuiltinImpls);
 
-  typedef std::map<BuiltinSignature, const OCLBuiltinImpl *, 
-                   BuiltinSignatureCompare> SignatureImplMap;
-  typedef std::map<const OCLBuiltin *, SignatureImplMap> BuiltinImplMap;
-
   BuiltinImplMap Impls;
+  BuiltinSignMap Signs;
   for (unsigned i = 0, e = OCLBuiltinImpls.size(); i != e; ++i) {
     const OCLBuiltinImpl &Impl = *OCLBuiltinImpls[i];
     const OCLBuiltin &B = Impl.getBuiltin();
@@ -280,12 +416,12 @@ bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS,
       continue;
     }
 
-    BuiltinSignatureList l;
+    BuiltinSignList l;
     for (std::list<const OCLBuiltinVariant*>::iterator
          I = CurVariants.begin(), E = CurVariants.end(); I != E; ++I)
-      ExpandSignature(**I, l);
+      ExpandSigns(**I, l);
 
-    for (BuiltinSignatureList::iterator I = l.begin(), 
+    for (BuiltinSignList::iterator I = l.begin(), 
          E = l.end(); I != E; ++I) {
       if (!Impls[&B].count(*I) || Impl.isTarget() || 
           Impls[&B][*I]->getVariantName() == "")
@@ -295,37 +431,24 @@ bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS,
 
   emitSourceFileHeader("OCL Builtin implementations", OS);
 
-  llvm::StringRef GlobalGroup = "";
+  GroupGuardEmitter Groups(OS);
+
   for (unsigned i = 0, e = OCLBuiltins.size(); i != e; ++i) {
     const OCLBuiltin &B = *OCLBuiltins[i];
 
     BuiltinImplMap::iterator BI = Impls.find(&B);
     if (BI == Impls.end()) continue;
 
-    llvm::StringRef Group = B.getGroup();
-    if (Group != GlobalGroup) {
-      EmitBuiltinGroupEnd(OS, GlobalGroup);
-      GlobalGroup = Group;
-      OS << "\n";
-      EmitBuiltinGroupBegin(OS, GlobalGroup);
-    }
+    Groups.Push(B.getGroup());
 
-    PredicateSet GroupPreds;
-    for (SignatureImplMap::const_iterator SI = BI->second.begin(),
-         SE = BI->second.end(); SI != SE; ++SI) {
-      PredicateSet Preds;
-      ComputePredicates(SI->first, Preds);
-      if (GroupPreds != Preds) {
-        EmitPredicatesEnd(OS, GroupPreds);
-        GroupPreds = Preds;
-        EmitPredicatesBegin(OS, GroupPreds);
-      }
-      EmitImplementation(OS, B, SI->first, SI->second->getStrategy());
-      OS << "\n";
-    }
-    EmitPredicatesEnd(OS, GroupPreds);
+    if (const OCLGenericBuiltin *GB = llvm::dyn_cast<OCLGenericBuiltin>(&B))
+      EmitOCLGenericBuiltinImpls(OS, *GB, BI->second);
+    else if (const OCLCastBuiltin *CB = llvm::dyn_cast<OCLCastBuiltin>(&B))
+      EmitOCLCastBuiltinImpls(OS, *CB, BI->second);
+    else
+      llvm::PrintFatalError("Invalid builtin!");
   }
-  EmitBuiltinGroupEnd(OS, GlobalGroup);
+  Groups.Finalize();
   
   return false;
 }

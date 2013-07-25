@@ -12,11 +12,11 @@ using namespace opencrun;
 OCLParam::~OCLParam() {
 }
 
-const OCLBasicType *OCLParamId::get(const BuiltinSignature &Ops) const {
+const OCLBasicType *OCLParamId::get(const BuiltinSign &Ops) const {
   return Ops[getOperand()];
 }
 
-const OCLBasicType *OCLParamPointee::get(const BuiltinSignature &Ops) const {
+const OCLBasicType *OCLParamPointee::get(const BuiltinSign &Ops) const {
   const OCLBasicType *R = Ops[getOperand()];
   for (unsigned i = 0; i != Nest; ++i) {
     if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(R)) {
@@ -239,16 +239,25 @@ private:
     std::string Group = R.getValueAsString("Group");
 
     OCLBuiltin::VariantsMap Variants;
-    if (R.isSubClassOf("OCLMultiBuiltin")) {
-      std::vector<llvm::Record *> Vars = R.getValueAsListOfDefs("Variants");
-      for (unsigned i = 0, e = Vars.size(); i != e; ++i)
-        BuildBuiltinVariant(*Vars[i], Variants);
-    } else if (R.isSubClassOf("OCLSimpleBuiltin")) {
-      BuildBuiltinVariant(R, Variants);
+    std::vector<llvm::Record *> Vars = R.getValueAsListOfDefs("Variants");
+    if (R.isSubClassOf("OCLBuiltinVariant")) {
+      assert(Vars.empty());
+      Vars.push_back(&R);
+    }
+    for (unsigned i = 0, e = Vars.size(); i != e; ++i)
+      BuildBuiltinVariant(*Vars[i], Variants);
+
+    if (R.isSubClassOf("OCLGenericBuiltin"))
+      Builtin = new OCLGenericBuiltin(Group, Name, Variants);
+    else if (R.isSubClassOf("OCLReinterpretBuiltin"))
+      Builtin = new OCLReinterpretBuiltin(Group, Name, Variants);
+    else if (R.isSubClassOf("OCLConvertBuiltin")) {
+      llvm::StringRef Rounding = R.getValueAsString("Rounding");
+      bool Saturation = R.getValueAsBit("Saturation");
+      Builtin = new OCLConvertBuiltin(Group, Name, Saturation, 
+                                      Rounding, Variants);
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
-
-    Builtin = new OCLBuiltin(Name, Group, Variants);
 
     Builtins[&R] = Builtin;
   }
@@ -292,7 +301,13 @@ private:
         Constraint = new OCLSameBaseKindTypeConstraint(P1, P2);
       else
         llvm::PrintFatalError("Invalid TypeConstraint: " + R.getName());
-    } else
+    }
+    else if (R.isSubClassOf("Not")) {
+      const OCLTypeConstraint &Basic = getTypeConstr(*R.getValueAsDef("Basic"));
+
+      Constraint = new OCLNotTypeConstraint(Basic);
+    }
+    else
       llvm::PrintFatalError("Invalid TypeConstraint: " + R.getName());
 
     Constraints[&R] = Constraint;
@@ -347,7 +362,18 @@ private:
         Decl = new OCLTypedefUnsignedDecl(Name, Param);
       else
         llvm::PrintFatalError("Invalid OCLTypedef: " + R.getName());
-    } else
+    }
+    else if (R.isSubClassOf("OCLTypeValue")) {
+      llvm::StringRef ID = R.getValueAsString("ID");
+      const OCLParam &Param = getParam(*R.getValueAsDef("Param"));
+      if (R.isSubClassOf("MinValue"))
+        Decl = new OCLMinValueDecl(ID, Param);
+      else if (R.isSubClassOf("MaxValue"))
+        Decl = new OCLMaxValueDecl(ID, Param);
+      else
+        llvm::PrintFatalError("Invalid OCLTypeValue: " + R.getName());
+    }
+    else
       llvm::PrintFatalError("Invalid OCLDecl: " + R.getName());
 
     Decls[&R] = Decl;
@@ -421,7 +447,7 @@ const OCLBuiltinImpl &OCLBuiltinsTable::getBuiltinImpl(llvm::Record &R) {
 
 typedef std::multimap<unsigned, const OCLTypeConstraint* > ConstraintMap;
 
-static bool IsConsistent(const ConstraintMap &CMap, BuiltinSignature &Sign) {
+static bool IsConsistent(const ConstraintMap &CMap, BuiltinSign &Sign) {
   unsigned LastOperand = Sign.size() - 1;
 
   for (ConstraintMap::const_iterator I = CMap.find(LastOperand), E = CMap.end(); 
@@ -432,10 +458,9 @@ static bool IsConsistent(const ConstraintMap &CMap, BuiltinSignature &Sign) {
   return true;
 }
 
-static void EnumerateSignature(const OCLBuiltinVariant &B, unsigned Index, 
-                               const ConstraintMap &CMap,
-                               BuiltinSignature &Tmp, 
-                               std::list<BuiltinSignature> &R) {
+static void EnumerateSigns(const OCLBuiltinVariant &B, unsigned Index, 
+                           const ConstraintMap &CMap, BuiltinSign &Tmp, 
+                           BuiltinSignList &R) {
   if (Index >= B.size()) {
     R.push_back(Tmp);
     return;
@@ -447,7 +472,7 @@ static void EnumerateSignature(const OCLBuiltinVariant &B, unsigned Index,
          I != E; ++I) {
       Tmp.push_back(*I);
       if (IsConsistent(CMap, Tmp))
-        EnumerateSignature(B, Index + 1, CMap, Tmp, R);
+        EnumerateSigns(B, Index + 1, CMap, Tmp, R);
       Tmp.pop_back();
     }
   } else if (const OCLPointerType *PT = llvm::dyn_cast<OCLPointerType>(&Cur)) {
@@ -457,13 +482,13 @@ static void EnumerateSignature(const OCLBuiltinVariant &B, unsigned Index,
     for (; I != E; ++I) {
       Tmp.push_back(&*I);
       if (IsConsistent(CMap, Tmp))
-        EnumerateSignature(B, Index + 1, CMap, Tmp, R);
+        EnumerateSigns(B, Index + 1, CMap, Tmp, R);
       Tmp.pop_back();
     }
   } else {
     Tmp.push_back(llvm::cast<OCLBasicType>(&Cur));
     if (IsConsistent(CMap, Tmp))
-      EnumerateSignature(B, Index + 1, CMap, Tmp, R);
+      EnumerateSigns(B, Index + 1, CMap, Tmp, R);
     Tmp.pop_back();
   }
 }
@@ -477,22 +502,21 @@ static ConstraintMap ComputeConstraintMap(const OCLBuiltinVariant &B) {
   return M;
 }
 
-void opencrun::ExpandSignature(const OCLBuiltinVariant &B, 
-                               BuiltinSignatureList &L) {
-  BuiltinSignature Sign;
-  Sign.reserve(B.size());
+void opencrun::ExpandSigns(const OCLBuiltinVariant &B, BuiltinSignList &L) {
+  BuiltinSign S;
+  S.reserve(B.size());
 
   ConstraintMap CMap = ComputeConstraintMap(B);
 
-  EnumerateSignature(B, 0, CMap, Sign, L);
+  EnumerateSigns(B, 0, CMap, S, L);
 }
 
 //===----------------------------------------------------------------------===//
 // Builtin signature ordering 
 //===----------------------------------------------------------------------===//
 
-bool BuiltinSignatureCompare::operator()(const BuiltinSignature &S1, 
-                                         const BuiltinSignature &S2) const {
+bool BuiltinSignCompare::operator()(const BuiltinSign &S1, 
+                                    const BuiltinSign &S2) const {
   unsigned i;
   unsigned e = std::min(S1.size(), S2.size());
 

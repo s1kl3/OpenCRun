@@ -25,7 +25,7 @@ bool opencrun::EmitOCLTargetDefs(llvm::raw_ostream &OS,
 
       const OCLPredicate &P = OCLPredicatesTable::get(*R);
 
-      if (&P != OCLPredicatesTable::getAddressSpace(AS_Private))
+      if (!llvm::isa<OCLAddressSpace>(&P))
         OS << "#define " << P.getFullName() << "\n";
     }
   }

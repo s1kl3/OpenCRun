@@ -4,13 +4,13 @@
 
 let Group = "COMMON" in {
 
-class CommonBuiltin_rr<string name> : OCLSimpleBuiltin<
+class CommonBuiltin_rr<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_gentype_real, ocl_gentype_real], 
   [isSameAs<Id<0>, Id<1>>]
 >;
 
-class CommonBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_ff_dd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float, 
     ocl_gentype_float 
@@ -25,7 +25,7 @@ class CommonBuiltin_ff_dd<string name> : OCLMultiBuiltin<name, [
   "dd">
 ]>;
 
-class CommonBuiltin_rrr_VrVrCr<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_rrr_VrVrCr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
     ocl_gentype_real, 
@@ -42,7 +42,7 @@ class CommonBuiltin_rrr_VrVrCr<string name> : OCLMultiBuiltin<name, [
   "VrVrCr">
 ]>;
 
-class CommonBuiltin_rrr_VrCrVr<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_rrr_VrCrVr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
     ocl_gentype_real, 
@@ -59,7 +59,7 @@ class CommonBuiltin_rrr_VrCrVr<string name> : OCLMultiBuiltin<name, [
   "VrCrVr">
 ]>;
 
-class CommonBuiltin_rrrr_VrVrVrCr<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_rrrr_VrVrVrCr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
     ocl_gentype_real, 
@@ -78,7 +78,7 @@ class CommonBuiltin_rrrr_VrVrVrCr<string name> : OCLMultiBuiltin<name, [
   "VrVrVrCr">
 ]>;
 
-class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
     ocl_gentype_real, 
@@ -97,7 +97,7 @@ class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLMultiBuiltin<name, [
   "VrCrCrVr">
 ]>;
 
-class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
+class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 
     ocl_gentype_real, 
@@ -117,7 +117,7 @@ class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLMultiBuiltin<name, [
 ]>;
 
 class CommonBuiltin_ffff_dddd_VfCfCfVf_VdCdCdVd<string name> : 
-  OCLMultiBuiltin<name, [
+  OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_float, 
     ocl_gentype_float, 
