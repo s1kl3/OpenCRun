@@ -6,7 +6,11 @@ let Group = "ASYNC" in {
 
 class AsyncBuiltin_vP1gz<string name> : OCLGenericBuiltinSimple<
   name,
-  [ocl_void, OCLPointerType<ocl_gentype, ocl_as_global, [ocl_mod_const]>],
+  [
+    ocl_void, 
+    OCLPointerType<ocl_gentype, ocl_as_global, [ocl_mod_const]>,
+    ocl_size_t
+  ],
   []
 >;
 

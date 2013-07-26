@@ -41,6 +41,6 @@ def : OCLBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_prefetch, TemplateStrategy<[{
-  for (uint i = 0; i < sizeof(GENTYPE) * param2; i++)
-    __builtin_prefetch((const uchar *) param1[i]);
+  for (uint i = 0; i < param2; i++)
+    __builtin_prefetch((const void *) &param1[i]);
 }], [TypedefId<"GENTYPE", Pointee<1>>]>>;
