@@ -31,7 +31,6 @@ CPUDevice::CPUDevice(sys::HardwareNode &Node) :
   InitDeviceInfo(Node);
   InitMultiprocessors(Node);
   InitJIT();
-  InitInternalCalls();
 }
 
 CPUDevice::~CPUDevice() {
@@ -230,18 +229,7 @@ void CPUDevice::InitJIT() {
   // Configure the JIT.
   Engine->InstallLazyFunctionCreator(LibLinker);
 
-  // Force compilation of all functions.
-  for(llvm::Module::iterator I = BitCodeLibrary->begin(),
-                             E = BitCodeLibrary->end();
-                             I != E;
-                             ++I)
-    Engine->runJITOnFunction(&*I);
-
-  // Save pointer.
-  JIT.reset(Engine);
-}
-
-void CPUDevice::InitInternalCalls() {
+  // Init internal calls.
   opencrun::OpenCLMetadataHandler MDHandler(*BitCodeLibrary);
 
   intptr_t AddrInt;
@@ -253,9 +241,19 @@ void CPUDevice::InitInternalCalls() {
     AddrInt = reinterpret_cast<intptr_t>(F);  \
     Addr = reinterpret_cast<void *>(AddrInt); \
     Func = MDHandler.GetBuiltin(#N);          \
-    JIT->addGlobalMapping(Func, Addr);
+    Engine->addGlobalMapping(Func, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
+
+  // Force compilation of all functions.
+  for(llvm::Module::iterator I = BitCodeLibrary->begin(),
+                             E = BitCodeLibrary->end();
+                             I != E;
+                             ++I)
+    Engine->runJITOnFunction(&*I);
+
+  // Save pointer.
+  JIT.reset(Engine);
 }
 
 void CPUDevice::InitMultiprocessors(sys::HardwareNode &Node) {
