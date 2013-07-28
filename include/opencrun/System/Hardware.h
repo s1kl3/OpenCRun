@@ -11,6 +11,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 
+#include <set>
 #include <stack>
 
 namespace opencrun {
