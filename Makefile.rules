@@ -14,6 +14,10 @@ CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
 # OCLGen Support
 ################################################################################
 
+CommonLibraryDir := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
+
+OCLGenLibrary := $(strip $(wildcard $(CommonLibraryDir)/*.td))
+
 HeaderDir := $(LibDir)/opencrun/include
 
 PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
@@ -25,6 +29,8 @@ OCLGen = $(OCLGEN) -I $(call SYSPATH, $(PROJ_SRC_DIR)) \
 
 ifdef OPENCRUN_TARGET
 
+OCLGenLibrary += $(strip $(wildcard $(PROJ_SRC_DIR)/*.td))
+
 HEADERS = oclconst.$(OPENCRUN_TARGET).h ocltype.$(OPENCRUN_TARGET).h ocltarget.$(OPENCRUN_TARGET).h
 
 TargetRequire = $(addprefix $(HeaderDir)/, $(HEADERS))
@@ -35,19 +41,19 @@ endif
 ifdef TABLEGEN_INC_FILES_COMMON
 ifdef OPENCRUN_TARGET
 
-$(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+$(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
 	$(Echo) Generating OCL target library definition for '$(OPENCRUN_TARGET)' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-constants-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
 
-$(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+$(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
 	$(Echo) Generating OCL target types definition for '$(OPENCRUN_TARGET)' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-types-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
 
-$(ObjDir)/ocltarget.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+$(ObjDir)/ocltarget.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
 	$(Echo) Generating OCL target definitions for '$(OPENCRUN_TARGET)' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-target-defs -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
 
-$(ObjDir)/Builtins.$(OPENCRUN_TARGET).inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
+$(ObjDir)/Builtins.$(OPENCRUN_TARGET).inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
 	$(Echo) Generating OCL builtins library implementation for '$(OPENCRUN_TARGET)' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-builtin-impls -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
 
