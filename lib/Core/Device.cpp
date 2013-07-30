@@ -43,7 +43,7 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   clang::CompilerInstance Compiler;
  
   // Create default DiagnosticsEngine and setup client.
-  Compiler.createDiagnostics(&Diag, false, false);
+  Compiler.createDiagnostics(&Diag, false);
 
   // Configure compiler invocation.
   clang::CompilerInvocation *Invocation = new clang::CompilerInvocation();
@@ -62,33 +62,25 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
 }
 
 void Device::InitLibrary() {
-  // Get search path.
-  std::vector<llvm::sys::Path> Libs;
-  llvm::sys::Path::GetBitcodeLibraryPaths(Libs);
-
   // Library name depends on the device name.
-  llvm::SmallString<8> LibName("opencrun");
+  llvm::SmallString<20> LibName("opencrun");
   LibName += Name;
   LibName += "Lib.bc";
 
-  // Look for the library.
-  for(std::vector<llvm::sys::Path>::iterator I = Libs.begin(),
-                                             E = Libs.end();
-                                             I != E && !BitCodeLibrary;
-                                             ++I) {
-    llvm::sys::Path BitCodeLib = *I;
-    BitCodeLib.appendComponent(LibName);
+  llvm::SmallString<32> Path;
+  if (sys::HasEnv("OPENCRUN_PREFIX"))
+    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
+  else
+    llvm::sys::path::append(Path, LLVM_PREFIX);
+  llvm::sys::path::append(Path, "lib", LibName.str());
 
-    llvm::OwningPtr<llvm::MemoryBuffer> File;
-    if(!llvm::MemoryBuffer::getFile(BitCodeLib.str(), File))
-      BitCodeLibrary.reset(llvm::ParseBitcodeFile(File.get(), LLVMCtx));
-  }
+  llvm::OwningPtr<llvm::MemoryBuffer> File;
+  if (!llvm::MemoryBuffer::getFile(Path.str(), File))
+    BitCodeLibrary.reset(llvm::ParseBitcodeFile(File.get(), LLVMCtx));
 
-  if(!BitCodeLibrary)
+  if (!BitCodeLibrary)
     llvm::report_fatal_error("Unable to find class library " + LibName +
                              " for device " + Name);
-
-
 }
 
 void Device::InitCompiler() {
@@ -146,18 +138,19 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();
   
   llvm::SmallString<32> Path;
-  if (sys::HasEnv("OPENCRUN_LLVM_ROOT"))
-    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_LLVM_ROOT"));
+  if (sys::HasEnv("OPENCRUN_PREFIX_LLVM"))
+    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX_LLVM"));
   else
     llvm::sys::path::append(Path, LLVM_PREFIX);
   llvm::sys::path::append(Path, "lib", "clang", CLANG_VERSION_STRING, "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 
   Path.clear();
-  if (sys::HasEnv("OPENCRUN_INCLUDE_PATH"))
-    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_INCLUDE_PATH"));
+  if (sys::HasEnv("OPENCRUN_PREFIX"))
+    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
   else
-    llvm::sys::path::append(Path, LLVM_PREFIX, "lib", "opencrun", "include");
+    llvm::sys::path::append(Path, LLVM_PREFIX);
+  llvm::sys::path::append(Path, "lib", "opencrun", "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Quoted, false, false);
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 

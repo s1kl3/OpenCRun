@@ -1,114 +1,14 @@
-#------------------------------------------------------------------------------#
-# Setup clang default paths
-#------------------------------------------------------------------------------#
+################################################################################
+# Setup clang
+################################################################################
 
 CLANG_SRC_ROOT = $(LLVM_SRC_ROOT)/tools/clang
 CLANG_OBJ_ROOT = $(LLVM_OBJ_ROOT)/tools/clang
 
-#------------------------------------------------------------------------------#
-# Add include path for clang
-#------------------------------------------------------------------------------#
+LLVMCC := $(LLVMToolDir)/clang
+LLVMCXX := $(LLVMToolDir)/clang++
 
 CPP.Flags += -I$(CLANG_SRC_ROOT)/include -I$(CLANG_OBJ_ROOT)/include
-
-
-#------------------------------------------------------------------------------#
-# Builtins and OCLGen 
-#------------------------------------------------------------------------------#
-
-LIBRARY_DIR := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
-
-OCLGENTool = $(ToolDir)/oclgen
-
-OCLGen = $(OCLGENTool) -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include) \
-         -I $(call SYSPATH, $(PROJ_SRC_DIR))
-
-NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
-
-BCCompile.OCL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
-                $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
-                -I$(HeaderDir) -Wno-empty-translation-unit -Wgnu
-
-HeaderDir := $(LibDir)/opencrun/include
-
-PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
-
-ifdef OPENCRUN_TARGET
-
-HEADERS = oclconst.$(OPENCRUN_TARGET).h ocltype.$(OPENCRUN_TARGET).h ocltarget.$(OPENCRUN_TARGET).h
-
-TargetRequire = $(addprefix $(HeaderDir)/, $(HEADERS))
-TargetCommonOpts = -DOPENCRUN_LIB_IMPL -include "$(HeaderDir)/ocltarget.$(OPENCRUN_TARGET).h"
-
-endif
-
-ifndef DISABLE_AUTO_DEPENDENCIES
-
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
-	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
-	$(Verb) if $(BCCompile.OCL) $(BC_DEPEND_OPTIONS) \
-                                    $(LLVMCC_EMITIR_FLAG) \
-                                    $< -o $(ObjDir)/$*.ll -S; \
-                  $(BC_DEPEND_MOVEFILE)
-else
-
-$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
-	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
-	$(Verb) $(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
-
-endif
-
-ifdef TABLEGEN_INC_FILES_COMMON
-ifdef OPENCRUN_TARGET
-
-$(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
-	$(Echo) Generating OCL target library definition for '$(OPENCRUN_TARGET)' with oclgen
-	$(Verb) $(OCLGen) -gen-ocl-constants-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
-
-$(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
-	$(Echo) Generating OCL target types definition for '$(OPENCRUN_TARGET)' with oclgen
-	$(Verb) $(OCLGen) -gen-ocl-types-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
-
-$(ObjDir)/ocltarget.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
-	$(Echo) Generating OCL target definitions for '$(OPENCRUN_TARGET)' with oclgen
-	$(Verb) $(OCLGen) -gen-ocl-target-defs -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
-
-$(ObjDir)/Builtins.$(OPENCRUN_TARGET).inc.tmp: $(OPENCRUN_TARGET).td $(OCLGENTool) $(ObjDir)/.dir
-	$(Echo) Generating OCL builtins library implementation for '$(OPENCRUN_TARGET)' with oclgen
-	$(Verb) $(OCLGen) -gen-ocl-builtin-impls -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
-
-endif
-endif
-
-ifdef HEADERS
-
-OBJHEADERS := $(addprefix $(HeaderDir)/, $(HEADERS))
-
-$(OBJHEADERS) : $(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
-	$(Verb) cp $< $@
-	$(Echo) Copying $(notdir $@) to build dir
-
-
-$(PROJ_headers):
-	$(Verb) $(MKDIR) $@
-
-INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
-
-$(INSTHEADERS) : $(PROJ_headers)/%.h : $(HeaderDir)/%.h | $(PROJ_headers)
-	$(Verb) $(DataInstall) $< $(PROJ_headers)
-	$(Echo) Installing compiler include file: $(notdir $<)
-
-all-local:: $(OBJHEADERS)
-
-install-local:: $(INSTHEADERS)
-
-uninstall-local:: 
-	$(Echo) Uninstalling compiler include files
-	$(Verb) if [ -d "$(PROJ_headers)" ] ; then \
-	  $(RM) -rf $(DESTDIR)$(PROJ_prefix)/lib/opencrun ; \
-	fi
-
-endif
 
 #------------------------------------------------------------------------
 # Temporary fix to remove all installed loadable modules
@@ -183,3 +83,203 @@ uninstall-local::
 endif
 
 endif
+
+################################################################################
+# OCLGen Support
+################################################################################
+
+CommonLibraryDir := $(PROJ_SRC_ROOT)/include/opencrun/Device/Library
+
+OCLGenLibrary := $(strip $(wildcard $(CommonLibraryDir)/*.td))
+
+HeaderDir := $(LibDir)/opencrun/include
+
+PROJ_headers := $(DESTDIR)$(PROJ_prefix)/lib/opencrun/include
+
+OCLGEN = $(ToolDir)/oclgen
+
+OCLGen = $(OCLGEN) -I $(call SYSPATH, $(PROJ_SRC_DIR)) \
+                   -I $(call SYSPATH, $(PROJ_SRC_ROOT)/include)
+
+ifdef OPENCRUN_TARGET
+
+OCLGenLibrary += $(strip $(wildcard $(PROJ_SRC_DIR)/*.td))
+
+HEADERS = oclconst.$(OPENCRUN_TARGET).h ocltype.$(OPENCRUN_TARGET).h ocltarget.$(OPENCRUN_TARGET).h
+
+TargetRequire = $(addprefix $(HeaderDir)/, $(HEADERS))
+TargetCommonOpts = -DOPENCRUN_LIB_IMPL -include "$(HeaderDir)/ocltarget.$(OPENCRUN_TARGET).h"
+
+endif
+
+ifdef TABLEGEN_INC_FILES_COMMON
+ifdef OPENCRUN_TARGET
+
+$(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
+	$(Echo) Generating OCL target library definition for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-constants-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
+	$(Echo) Generating OCL target types definition for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-types-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/ocltarget.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
+	$(Echo) Generating OCL target definitions for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-target-defs -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+$(ObjDir)/Builtins.$(OPENCRUN_TARGET).inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
+	$(Echo) Generating OCL builtins library implementation for '$(OPENCRUN_TARGET)' with oclgen
+	$(Verb) $(OCLGen) -gen-ocl-builtin-impls -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
+
+endif
+endif
+
+ifdef HEADERS
+
+OBJHEADERS := $(addprefix $(HeaderDir)/, $(HEADERS))
+
+$(OBJHEADERS) : $(HeaderDir)/%.h: %.h.inc $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $@) to build dir
+
+$(PROJ_headers):
+	$(Verb) $(MKDIR) $@
+
+INSTHEADERS := $(addprefix $(PROJ_headers)/, $(HEADERS))
+
+$(INSTHEADERS) : $(PROJ_headers)/%.h : $(HeaderDir)/%.h | $(PROJ_headers)
+	$(Verb) $(DataInstall) $< $(PROJ_headers)
+	$(Echo) Installing compiler include file: $(notdir $<)
+
+all-local:: $(OBJHEADERS)
+
+install-local:: $(INSTHEADERS)
+
+uninstall-local:: 
+	$(Echo) Uninstalling compiler include files
+	$(Verb) if [ -d "$(PROJ_headers)" ] ; then \
+	  $(RM) -rf $(DESTDIR)$(PROJ_prefix)/lib/opencrun ; \
+	fi
+
+endif
+
+################################################################################
+# OpenCL to Bytecode compilation
+################################################################################
+
+NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
+
+BCCompile.CL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
+               $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
+               -I$(HeaderDir) -Wno-empty-translation-unit -Wgnu
+
+ObjectsBC := $(BaseNameSources:%=$(ObjDir)/%.bc)
+
+#---------------------------------------------------------
+# Bytecode Module Targets:
+# If the user set MODULE_NAME then they want to build a
+# bytecode module from the sources. We compile all the
+# sources and link it together into a single bytecode
+# module.
+#---------------------------------------------------------
+
+ifdef MODULE_NAME
+
+Module := $(LibDir)/$(MODULE_NAME).bc
+LinkModule := $(LLVMLINK)
+
+
+ifdef EXPORTED_SYMBOL_FILE
+LinkModule += -internalize-public-api-file=$(EXPORTED_SYMBOL_FILE)
+endif
+
+$(Module): $(BUILT_SOURCES) $(ObjectsBC) $(LibDir)/.dir $(LLVMLINK)
+	$(Echo) Building $(BuildMode) Bytecode Module $(notdir $@)
+	$(Verb) $(LinkModule) -o $@ $(ObjectsBC)
+
+all-local:: $(Module)
+
+clean-local::
+ifneq ($(strip $(Module)),)
+	-$(Verb) $(RM) -f $(Module)
+endif
+
+ifdef BYTECODE_DESTINATION
+ModuleDestDir := $(BYTECODE_DESTINATION)
+else
+ModuleDestDir := $(DESTDIR)$(PROJ_libdir)
+endif
+
+ifdef NO_INSTALL
+install-local::
+	$(Echo) Install circumvented with NO_INSTALL
+uninstall-local::
+	$(Echo) Uninstall circumvented with NO_INSTALL
+else
+DestModule := $(ModuleDestDir)/$(MODULE_NAME).bc
+
+install-module:: $(DestModule)
+install-local:: $(DestModule)
+
+$(DestModule): $(ModuleDestDir) $(Module)
+	$(Echo) Installing $(BuildMode) Bytecode Module $(DestModule)
+	$(Verb) $(DataInstall) $(Module) $(DestModule)
+
+uninstall-local::
+	$(Echo) Uninstalling $(BuildMode) Bytecode Module $(DestModule)
+	-$(Verb) $(RM) -f $(DestModule)
+endif
+
+endif
+
+
+###############################################################################
+# Object Build Rules: Build object files based on sources
+###############################################################################
+
+ifndef DISABLE_AUTO_DEPENDENCIES
+
+BC_DEPEND_OPTIONS = -MMD -MP -MF "$(ObjDir)/$*.bc.d.tmp" \
+                    -MT "$(ObjDir)/$*.ll" -MT "$(ObjDir)/$*.bc.d"
+
+# If the build succeeded, move the dependency file over, otherwise
+# remove it.
+BC_DEPEND_MOVEFILE = then $(MV) -f "$(ObjDir)/$*.bc.d.tmp" "$(ObjDir)/$*.bc.d"; \
+                     else $(RM) "$(ObjDir)/$*.bc.d.tmp"; exit 1; fi
+
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
+	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
+	$(Verb) if $(BCCompile.CL) $(BC_DEPEND_OPTIONS) \
+			$< -o $(ObjDir)/$*.ll -S $(LLVMCC_EMITIR_FLAG) ; \
+		$(BC_DEPEND_MOVEFILE)
+
+# Provide alternate rule sets if dependencies are disabled.
+else
+
+$(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
+	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
+	$(Verb) $(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
+
+endif
+
+
+# make the C and C++ compilers strip debug info out of bytecode libraries.
+ifdef DEBUG_RUNTIME
+$(ObjectsBC): $(ObjDir)/%.bc: $(ObjDir)/%.ll $(LOPT)
+	$(Echo) "Compiling $*.ll to $*.bc for $(BuildMode) build (bytecode)"
+	$(Verb) $(LOPT) $< -std-compile-opts -o $@
+else
+$(ObjectsBC): $(ObjDir)/%.bc: $(ObjDir)/%.ll $(LOPT)
+	$(Echo) "Compiling $*.ll to $*.bc for $(BuildMode) build (bytecode)"
+	$(Verb) $(LOPT) $< -std-compile-opts -strip-debug -o $@
+endif
+
+#---------------------------------------------------------
+# Provide rule to build .bc files from .ll sources,
+# regardless of dependencies
+#---------------------------------------------------------
+$(ObjDir)/%.bc: %.ll $(ObjDir)/.dir $(LLVMAS)
+	$(Echo) "Compiling $*.ll for $(BuildMode) build"
+	$(Verb) $(LLVMAS) $< -f -o $@
+
+
