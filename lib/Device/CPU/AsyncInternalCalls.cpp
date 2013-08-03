@@ -1,7 +1,7 @@
+
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPU/Multiprocessor.h"
 #include "opencrun/Device/CPU/AsyncCopyThread.h"
-#include "opencrun/Device/CPU/WaitList.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;
@@ -15,7 +15,6 @@ event_t opencrun::cpu::AsyncWorkGroupCopy(unsigned char *dst,
     
     CPUThread &Thr = GetCurrentThread();
     const DimensionInfo::iterator &Cur = Thr.GetCurrentIndex();
-    
     bool IsFirst = true;
     for(unsigned I = 0; I < Cur.GetWorkDim(); ++I) {
       if(Cur.GetLocalId(I) != 0) {
@@ -28,10 +27,11 @@ event_t opencrun::cpu::AsyncWorkGroupCopy(unsigned char *dst,
       AsyncCopyThread *job = new AsyncCopyThread();
       
       if(event != NULL) {
-        job_evt = GetEvent(event);
+		event->async_copies.push_back(job);
         out_evt = event;
       } else {
-        job_evt = GetEvent();
+        job_evt = new _event_t;
+		job_evt->async_copies.push_back(job);
         out_evt = job_evt;
       }
       
@@ -43,9 +43,9 @@ event_t opencrun::cpu::AsyncWorkGroupCopy(unsigned char *dst,
       data->sz_gentype = sz_gentype;
       data->dst_stride = 0;
       data->src_stride = 0;
-      data->event = job_evt;
       
-      Run(job, data, true);
+	  job->SetThreadData(data);
+      EnqueueJobInThreadPool(job);
     } else {
       if(event != NULL)
         out_evt = event;
@@ -81,10 +81,11 @@ event_t opencrun::cpu::AsyncWorkGroupStridedCopy(unsigned char *dst,
       AsyncCopyThread *job = new AsyncCopyThread();
       
       if(event != NULL) {
-        job_evt = GetEvent(event);
+		event->async_copies.push_back(job);
         out_evt = event;
       } else {
-        job_evt = GetEvent();
+        job_evt = new _event_t;
+		job_evt->async_copies.push_back(job);
         out_evt = job_evt;
       }
       
@@ -105,9 +106,8 @@ event_t opencrun::cpu::AsyncWorkGroupStridedCopy(unsigned char *dst,
         data->dst_stride = 0;
       }
 
-      data->event = job_evt;
-      
-      Run(job, data, true);
+	  job->SetThreadData(data);
+      EnqueueJobInThreadPool(job);
     } else {
       if(event != NULL)
         out_evt = event;
@@ -119,11 +119,36 @@ event_t opencrun::cpu::AsyncWorkGroupStridedCopy(unsigned char *dst,
 }
 
 void opencrun::cpu::WaitGroupEvents(int num_events, event_t *event_list) {
-  
   if(!num_events || !event_list)
     return;
 
-  for(int I = 0; I < num_events; ++I)
-    opencrun::cpu::WaitEventCompletion(event_list[I]);
+  CPUThread &Thr = GetCurrentThread();
+  const DimensionInfo::iterator &Cur = Thr.GetCurrentIndex();
 
+  bool IsFirst = true;
+  for(unsigned I = 0; I < Cur.GetWorkDim(); ++I) {
+	if(Cur.GetLocalId(I) != 0) {
+	  IsFirst = false;
+	  break;
+	}
+  }
+
+  if(IsFirst) {
+	for(int i = 0; i < num_events; ++i) {
+	  for(_event_t::iterator I = event_list[i]->async_copies.begin(),
+		  E = event_list[i]->async_copies.end();
+		  I != E;
+		  ++I) {
+		{
+		  sys::ScopedMonitor lock((*I)->GetJobMonitor());
+
+		  if(!(*I)->IsCompleted())
+			lock.Wait();
+		}
+		delete *I;
+	  }
+	}
+  }
+
+  Barrier(CLK_LOCAL_MEM_FENCE);
 }

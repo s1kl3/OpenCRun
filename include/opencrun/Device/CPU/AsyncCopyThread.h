@@ -2,7 +2,6 @@
 #ifndef OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 #define OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 
-#include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPU/ThreadPool.h"
 
 namespace opencrun {
@@ -16,7 +15,6 @@ public:
 
 public:
   struct AsyncCopyThreadData {
-
     unsigned char *dst;         // Destination address.
 
     const unsigned char *src;   // Source address.
@@ -27,9 +25,6 @@ public:
 
     size_t dst_stride;          // Destination stride (expressed in gentype elements).
     size_t src_stride;          // Source stride (expressed in gentype elements).
-
-    event_t event;              // Event to be notified of Job completion.
-
   };
 
 public:
@@ -38,7 +33,8 @@ public:
   ~AsyncCopyThread() { delete thrd_data; }
 
 public:
-  void Run(void *data);
+  void Run();
+  void SetThreadData(AsyncCopyThreadData *thrd_data) { this->thrd_data = thrd_data; }
 
 private:
   AsyncCopyThreadData *thrd_data;

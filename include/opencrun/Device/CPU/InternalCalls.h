@@ -2,6 +2,10 @@
 #ifndef OPENCRUN_DEVICE_CPU_INTERNALCALLS_H
 #define OPENCRUN_DEVICE_CPU_INTERNALCALLS_H
 
+#include "opencrun/Device/CPU/AsyncCopyThread.h"
+
+#include "llvm/ADT/SmallVector.h"
+
 // With the CPU device the accellerator and the host are on the same computed
 // device, so include CL/opencl.h to get defined the same data-types used by the
 // host.
@@ -14,7 +18,14 @@ typedef cl_ulong cl_mem_fence_flags;
 
 // Event type used to identify asynchronous copies from local to global memory
 // and vice-versa.
-typedef struct _event_t { } * event_t;
+
+struct _event_t {
+  typedef llvm::SmallVector<opencrun::cpu::AsyncCopyThread *, 10>::iterator iterator;
+
+  llvm::SmallVector<opencrun::cpu::AsyncCopyThread *, 10> async_copies;
+};
+
+typedef _event_t * event_t;
 
 // The same holds for some macro.
 #define CLK_LOCAL_MEM_FENCE  1 << 0
