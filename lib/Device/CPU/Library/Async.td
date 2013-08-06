@@ -2,7 +2,7 @@
 // Async Copy and Prefetch builtin implementations 
 //===----------------------------------------------------------------------===//
 
-def : OCLBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
+def : OCLTargetBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
   return __builtin_ocl_async_work_group_copy_impl(
     (uchar *) param1,
     (const uchar *) param2,
@@ -14,7 +14,7 @@ def : OCLBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
+def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
   return __builtin_ocl_async_work_group_strided_copy_impl(
     (uchar *) param1,
     (const uchar *) param2,
@@ -26,7 +26,7 @@ def : OCLBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
   );
 }], [TypedefId<"GENTYPE", Pointee<1>>]>, "eP2gP1gzze">;
 
-def : OCLBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
+def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
    return __builtin_ocl_async_work_group_strided_copy_impl(
     (uchar *) param1,
     (const uchar *) param2,
@@ -40,7 +40,7 @@ def : OCLBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_prefetch, TemplateStrategy<[{
+def : OCLTargetBuiltinImpl<blt_prefetch, TemplateStrategy<[{
   for (uint i = 0; i < param2; i++)
     __builtin_prefetch((const void *) &param1[i]);
 }], [TypedefId<"GENTYPE", Pointee<1>>]>>;

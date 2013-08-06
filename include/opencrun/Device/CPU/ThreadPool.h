@@ -70,7 +70,7 @@ private:
   unsigned int num_thrds;
 
   // Array of threads.
-  llvm::SmallVector<WorkerThread *, 12> thrds;
+  llvm::SmallVector<WorkerThread *, 16> thrds;
 
   // Job queue.
   std::deque<Job *> jobs;

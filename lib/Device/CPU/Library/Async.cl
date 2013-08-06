@@ -1,6 +1,6 @@
 
 //
-// The Common library is auto-generated.
+// The Async library is auto-generated.
 //
 
 #define OPENCRUN_BUILTIN_ASYNC
