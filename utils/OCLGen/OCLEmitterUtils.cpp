@@ -53,6 +53,10 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     // Modifiers
     if (P->hasModifier(OCLPointerType::M_Const))
       OS << "const ";
+	if (P->hasModifier(OCLPointerType::M_Restrict))
+	  OS << "restrict ";
+	if (P->hasModifier(OCLPointerType::M_Volatile))
+	  OS << "volatile ";
 
     // Base type
     EmitOCLTypeSignature(OS, P->getBaseType());

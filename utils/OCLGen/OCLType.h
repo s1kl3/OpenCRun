@@ -172,7 +172,10 @@ private:
 class OCLPointerType : public OCLBasicType {
 public:
   enum Modifier {
-    M_Const = 1 << 0
+    M_Const = 1 << 0,
+	M_Restrict = 1 << 1,
+	M_Volatile = 1 << 2,
+	M_Unknown
   };
 
 public:
