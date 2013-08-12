@@ -64,6 +64,11 @@ event_t AsyncWorkGroupStridedCopy(unsigned char *dst,
 
 void WaitGroupEvents(int num_events, event_t *event_list);
 
+// Explicit Memory Fence Functions.
+void MemFence(cl_mem_fence_flags flags);
+void ReadMemFence(cl_mem_fence_flags flags);
+void WriteMemFence(cl_mem_fence_flags flags);
+
 } // End namespace cpu.
 } // End namespace opencrun.
 

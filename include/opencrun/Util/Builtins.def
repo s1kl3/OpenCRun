@@ -16,3 +16,8 @@ BUILTIN("barrier", "vULi")
 BUILTIN("async_work_group_copy_impl", "ePUcPUczez")
 BUILTIN("async_work_group_strided_copy_impl", "ePUcPUczzezUi")
 BUILTIN("wait_group_events", "viPe")
+
+// Explicit Memory Fence Functions.
+BUILTIN("mem_fence", "vULi")
+BUILTIN("read_mem_fence", "vULi")
+BUILTIN("write_mem_fence", "vULi")
