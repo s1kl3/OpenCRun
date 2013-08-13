@@ -60,6 +60,7 @@ class OCLBuiltin<string name, list<OCLBuiltinVariant> var> {
   string Name = name;
   string Group = "";
   list<OCLBuiltinVariant> Variants = var;
+  list<OCLPredicate> Predicates = [];
 }
 
 class OCLGenericBuiltin<string name, list<OCLBuiltinVariant> var>

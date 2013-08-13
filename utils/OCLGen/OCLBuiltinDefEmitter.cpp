@@ -29,7 +29,7 @@ void EmitOCLGenericBuiltinPrototype(llvm::raw_ostream &OS,
      << BD.getInternalName() << "\n\n";
 
   BuiltinSignList Alts;
-  for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
+  for (OCLBuiltin::var_iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
     const OCLBuiltinVariant &BV = *BI->second;
 
     ExpandSigns(BV, Alts);
@@ -43,7 +43,7 @@ void EmitOCLGenericBuiltinPrototype(llvm::raw_ostream &OS,
        E = Alts.end(); I != E; ++I) {
     const BuiltinSign &S = *I;
 
-    Preds.Push(ComputePredicates(S, true));
+    Preds.Push(ComputePredicates(B, S, true));
     
     if (Alts.size() > 1)
       OS << "__opencrun_overload\n";
@@ -68,7 +68,7 @@ void EmitOCLCastBuiltinPrototype(llvm::raw_ostream &OS,
   OCLBuiltinDecorator BD(B);
 
   BuiltinSignList Alts;
-  for (OCLBuiltin::iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
+  for (OCLBuiltin::var_iterator BI = B.begin(), BE = B.end(); BI != BE; ++BI) {
     const OCLBuiltinVariant &BV = *BI->second;
 
     ExpandSigns(BV, Alts);
@@ -91,7 +91,7 @@ void EmitOCLCastBuiltinPrototype(llvm::raw_ostream &OS,
          << BD.getInternalName(&S) << "\n\n";
     }
  
-    Preds.Push(ComputePredicates(S, true));
+    Preds.Push(ComputePredicates(B, S, true));
    
     if (Ranges.front().first > 1)
       OS << "__opencrun_overload\n";

@@ -230,6 +230,20 @@ public:
   }
 
 private:
+  PredicateSet FetchPredicates(llvm::Record &R) {
+    PredicateSet Preds;
+    std::vector<llvm::Record*> Predicates =
+      R.getValueAsListOfDefs("Predicates");
+
+    for (unsigned i = 0, e = Predicates.size(); i != e; ++i) {
+      const OCLPredicate &P = OCLPredicatesTable::get(*Predicates[i]);
+
+      if (!llvm::isa<OCLAddressSpace>(&P))
+        Preds.insert(&P);
+    }
+    return Preds;
+  }
+
   void BuildBuiltin(llvm::Record &R) {
     OCLBuiltin *Builtin = 0;
 
@@ -259,6 +273,7 @@ private:
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
 
+    Builtin->setPredicates(FetchPredicates(R));
     Builtins[&R] = Builtin;
   }
 

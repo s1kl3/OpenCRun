@@ -16,7 +16,8 @@ class OCLType;
 
 const char *AddressSpaceQualifier(AddressSpaceKind AS);
 
-PredicateSet ComputePredicates(const BuiltinSign &S, bool IgnoreAS = false);
+PredicateSet ComputePredicates(const OCLBuiltin &B, const BuiltinSign &S, 
+                               bool IgnoreAS = false);
 
 void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                           std::string Name = "");
@@ -102,7 +103,7 @@ class GroupGuardEmitter {
 
 public:
   GroupGuardEmitter(llvm::raw_ostream &os) : OS(os) {}
-  void Push(llvm::StringRef G);
+  bool Push(llvm::StringRef G);
   void Finalize();
 };
 
@@ -113,7 +114,7 @@ class PredicatesGuardEmitter {
 
 public:
   PredicatesGuardEmitter(llvm::raw_ostream &os) : OS(os) {}
-  void Push(const PredicateSet &S);
+  bool Push(const PredicateSet &S);
   void Finalize();
 };
 

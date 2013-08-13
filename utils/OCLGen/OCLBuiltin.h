@@ -254,7 +254,7 @@ public:
 
 public:
   typedef std::map<llvm::StringRef, const OCLBuiltinVariant*> VariantsMap;
-  typedef VariantsMap::const_iterator iterator;
+  typedef VariantsMap::const_iterator var_iterator;
 
 protected:
   OCLBuiltin(BuiltinKind K, llvm::StringRef group, llvm::StringRef name,
@@ -268,15 +268,18 @@ public:
   BuiltinKind getKind() const { return Kind; }
   std::string getName() const { return Name; }
   std::string getGroup() const { return Group; }
-  iterator begin() const { return Variants.begin(); }
-  iterator end() const { return Variants.end(); }
-  iterator find(llvm::StringRef V) const { return Variants.find(V); }
+  var_iterator begin() const { return Variants.begin(); }
+  var_iterator end() const { return Variants.end(); }
+  var_iterator find(llvm::StringRef V) const { return Variants.find(V); }
+  const PredicateSet &getPredicates() const { return Predicates; }
+  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
 private:
   BuiltinKind Kind;
   std::string Group;
   std::string Name;
   VariantsMap Variants;
+  PredicateSet Predicates;
 };
 
 class OCLGenericBuiltin : public OCLBuiltin {

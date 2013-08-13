@@ -327,7 +327,7 @@ static void EmitOCLGenericBuiltinImpls(llvm::raw_ostream &OS,
     const BuiltinSign &Sign = SI->first;
     const OCLStrategy &Strategy = SI->second->getStrategy();
 
-    Preds.Push(ComputePredicates(Sign));
+    Preds.Push(ComputePredicates(B, Sign));
 
     if (M.size() > 1)
       OS << "__opencrun_overload\n";
@@ -368,7 +368,7 @@ static void EmitOCLCastBuiltinImpls(llvm::raw_ostream &OS,
 
     if (Ranges.front().second == ImplMapKeyIter(SI)) Ranges.pop_front();
 
-    Preds.Push(ComputePredicates(Sign));
+    Preds.Push(ComputePredicates(B, Sign));
 
     if (Ranges.front().first > 1)
       OS << "__opencrun_overload\n";
@@ -402,14 +402,14 @@ bool opencrun::EmitOCLBuiltinImpls(llvm::raw_ostream &OS,
   for (unsigned i = 0, e = OCLBuiltinImpls.size(); i != e; ++i) {
     const OCLBuiltinImpl &Impl = *OCLBuiltinImpls[i];
     const OCLBuiltin &B = Impl.getBuiltin();
-    OCLBuiltin::iterator VI = B.find(Impl.getVariantName());
+    OCLBuiltin::var_iterator VI = B.find(Impl.getVariantName());
 
     std::list<const OCLBuiltinVariant *> CurVariants;
     if (VI != B.end()) {
       CurVariants.push_back(VI->second);
     } else if (Impl.getVariantName() == "") {
-      for (OCLBuiltin::iterator VI = B.begin(), VE = B.end(); VI != VE; ++VI)
-        CurVariants.push_back(VI->second);
+      for (OCLBuiltin::var_iterator I = B.begin(), E = B.end(); I != E; ++I)
+        CurVariants.push_back(I->second);
     } else {
       llvm::PrintWarning("Unknown variant '" + Impl.getVariantName() + "' "
                          "for builtin '" + B.getName() + "'");
