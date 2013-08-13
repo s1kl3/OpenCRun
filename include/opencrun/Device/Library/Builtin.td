@@ -34,6 +34,9 @@ class isSameBaseSizeAs<OCLParam op1, OCLParam op2>
 class isSameBaseKindAs<OCLParam op1, OCLParam op2>
  : OCLBinaryTypeConstraint<op1, op2>;
 
+class isSameBitSizeAs<OCLParam op1, OCLParam op2>
+ : OCLBinaryTypeConstraint<op1, op2>;
+
 class Not<OCLTypeConstraint c> : OCLTypeConstraint {
   OCLTypeConstraint Basic = c;
 }
@@ -114,6 +117,11 @@ class MinValue<string id, OCLParam param>
 class MaxValue<string id, OCLParam param>
  : OCLTypeValue<id, param>;
 
+class BuiltinName<string name, OCLBuiltin builtin> : OCLDeclaration {
+  string Name = name;
+  OCLBuiltin Builtin = builtin;
+}
+
 class OCLStrategy<list<OCLDeclaration> decls> {
   list<OCLDeclaration> Declarations = decls;
 }
@@ -148,11 +156,22 @@ class TemplateStrategy<code impl, list<OCLDeclaration> decls = []>
   code TemplateImpl = impl;
 }
 
+class OCLRequirement;
+
+class OCLInclude<string filename> : OCLRequirement {
+  string FileName = filename;
+}
+
+class OCLCodeBlock<code block> : OCLRequirement {
+  code Block = block;
+}
+
 class OCLBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, string varname = ""> {
   OCLBuiltin BuiltIn = builtin;
   OCLStrategy Strategy = s;
   string VariantName = varname;
   bit isTarget = 0;
+  list<OCLRequirement> Requirements = [];
 }
 
 class OCLTargetBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, 

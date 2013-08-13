@@ -24,8 +24,9 @@ BUILT_SOURCES = oclconst.CPU.h.inc ocltype.CPU.h.inc ocltarget.CPU.h.inc Builtin
 #
 # The LLVM build system does not known recognize .cl files automatically.
 #
-SOURCES = Async.cl Common.cl Mfence.cl Geometric.cl Integer.cl Math.cl \
-      Vmisc.cl Relational.cl Synchronization.cl Vloadstore.cl WorkItem.cl
+SOURCES = Async.cl Common.cl Convert.cl Mfence.cl Geometric.cl Integer.cl \
+          Math.cl Vmisc.cl Relational.cl Reinterpret.cl Synchronization.cl \
+          Vloadstore.cl WorkItem.cl
 
 OPENCRUN_TARGET = CPU
 
