@@ -20,9 +20,10 @@ const char *opencrun::AddressSpaceQualifier(AddressSpaceKind AS) {
   return 0;
 }
 
-PredicateSet opencrun::ComputePredicates(const BuiltinSign &Sign, 
+PredicateSet opencrun::ComputePredicates(const OCLBuiltin &B,
+                                         const BuiltinSign &Sign, 
                                          bool IgnoreAS) {
-  PredicateSet Preds;
+  PredicateSet Preds(B.getPredicates().begin(), B.getPredicates().end());
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 
@@ -111,8 +112,8 @@ static void EmitGroupGuardEnd(llvm::raw_ostream &OS, llvm::StringRef Group) {
 }
 
 
-void GroupGuardEmitter::Push(llvm::StringRef Group) {
-  if (Group == Current) return;
+bool GroupGuardEmitter::Push(llvm::StringRef Group) {
+  if (Group == Current) return false;
 
   EmitGroupGuardEnd(OS, Current);
 
@@ -120,6 +121,8 @@ void GroupGuardEmitter::Push(llvm::StringRef Group) {
   Current = Group;
 
   EmitGroupGuardBegin(OS, Current);
+
+  return true;
 }
 
 void GroupGuardEmitter::Finalize() {
@@ -162,8 +165,8 @@ static void EmitPredicatesEnd(llvm::raw_ostream &OS,
   OS << "#endif\n\n";
 }
 
-void PredicatesGuardEmitter::Push(const PredicateSet &Preds) {
-  if (Preds == Current) return;
+bool PredicatesGuardEmitter::Push(const PredicateSet &Preds) {
+  if (Preds == Current) return false;
 
   EmitPredicatesEnd(OS, Current);
 
@@ -171,6 +174,8 @@ void PredicatesGuardEmitter::Push(const PredicateSet &Preds) {
   Current = Preds;
 
   EmitPredicatesBegin(OS, Current);
+
+  return true;
 }
 
 void PredicatesGuardEmitter::Finalize() {

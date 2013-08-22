@@ -123,6 +123,29 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
   return S1->getKind() == S2->getKind();
 }
 
+bool OCLSameBitSizeTypeConstraint::
+apply(const std::vector<const OCLBasicType *> &Ops) const {
+  const OCLBasicType *P1 = FirstParam.get(Ops);
+  const OCLBasicType *P2 = SecondParam.get(Ops);
+
+  unsigned Size1 = 0;
+  unsigned Size2 = 0;
+
+  if (const OCLScalarType *S = llvm::dyn_cast<OCLScalarType>(P1))
+    Size1 = S->getBitWidth();
+  else if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(P1))
+    Size1 = V->getBaseType().getBitWidth() * V->getWidth();
+
+  if (const OCLScalarType *S = llvm::dyn_cast<OCLScalarType>(P2))
+    Size2 = S->getBitWidth();
+  else if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(P2))
+    Size2 = V->getBaseType().getBitWidth() * V->getWidth();
+
+  if (!Size1 || !Size2) return false;
+
+  return Size1 == Size2;
+}
+
 OCLBuiltin::~OCLBuiltin() {
   llvm::DeleteContainerSeconds(Variants);
 }
@@ -163,6 +186,7 @@ public:
   typedef std::map<llvm::Record *, const OCLParam *> OCLParamsMap;
 
   typedef std::map<llvm::Record *, const OCLBuiltinImpl *> OCLBuiltinImplsMap;
+  typedef std::map<llvm::Record *, const OCLRequirement *> OCLRequirementsMap;
   typedef std::map<llvm::Record *, const OCLStrategy *> OCLStrategiesMap;
   typedef std::map<llvm::Record *, const OCLReduction *> OCLReductionsMap;
   typedef std::map<llvm::Record *, const OCLDecl *> OCLDeclsMap;
@@ -229,7 +253,28 @@ public:
     return *Reductions[&R];
   }
 
+  const OCLRequirement &getRequirement(llvm::Record &R) {
+    if (!Requirements.count(&R))
+      BuildRequirement(R);
+
+    return *Requirements[&R];
+  }
+
 private:
+  PredicateSet FetchPredicates(llvm::Record &R) {
+    PredicateSet Preds;
+    std::vector<llvm::Record*> Predicates =
+      R.getValueAsListOfDefs("Predicates");
+
+    for (unsigned i = 0, e = Predicates.size(); i != e; ++i) {
+      const OCLPredicate &P = OCLPredicatesTable::get(*Predicates[i]);
+
+      if (!llvm::isa<OCLAddressSpace>(&P))
+        Preds.insert(&P);
+    }
+    return Preds;
+  }
+
   void BuildBuiltin(llvm::Record &R) {
     OCLBuiltin *Builtin = 0;
 
@@ -259,6 +304,7 @@ private:
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
 
+    Builtin->setPredicates(FetchPredicates(R));
     Builtins[&R] = Builtin;
   }
 
@@ -299,6 +345,8 @@ private:
         Constraint = new OCLSameBaseSizeTypeConstraint(P1, P2);
       else if (R.isSubClassOf("isSameBaseKindAs"))
         Constraint = new OCLSameBaseKindTypeConstraint(P1, P2);
+      else if (R.isSubClassOf("isSameBitSizeAs"))
+        Constraint = new OCLSameBitSizeTypeConstraint(P1, P2);
       else
         llvm::PrintFatalError("Invalid TypeConstraint: " + R.getName());
     }
@@ -347,6 +395,10 @@ private:
 
     BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, VarName, IsTarget);
 
+    std::vector<llvm::Record *> Reqs = R.getValueAsListOfDefs("Requirements");
+    for (unsigned i = 0, e = Reqs.size(); i != e; ++i)
+      BuiltinImpl->addRequirement(&getRequirement(*Reqs[i]));
+
     BuiltinImpls[&R] = BuiltinImpl;
   }
 
@@ -373,6 +425,11 @@ private:
       else
         llvm::PrintFatalError("Invalid OCLTypeValue: " + R.getName());
     }
+    else if (R.isSubClassOf("BuiltinName")) {
+      llvm::StringRef Name = R.getValueAsString("Name");
+      const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("Builtin"));
+      Decl = new OCLBuiltinNameDecl(Name, Builtin);
+    }
     else
       llvm::PrintFatalError("Invalid OCLDecl: " + R.getName());
 
@@ -390,6 +447,21 @@ private:
       llvm::PrintFatalError("Invalid OCLReduction: " + R.getName());
 
     Reductions[&R] = Red;
+  }
+
+  void BuildRequirement(llvm::Record &R) {
+    OCLRequirement *Req = 0;
+
+    if (R.isSubClassOf("OCLInclude")) {
+      llvm::StringRef FileName = R.getValueAsString("FileName");
+      Req = new OCLIncludeRequirement(FileName);
+    } else if (R.isSubClassOf("OCLCodeBlock")) {
+      llvm::StringRef CodeBlock = R.getValueAsString("CodeBlock");
+      Req = new OCLCodeBlockRequirement(CodeBlock);
+    } else
+      llvm::PrintFatalError("Invalid OCLRequirement: " + R.getName());
+
+    Requirements[&R] = Req;
   }
 
   void BuildStrategy(llvm::Record &R) {
@@ -424,6 +496,7 @@ private:
   OCLParamsMap Params;
 
   OCLBuiltinImplsMap BuiltinImpls;
+  OCLRequirementsMap Requirements;
   OCLStrategiesMap Strategies;
   OCLReductionsMap Reductions;
   OCLDeclsMap Decls;

@@ -5,6 +5,7 @@
 
 #include <list>
 #include <map>
+#include <set>
 
 namespace opencrun {
 
@@ -82,12 +83,12 @@ class OCLTypeConstraint {
 public:
   enum ConstraintKind {
     CK_Not,
-    CK_Binary,
     CK_Same,
     CK_SameDim,
     CK_SameBase,
     CK_SameBaseKind,
-    CK_SameBaseSize
+    CK_SameBaseSize,
+    CK_SameBitSize
   };
 
 protected:
@@ -130,8 +131,8 @@ class OCLBinaryTypeConstraint : public OCLTypeConstraint {
 public:
   static bool classof(const OCLTypeConstraint *C) {
     switch (C->getKind()) {
-    case CK_Binary: case CK_Same: case CK_SameDim:
-    case CK_SameBase: case CK_SameBaseKind: case CK_SameBaseSize:
+    case CK_Same: case CK_SameDim: case CK_SameBase: 
+    case CK_SameBaseKind: case CK_SameBaseSize: case CK_SameBitSize:
       return true;
     default: return false;
     }
@@ -217,6 +218,19 @@ public:
   bool apply(const BuiltinSign &Ops) const;
 };
 
+class OCLSameBitSizeTypeConstraint : public OCLBinaryTypeConstraint {
+public:
+  static bool classof(const OCLTypeConstraint *C) {
+    return C->getKind() == CK_SameBitSize;
+  }
+
+public:
+  OCLSameBitSizeTypeConstraint(const OCLParam &P1, const OCLParam &P2)
+   : OCLBinaryTypeConstraint(CK_SameBitSize, P1, P2) {}
+
+  bool apply(const BuiltinSign &Ops) const;
+};
+
 //===----------------------------------------------------------------------===//
 // OCLBuiltin
 //===----------------------------------------------------------------------===//
@@ -254,7 +268,7 @@ public:
 
 public:
   typedef std::map<llvm::StringRef, const OCLBuiltinVariant*> VariantsMap;
-  typedef VariantsMap::const_iterator iterator;
+  typedef VariantsMap::const_iterator var_iterator;
 
 protected:
   OCLBuiltin(BuiltinKind K, llvm::StringRef group, llvm::StringRef name,
@@ -268,15 +282,18 @@ public:
   BuiltinKind getKind() const { return Kind; }
   std::string getName() const { return Name; }
   std::string getGroup() const { return Group; }
-  iterator begin() const { return Variants.begin(); }
-  iterator end() const { return Variants.end(); }
-  iterator find(llvm::StringRef V) const { return Variants.find(V); }
+  var_iterator begin() const { return Variants.begin(); }
+  var_iterator end() const { return Variants.end(); }
+  var_iterator find(llvm::StringRef V) const { return Variants.find(V); }
+  const PredicateSet &getPredicates() const { return Predicates; }
+  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
 private:
   BuiltinKind Kind;
   std::string Group;
   std::string Name;
   VariantsMap Variants;
+  PredicateSet Predicates;
 };
 
 class OCLGenericBuiltin : public OCLBuiltin {
@@ -345,7 +362,8 @@ public:
     DK_TypedefId,
     DK_TypedefUnsigned,
     DK_MinValue,
-    DK_MaxValue
+    DK_MaxValue,
+    DK_BuiltinName
   };
 
 protected:
@@ -446,6 +464,25 @@ public:
 public:
   OCLMaxValueDecl(llvm::StringRef id, const OCLParam &p) 
    : OCLTypeValueDecl(DK_MaxValue, id, p) {}
+};
+
+class OCLBuiltinNameDecl : public OCLDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_BuiltinName;
+  }
+
+public:
+  OCLBuiltinNameDecl(llvm::StringRef name, const OCLBuiltin &b)
+   : OCLDecl(DK_BuiltinName), Name(name), Builtin(b) {}
+
+public:
+  std::string getName() const { return Name; }
+  const OCLBuiltin &getBuiltin() const { return Builtin; }
+
+private:
+  std::string Name;
+  const OCLBuiltin &Builtin;
 };
 
 class OCLReduction {
@@ -562,7 +599,62 @@ private:
   std::string TemplateImpl;
 };
 
+class OCLRequirement {
+public:
+  enum RequirementKind {
+    RK_Include,
+    RK_CodeBlock
+  };
+
+protected:
+  OCLRequirement(RequirementKind K) : Kind(K) {}
+
+public:
+  RequirementKind getKind() const { return Kind; }
+
+private:
+  RequirementKind Kind;
+};
+
+class OCLIncludeRequirement : public OCLRequirement {
+public:
+  static bool classof(const OCLRequirement *R) {
+    return R->getKind() == RK_Include;
+  }
+
+public:
+  OCLIncludeRequirement(llvm::StringRef filename)
+   : OCLRequirement(RK_Include), FileName(filename) {}
+
+public:
+  std::string getFileName() const { return FileName; }
+
+private:
+  std::string FileName;
+};
+
+class OCLCodeBlockRequirement : public OCLRequirement {
+public:
+  static bool classof(const OCLRequirement *R) {
+    return R->getKind() == RK_CodeBlock;
+  }
+
+public:
+  OCLCodeBlockRequirement(llvm::StringRef codeblock)
+   : OCLRequirement(RK_CodeBlock), CodeBlock(codeblock) {}
+
+public:
+  std::string getCodeBlock() const { return CodeBlock; }
+
+private:
+  std::string CodeBlock;
+};
+
 class OCLBuiltinImpl {
+public:
+  typedef std::vector<const OCLRequirement*> RequirementsContainer;
+  typedef RequirementsContainer::const_iterator req_iterator;
+
 public:
   OCLBuiltinImpl(const OCLBuiltin &builtin, const OCLStrategy &strategy,
                  const std::string varname, bool target) 
@@ -575,11 +667,18 @@ public:
   const std::string getVariantName() const { return VariantName; }
   bool isTarget() const { return IsTarget; }
 
+  void addRequirement(const OCLRequirement *R) {
+    Requirements.push_back(R);
+  }
+  req_iterator req_begin() const { return Requirements.begin(); }
+  req_iterator req_end() const { return Requirements.end(); }
+
 private:
   const OCLBuiltin &BuiltIn;
   const OCLStrategy &Strategy;
   std::string VariantName;
   bool IsTarget;
+  RequirementsContainer Requirements;
 };
 
 //===----------------------------------------------------------------------===//
