@@ -112,7 +112,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_global, [ocl_mod_volatile]>,
     ocl_int,
-	ocl_int
+	  ocl_int
   ],
   [],
   "nP1nnn">,
@@ -120,7 +120,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_global, [ocl_mod_volatile]>,
     ocl_uint,
-	ocl_uint
+	  ocl_uint
   ],
   [],
   "UnP1UnUnUn">,
@@ -128,7 +128,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_local, [ocl_mod_volatile]>,
     ocl_int,
-	ocl_int
+	  ocl_int
   ],
   [],
   "nP2nnn">,
@@ -136,10 +136,103 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_local, [ocl_mod_volatile]>,
     ocl_uint,
-	ocl_uint
+	  ocl_uint
   ],
   [],
   "UnP2UnUnUn">
+]>;
+
+class AtomicBuiltin_lP1l_UlP1Ul_lP2l_UlP2Ul<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_global, [ocl_mod_volatile]>
+  ],
+  [],
+  "lP1l">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_global, [ocl_mod_volatile]>
+  ],
+  [],
+  "UlP1Ul">,
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_local, [ocl_mod_volatile]>
+  ],
+  [],
+  "lP2l">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_local, [ocl_mod_volatile]>
+  ],
+  [],
+  "UlP2Ul">
+]>;
+
+class AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_global, [ocl_mod_volatile]>,
+    ocl_long
+  ],
+  [],
+  "lP1ll">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_global, [ocl_mod_volatile]>,
+    ocl_ulong
+  ],
+  [],
+  "UlP1UlUl">,
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_local, [ocl_mod_volatile]>,
+    ocl_long
+  ],
+  [],
+  "lP2ll">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_local, [ocl_mod_volatile]>,
+    ocl_ulong
+  ],
+  [],
+  "UlP2UlUl">
+]>;
+
+class AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_global, [ocl_mod_volatile]>,
+    ocl_long,
+	  ocl_long
+  ],
+  [],
+  "lP1lll">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_global, [ocl_mod_volatile]>,
+    ocl_ulong,
+	  ocl_ulong
+  ],
+  [],
+  "UlP1UlUlUl">,
+  OCLBuiltinVariant<[
+    ocl_long,
+    OCLPointerType<ocl_long, ocl_as_local, [ocl_mod_volatile]>,
+    ocl_long,
+	  ocl_long
+  ],
+  [],
+  "lP2lll">,
+  OCLBuiltinVariant<[
+    ocl_ulong,
+    OCLPointerType<ocl_ulong, ocl_as_local, [ocl_mod_volatile]>,
+    ocl_ulong,
+	  ocl_ulong
+  ],
+  [],
+  "UlP2UlUlUl">
 ]>;
 
 }
@@ -165,47 +258,64 @@ def blt_atomic_and	: AtomicBuiltin_nP1nn_UnP1UnUn_nP2nn_UnP2UnUn<"atomic_and">;
 def blt_atomic_or	: AtomicBuiltin_nP1nn_UnP1UnUn_nP2nn_UnP2UnUn<"atomic_or">;
 def blt_atomic_xor	: AtomicBuiltin_nP1nn_UnP1UnUn_nP2nn_UnP2UnUn<"atomic_xor">;
 
+let Predicates = [ocl_ext_cl_khr_int64_base_atomics] in {
+  def blt_atom_add : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_add">;
+  def blt_atom_sub : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_sub">;
+  def blt_atom_xchg : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_xchg">;
+  def blt_atom_inc : AtomicBuiltin_lP1l_UlP1Ul_lP2l_UlP2Ul<"atom_inc">;
+  def blt_atom_dec : AtomicBuiltin_lP1l_UlP1Ul_lP2l_UlP2Ul<"atom_dec">;
+  def blt_atom_cmpxchg : AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<"atom_cmpxchg">;
+}
+
+let Predicates = [ocl_ext_cl_khr_int64_extended_atomics] in {
+  def blt_atom_min : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_min">;
+  def blt_atom_max : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_max">;
+  def blt_atom_xor : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_xor">;
+  def blt_atom_and : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_and">;
+  def blt_atom_or : AtomicBuiltin_lP1ll_UlP1UlUl_lP2ll_UlP2UlUl<"atom_or">;
+}
+
 //===----------------------------------------------------------------------===//
 // Atomic builtin implementations
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_atomic_add, TemplateStrategy<[{
-  return __sync_fetch_and_add(param1, param2);
+  return __sync_fetch_and_add_4(param1, param2);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_sub, TemplateStrategy<[{
-  return __sync_fetch_and_sub(param1, param2);
+  return __sync_fetch_and_sub_4(param1, param2);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(param1, param2);
+  return __sync_lock_test_and_set_4(param1, param2);
 }]>, "nP1nn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(param1, param2);
+  return __sync_lock_test_and_set_4(param1, param2);
 }]>, "UnP1UnUn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(
+  return __sync_lock_test_and_set_4(
 				(volatile uint __global*)param1, 
 				(uint) param2
 			  );
 }]>, "fP1ff">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(param1, param2);
+  return __sync_lock_test_and_set_4(param1, param2);
 }]>, "nP2nn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(param1, param2);
+  return __sync_lock_test_and_set_4(param1, param2);
 }]>, "UnP2UnUn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set(
+  return __sync_lock_test_and_set_4(
 				(volatile uint __local *) param1, 
 				(uint) param2
 			  );
@@ -226,61 +336,77 @@ def : OCLBuiltinImpl<blt_atomic_dec, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_cmpxchg, TemplateStrategy<[{
-  return __sync_val_compare_and_swap(param1, param2, param3);
+  return __sync_val_compare_and_swap_4(param1, param2, param3);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_atomic_min, TemplateStrategy<[{
-  TYPE old = *param1;
-  if (old <= param2)
-	return old;
-  
-  __sync_lock_test_and_set(param1, *param1);
-  {
-	old = *param1;
-	if (old > param2)
-	  *param1 = param2;
-  }
-  __sync_lock_release(param1); 
-  return old;
-}], [TypedefId<"TYPE", Id<0>>]>>;
-
-//----------------------------------------------------------------------------//
-
-def : OCLBuiltinImpl<blt_atomic_max, TemplateStrategy<[{
-  TYPE old = *param1;
-  if (old >= param2)
-	return old;
-  
-  __sync_lock_test_and_set(param1, *param1);
-  {
-	old = *param1;
-	if (old < param2)
-	  *param1 = param2;
-  }
-  __sync_lock_release(param1); 
-  return old;
-}], [TypedefId<"TYPE", Id<0>>]>>;
-
-//----------------------------------------------------------------------------//
-
 def : OCLBuiltinImpl<blt_atomic_and, TemplateStrategy<[{
-  return __sync_fetch_and_and(param1, param2);
+  return __sync_fetch_and_and_4(param1, param2);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_or, TemplateStrategy<[{
-  return __sync_fetch_and_or(param1, param2);
+  return __sync_fetch_and_or_4(param1, param2);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_xor, TemplateStrategy<[{
-  return __sync_fetch_and_xor(param1, param2);
+  return __sync_fetch_and_xor_4(param1, param2);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
+def : OCLBuiltinImpl<blt_atom_add, TemplateStrategy<[{
+  return __sync_fetch_and_add_8(param1, param2);
+}]>>;
 
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_sub, TemplateStrategy<[{
+  return __sync_fetch_and_sub_8(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_xchg, TemplateStrategy<[{
+  return __sync_lock_test_and_set_8(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_inc, TemplateStrategy<[{
+  return __builtin_ocl_atom_add(param1, 1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_dec, TemplateStrategy<[{
+  return __builtin_ocl_atom_sub(param1, 1);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_cmpxchg, TemplateStrategy<[{
+  return __sync_val_compare_and_swap_8(param1, param2, param3);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_xor, TemplateStrategy<[{
+  return __sync_fetch_and_xor_8(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_and, TemplateStrategy<[{
+  return __sync_fetch_and_and_8(param1, param2);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atomic_or, TemplateStrategy<[{
+  return __sync_fetch_and_or_8(param1, param2);
+}]>>;
