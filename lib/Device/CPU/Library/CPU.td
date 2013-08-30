@@ -10,6 +10,10 @@ include "Atomic.td"
 //===----------------------------------------------------------------------===//
 
 def : OCLTargetFeature<[ocl_ext_cl_khr_fp64]>;
+def : OCLTargetFeature<[ocl_ext_cl_khr_local_int32_base_atomics]>;
+def : OCLTargetFeature<[ocl_ext_cl_khr_global_int32_base_atomics]>;
+def : OCLTargetFeature<[ocl_ext_cl_khr_local_int32_extended_atomics]>;
+def : OCLTargetFeature<[ocl_ext_cl_khr_global_int32_extended_atomics]>;
 def : OCLTargetFeature<[ocl_ext_cl_khr_int64_base_atomics]>;
 def : OCLTargetFeature<[ocl_ext_cl_khr_int64_extended_atomics]>;
 
