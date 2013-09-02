@@ -23,4 +23,5 @@ class Requires<list<OCLPredicate> l> {
 
 class OCLTargetFeature<list<OCLPredicate> l> {
   list<OCLPredicate> Features = l;
+  list<OCLPredicate> Predicates = [];
 }

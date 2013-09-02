@@ -147,10 +147,10 @@ static void EmitPredicatesBegin(llvm::raw_ostream &OS,
     if (const OCLExtension *E = llvm::dyn_cast<OCLExtension>(P))
       ExtNames.push_back(E->getName());
   }
-  OS << "\n";
+
   if (ExtNames.size()) {
     for (unsigned i = 0, e = ExtNames.size(); i != e; ++i)
-      OS << "#pragma OPENCL EXTENSION " << ExtNames[i] << " : enable\n";
+      OS << "\n#pragma OPENCL EXTENSION " << ExtNames[i] << " : enable\n";
   }
   OS << "\n";
 }
@@ -162,7 +162,7 @@ static void EmitPredicatesEnd(llvm::raw_ostream &OS,
   for (PredicateSet::iterator I = Preds.begin(), E = Preds.end(); I != E; ++I)
     if (const OCLExtension *E = llvm::dyn_cast<OCLExtension>(*I))
       OS << "#pragma OPENCL EXTENSION " << E->getName() << " : disable\n";
-  OS << "#endif\n\n";
+  OS << "#endif\n";
 }
 
 bool PredicatesGuardEmitter::Push(const PredicateSet &Preds) {

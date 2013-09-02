@@ -15,11 +15,26 @@ bool opencrun::EmitOCLTargetDefs(llvm::raw_ostream &OS,
   std::vector<llvm::Record *> Features = 
     R.getAllDerivedDefinitions("OCLTargetFeature");
 
-  PredicateSet Preds;
+  PredicatesGuardEmitter Requires(OS);
 
   for (unsigned i = 0, e = Features.size(); i != e; ++i) {
+    PredicateSet Preds;
+
+    std::vector<llvm::Record*> Predicates = 
+      Features[i]->getValueAsListOfDefs("Predicates");
+
+    for (unsigned j = 0, k = Predicates.size(); j != k; ++j) {
+      const OCLPredicate &P = OCLPredicatesTable::get(*Predicates[j]);
+
+      if (!llvm::isa<OCLAddressSpace>(&P))
+        Preds.insert(&P);
+    }
+
+    Requires.Push(Preds);
+
     std::vector<llvm::Record*> L =
       Features[i]->getValueAsListOfDefs("Features");
+
     for (unsigned j = 0, k = L.size(); j != k; ++j) {
       llvm::Record *R = L[j];
 
@@ -28,7 +43,10 @@ bool opencrun::EmitOCLTargetDefs(llvm::raw_ostream &OS,
       if (!llvm::isa<OCLAddressSpace>(&P))
         OS << "#define " << P.getFullName() << "\n";
     }
+
   }
+
+  Requires.Finalize();
 
   OS << "\n";
   OS << "#include <ocltype.h>\n";
