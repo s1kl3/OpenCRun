@@ -69,6 +69,23 @@ EnqueueWriteBuffer::EnqueueWriteBuffer(Buffer &Target,
     Size(Size) { }
 
 //
+// EnqueueCopyBuffer implementation.
+//
+
+EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Src,
+																		 Buffer &Dst,
+																		 size_t Src_Offset,
+																		 size_t Dst_Offset,
+																		 size_t Size,
+																		 EventsContainer &WaitList)
+	: Command(Command::CopyBuffer, WaitList, true),
+		Target(&Dst),
+		Source(&Src),
+		Target_Offset(Dst_Offset),
+		Source_Offset(Src_Offset),
+		Size(Size) { }
+
+//
 // EnqueueNDRangeKernel implementation.
 //
 
@@ -318,6 +335,71 @@ EnqueueWriteBuffer *EnqueueWriteBufferBuilder::Create(cl_int *ErrCode) {
   return new EnqueueWriteBuffer(*Target, Src, Blocking, Offset, Size, WaitList);
 }
 
+//
+// EnqueueCopyBufferBuilder implementation.
+//
+
+EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
+	Context &Ctx,
+	cl_mem DstBuf,
+	cl_mem SrcBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
+																	Ctx),
+									 Target(NULL),
+									 Source(NULL),
+									 Target_Offset(0),
+									 Source_Offset(0),
+									 Size(0) {
+  if(!DstBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
+	
+	else if(!SrcBuf)
+		NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
+
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
+		
+	else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SrcBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not a buffer");				 
+}
+
+EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t DstOffset,
+																																size_t SrcOffset,
+																																size_t Size) {
+  if(!Target || !Source)
+    return *this;
+
+  if(DstOffset + Size > Target->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "data size exceed destination buffer capacity");
+
+	if(SrcOffset + Size > Source->GetSize())
+		return NotifyError(CL_INVALID_VALUE, "data size exceed source buffer capacity");
+		
+  // TODO: checking for sub-buffers.
+
+  this->Target_Offset = DstOffset;
+	this->Source_Offset = SrcOffset;
+  this->Size = Size;
+
+  return *this;																																
+}
+
+EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  return llvm::cast<EnqueueCopyBufferBuilder>(Super);
+}
+
+EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueCopyBuffer(*Target, *Source, Source_Offset, Target_Offset, Size, WaitList);
+}
 //
 // EnqueueNDRangeKernelBuilder implementation.
 //

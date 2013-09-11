@@ -57,6 +57,7 @@ private:
 
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
+	bool Submit(EnqueueCopyBuffer &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
 

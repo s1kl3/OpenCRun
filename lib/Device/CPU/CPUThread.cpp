@@ -328,7 +328,11 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
   else if(WriteBufferCPUCommand *Write =
             llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
     return Submit(Write);
-
+	
+	else if(CopyBufferCPUCommand *Copy =
+						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
+		return Submit(Copy);
+	
   else if(NDRangeKernelBlockCPUCommand *NDBlock =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     return Submit(NDBlock);
@@ -387,6 +391,10 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
             llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
 
+	else if(CopyBufferCPUCommand *OnFly =
+						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
+		ExitStatus = Execute(*OnFly);
+		
   else if(NDRangeKernelBlockCPUCommand *OnFly =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -411,6 +419,12 @@ int CPUThread::Execute(WriteBufferCPUCommand &Cmd) {
   std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
 
   return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(CopyBufferCPUCommand &Cmd) {
+	std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+	
+	return CPUCommand::NoError;
 }
 
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {

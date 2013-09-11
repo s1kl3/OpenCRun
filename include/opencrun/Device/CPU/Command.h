@@ -18,6 +18,7 @@ public:
     LastCPUServiceCommand,
     ReadBuffer,
     WriteBuffer,
+		CopyBuffer,
     NativeKernel,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
@@ -254,6 +255,44 @@ public:
 
 private:
   void *Target;
+};
+
+class CopyBufferCPUCommand : public CPUExecCommand {
+public:
+	static bool classof(const CPUCommand *Cmd) {
+		return Cmd->GetType() == CPUCommand::CopyBuffer;
+	}
+	
+public:
+	CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
+											 void *Target, 
+											 void *Source)
+		:	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
+			Target(Target),
+			Source(Source) { }
+		
+public:
+	void *GetTarget() {
+		uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
+		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
+		
+		return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+	}
+	
+	const void *GetSource() {
+		uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
+		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
+		
+		return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
+	}
+	
+	size_t GetSize() {
+    return GetQueueCommandAs<EnqueueCopyBuffer>().GetSize();	
+	}
+
+private:
+	void *Target;
+	void *Source;
 };
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {

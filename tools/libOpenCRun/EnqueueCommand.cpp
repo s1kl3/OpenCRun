@@ -8,6 +8,8 @@
 #include "opencrun/Core/Event.h"
 #include "opencrun/Core/MemoryObj.h"
 
+#include <algorithm>
+
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueReadBuffer(cl_command_queue command_queue,
                     cl_mem buffer,
@@ -21,6 +23,9 @@ clEnqueueReadBuffer(cl_command_queue command_queue,
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
 
+	if(!cb)
+		return CL_INVALID_VALUE;
+		
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -76,7 +81,10 @@ clEnqueueWriteBuffer(cl_command_queue command_queue,
                      cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
-
+	
+	if(!cb)
+		return CL_INVALID_VALUE;
+		
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -130,8 +138,37 @@ clEnqueueCopyBuffer(cl_command_queue command_queue,
                     cl_uint num_events_in_wait_list,
                     const cl_event *event_wait_list,
                     cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+	if(!cb)
+		return CL_INVALID_VALUE;
+	
+	if(src_buffer == dst_buffer && 
+			std::max(src_offset, dst_offset) - std::min(src_offset, dst_offset) < cb)
+		return CL_MEM_COPY_OVERLAP;
+	
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  cl_int ErrCode;
+	
+  opencrun::EnqueueCopyBufferBuilder Bld(Queue->GetContext(), dst_buffer, src_buffer);
+  opencrun::Command *Cmd = Bld.SetCopyArea(dst_offset, src_offset, cb)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);  
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

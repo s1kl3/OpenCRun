@@ -76,6 +76,7 @@ private:
   bool Submit(CPUExecCommand *Cmd);
   bool Submit(ReadBufferCPUCommand *Cmd) { return true; }
   bool Submit(WriteBufferCPUCommand *Cmd) { return true; }
+	bool Submit(CopyBufferCPUCommand *Cmd) { return true; }
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
   bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
 
@@ -87,6 +88,7 @@ private:
   void Execute(CPUExecCommand *Cmd);
   int Execute(ReadBufferCPUCommand &Cmd);
   int Execute(WriteBufferCPUCommand &Cmd);
+	int Execute(CopyBufferCPUCommand &Cmd);
   int Execute(NDRangeKernelBlockCPUCommand &Cmd);
   int Execute(NativeKernelCPUCommand &Cmd);
 

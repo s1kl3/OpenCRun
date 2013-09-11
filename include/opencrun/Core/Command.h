@@ -26,6 +26,7 @@ public:
   enum Type {
     ReadBuffer = CL_COMMAND_READ_BUFFER,
     WriteBuffer = CL_COMMAND_WRITE_BUFFER,
+		CopyBuffer = CL_COMMAND_COPY_BUFFER,
     NDRangeKernel = CL_COMMAND_NDRANGE_KERNEL,
     NativeKernel = CL_COMMAND_NATIVE_KERNEL
   };
@@ -131,6 +132,37 @@ private:
   friend class EnqueueWriteBufferBuilder;
 };
 
+class EnqueueCopyBuffer : public Command {
+public:
+	static bool classof(const Command *Cmd) {
+		return Cmd->GetType() == Command::CopyBuffer;
+	}
+	
+private:
+	EnqueueCopyBuffer(Buffer &Src,
+										Buffer &Dst,
+										size_t Src_Offset,
+										size_t Dst_Offset,
+										size_t Size,
+										EventsContainer &WaitList);
+										
+public:
+	Buffer &GetTarget() { return *Target; }
+	Buffer &GetSource() { return *Source; }
+	size_t GetTargetOffset() { return Target_Offset; }
+	size_t GetSourceOffset() { return Source_Offset; }
+	size_t GetSize() { return Size; }
+	
+private:
+	llvm::IntrusiveRefCntPtr<Buffer> Target;
+	llvm::IntrusiveRefCntPtr<Buffer> Source;
+	size_t Target_Offset;
+	size_t Source_Offset;
+	size_t Size;
+	
+	friend class EnqueueCopyBufferBuilder;
+};
+
 class EnqueueNDRangeKernel : public Command {
 public:
   static bool classof(const Command *Cmd) {
@@ -198,6 +230,7 @@ public:
   enum Type {
     EnqueueReadBufferBuilder,
     EnqueueWriteBufferBuilder,
+		EnqueueCopyBufferBuilder,
     EnqueueNDRangeKernelBuilder,
     EnqueueNativeKernelBuilder
   };
@@ -287,6 +320,36 @@ private:
   const void *Src;
   bool Blocking;
   size_t Offset;
+  size_t Size;
+};
+
+class EnqueueCopyBufferBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueCopyBufferBuilder;
+  }
+
+public:
+  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
+
+public:
+  EnqueueCopyBufferBuilder &SetCopyArea(size_t DstOffset, size_t SrcOffset, size_t Size);
+  EnqueueCopyBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueCopyBuffer *Create(cl_int *ErrCode);
+
+private:
+  EnqueueCopyBufferBuilder &NotifyError(cl_int ErrCode,
+                                         const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+  Buffer *Target;
+  Buffer *Source;
+  size_t Target_Offset;
+	size_t Source_Offset;
   size_t Size;
 };
 
