@@ -59,7 +59,32 @@ HostBuffer *Context::CreateHostBuffer(size_t Size,
                                       void *Storage,
                                       MemoryObj::AccessProtection AccessProt,
                                       cl_int *ErrCode) {
-  return NULL;
+  HostBuffer *Buf = new HostBuffer(*this, Size, Storage, AccessProt);
+  bool Rollback = false;
+
+  for(device_iterator I = Devices.begin(),
+                      E = Devices.end();
+                      I != E && !Rollback;
+                      ++I)
+    if(!(*I)->CreateHostBuffer(*Buf))
+      Rollback = true;
+
+  if(Rollback) {
+    for(device_iterator I = Devices.begin(), E = Devices.end(); I != E; ++I)
+      (*I)->DestroyMemoryObj(*Buf);
+
+    delete Buf;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device buffer");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Buf;																			
 }
 
 HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
@@ -67,7 +92,32 @@ HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
                                  void *Src,
                                  MemoryObj::AccessProtection AccessProt,
                                  cl_int *ErrCode) {
-  return NULL;
+	HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this, Size, Src, AccessProt);
+  bool Rollback = false;
+
+  for(device_iterator I = Devices.begin(),
+                      E = Devices.end();
+                      I != E && !Rollback;
+                      ++I)
+    if(!(*I)->CreateHostAccessibleBuffer(*Buf))
+      Rollback = true;
+
+  if(Rollback) {
+    for(device_iterator I = Devices.begin(), E = Devices.end(); I != E; ++I)
+      (*I)->DestroyMemoryObj(*Buf);
+
+    delete Buf;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device buffer");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Buf;
 }
 
 DeviceBuffer *Context::CreateDeviceBuffer(

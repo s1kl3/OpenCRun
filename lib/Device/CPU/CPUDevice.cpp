@@ -58,11 +58,11 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
 }
 
 bool CPUDevice::CreateHostBuffer(HostBuffer &Buf) {
-  return false;
+	return Global.Alloc(Buf);
 }
 
 bool CPUDevice::CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) {
-  return false;
+  return Global.Alloc(Buf);
 }
 
 bool CPUDevice::CreateDeviceBuffer(DeviceBuffer &Buf) {
@@ -90,6 +90,9 @@ bool CPUDevice::Submit(Command &Cmd) {
   else if(EnqueueWriteBuffer *Write = llvm::dyn_cast<EnqueueWriteBuffer>(&Cmd))
     Submitted = Submit(*Write);
 
+	else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
+		Submitted = Submit(*Copy);
+		
   else if(EnqueueNDRangeKernel *NDRange =
             llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
     Submitted = Submit(*NDRange);
@@ -284,6 +287,13 @@ bool CPUDevice::Submit(EnqueueWriteBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new WriteBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+}
+
+bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {

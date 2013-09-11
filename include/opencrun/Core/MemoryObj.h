@@ -82,6 +82,12 @@ private:
   HostBuffer(const HostBuffer &That); // Do not implement.
   void operator=(const HostBuffer &That); // Do not implement.
 
+public:
+	void *GetStorageData() const { return Storage; }
+
+private:
+	void *Storage;
+	
   friend class Context;
 };
 
@@ -91,11 +97,19 @@ private:
                        size_t Size,
                        void *Src,
                        MemoryObj::AccessProtection AccessProt)
-    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, AccessProt) { }
+    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, AccessProt),
+			Src(Src) { }
 
   HostAccessibleBuffer(const HostAccessibleBuffer &That); // Do not implement.
   void operator=(const HostAccessibleBuffer &That); // Do not implement.
 
+public:
+	const void *GetInitializationData() const { return Src; }
+	bool HasInitializationData() const { return Src; }
+	
+private:
+	void *Src;
+	
   friend class Context;
 };
 

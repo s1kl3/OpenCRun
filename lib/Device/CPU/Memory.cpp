@@ -36,12 +36,41 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
   return Addr;
 }
 
+// For the CPU target the device global memory is in the host AS,
+// hence we return the address of the provided host buffer and update the
+// available global memory size. In this way the OpenCL kernel will
+// directly operate on the host buffer which will be always coherent and
+// we use a half of memory.
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
-  return NULL;
+	size_t HostBufferSize = Buf.GetSize();
+	
+	llvm::sys::ScopedLock Lock(ThisLock);
+	
+	if(Available < HostBufferSize)
+		return NULL;
+		
+	void *Addr = Buf.GetStorageData();
+	
+	if(Addr) {
+		Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
+		Available -= HostBufferSize;
+	}
+	
+  return Addr;
 }
 
+// In case of a CPU target, the device memory is in the same AS 
+// of the host memory, so we allocate the buffer object and its
+// address will be accessible by the host.
 void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
-  return NULL;
+  void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+
+	// CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
+	// togheter.
+  if(Buf.HasInitializationData())
+    std::memcpy(Addr, Buf.GetInitializationData(), Buf.GetSize());
+
+  return Addr;
 }
 
 void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
@@ -59,10 +88,15 @@ void GlobalMemory::Free(MemoryObj &MemObj) {
   MappingsContainer::iterator I = Mappings.find(&MemObj);
   if(!Mappings.count(&MemObj))
     return;
-
+		
   Available += MemObj.GetSize();
 
-  sys::Free(I->second);
+	// For an HostBuffer memory allocation/deallocation is under control
+	// and responsability of the host code, because we've used the host buffer
+	// as a device buffer.
+	if(!llvm::isa<HostBuffer>(MemObj))
+		sys::Free(I->second);
+		
   Mappings.erase(I);
 }
 
