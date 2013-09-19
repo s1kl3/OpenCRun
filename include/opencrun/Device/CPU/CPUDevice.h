@@ -40,6 +40,12 @@ public:
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj);
 
+	virtual void *CreateMapBuffer(MemoryObj &MemObj, 
+																size_t Offset, 
+																size_t Size, 
+																cl_map_flags MapFlags,
+																cl_int *ErrCode);
+	
   virtual bool Submit(Command &Cmd);
 
   virtual void UnregisterKernel(Kernel &Kern);
@@ -58,6 +64,8 @@ private:
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
 	bool Submit(EnqueueCopyBuffer &Cmd);
+	bool Submit(EnqueueMapBuffer &Cmd);
+	bool Submit(EnqueueUnmapMemObject &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
 

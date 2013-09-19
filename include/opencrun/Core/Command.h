@@ -27,6 +27,8 @@ public:
     ReadBuffer = CL_COMMAND_READ_BUFFER,
     WriteBuffer = CL_COMMAND_WRITE_BUFFER,
 		CopyBuffer = CL_COMMAND_COPY_BUFFER,
+		MapBuffer = CL_COMMAND_MAP_BUFFER,
+		UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
     NDRangeKernel = CL_COMMAND_NDRANGE_KERNEL,
     NativeKernel = CL_COMMAND_NATIVE_KERNEL
   };
@@ -163,6 +165,69 @@ private:
 	friend class EnqueueCopyBufferBuilder;
 };
 
+class EnqueueMapBuffer : public Command {
+public:
+	static bool classof(const Command *Cmd) {
+		return Cmd->GetType() == Command::MapBuffer;
+	}
+	
+private:
+	EnqueueMapBuffer(Buffer &Src,
+									 bool Blocking,
+									 cl_map_flags MapFlags,
+									 size_t Offset,
+									 size_t Size,
+                   void *MapBuf,
+									 EventsContainer &WaitList);
+
+public:
+	Buffer &GetSource() { return *Source; }
+	cl_map_flags GetMapFlags() { return MapFlags; }
+  size_t GetOffset() { return Offset; }
+  size_t GetSize() { return Size; }
+	void *GetMapBuffer() { return MapBuf; }
+
+public:
+	bool IsMapRead() const { return MapFlags & CL_MAP_READ; }
+	bool IsMapWrite() const { return MapFlags & CL_MAP_WRITE; }
+	bool IsMapInvalidate() const { return MapFlags & CL_MAP_WRITE_INVALIDATE_REGION; }
+	
+public:
+	void SetMapBuffer(void *MapBuf) { this->MapBuf = MapBuf;}
+	
+private:
+  llvm::IntrusiveRefCntPtr<Buffer> Source;
+	cl_map_flags MapFlags;
+  size_t Offset;
+  size_t Size;
+
+	void *MapBuf;
+	
+  friend class EnqueueMapBufferBuilder;	
+};
+
+class EnqueueUnmapMemObject : public Command {
+public:
+	static bool classof(const Command *Cmd) {
+		return Cmd->GetType() == Command::UnmapMemObject;
+	}
+	
+private:
+	EnqueueUnmapMemObject(MemoryObj &MemObj,
+												void *MappedPtr,
+												EventsContainer &WaitList);
+	
+public:
+	MemoryObj &GetMemObj() { return *MemObj; }
+	void *GetMappedPtr() { return MappedPtr; }
+
+private:
+	llvm::IntrusiveRefCntPtr<MemoryObj> MemObj;
+	void *MappedPtr;
+	
+	friend class EnqueueUnmapMemObjectBuilder;
+};
+
 class EnqueueNDRangeKernel : public Command {
 public:
   static bool classof(const Command *Cmd) {
@@ -231,6 +296,8 @@ public:
     EnqueueReadBufferBuilder,
     EnqueueWriteBufferBuilder,
 		EnqueueCopyBufferBuilder,
+		EnqueueMapBufferBuilder,
+		EnqueueUnmapMemObjectBuilder,
     EnqueueNDRangeKernelBuilder,
     EnqueueNativeKernelBuilder
   };
@@ -351,6 +418,67 @@ private:
   size_t Target_Offset;
 	size_t Source_Offset;
   size_t Size;
+};
+
+class EnqueueMapBufferBuilder : public CommandBuilder {
+public:
+	static bool classof(const CommandBuilder *Bld) {
+		return Bld->GetType() == CommandBuilder::EnqueueMapBufferBuilder;
+	}
+
+public:
+	EnqueueMapBufferBuilder(Context &Ctx, cl_mem Buf);
+	
+public:
+	EnqueueMapBufferBuilder &SetBlocking(bool Blocking = true);
+	EnqueueMapBufferBuilder &SetMapFlags(cl_map_flags MapFlags);
+	EnqueueMapBufferBuilder &SetMapArea(size_t Offset, size_t Size);
+	EnqueueMapBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+	EnqueueMapBufferBuilder &SetMapBuffer(void *MapBuf);
+	
+	EnqueueMapBuffer *Create(cl_int *ErrCode);
+
+private:
+  EnqueueMapBufferBuilder &NotifyError(cl_int ErrCode,
+                                       const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+	
+private:
+	Buffer *Source;
+	bool Blocking;
+	cl_map_flags MapFlags;
+	size_t Offset;
+	size_t Size;
+	
+	void *MapBuf;
+};
+
+class EnqueueUnmapMemObjectBuilder : public CommandBuilder {
+public:
+	static bool classof(const CommandBuilder *Bld) {
+		return Bld->GetType() == CommandBuilder::EnqueueUnmapMemObjectBuilder;
+	}
+	
+public:
+	EnqueueUnmapMemObjectBuilder(Context &Ctx, cl_mem MemObj, void *MappedPtr);
+	
+public:
+	EnqueueUnmapMemObjectBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueUnmapMemObject *Create(cl_int *ErrCode);
+
+private:
+  EnqueueUnmapMemObjectBuilder &NotifyError(cl_int ErrCode,
+																						const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+	MemoryObj *MemObj;
+	void *MappedPtr;
 };
 
 class EnqueueNDRangeKernelBuilder : public CommandBuilder {

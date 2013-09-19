@@ -332,7 +332,15 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
 	else if(CopyBufferCPUCommand *Copy =
 						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
 		return Submit(Copy);
+
+	else if(MapBufferCPUCommand *Map =
+						llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
+		return Submit(Map);
 	
+	else if(UnmapMemObjectCPUCommand *Unmap =
+						llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
+		return Submit(Unmap);
+		
   else if(NDRangeKernelBlockCPUCommand *NDBlock =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     return Submit(NDBlock);
@@ -394,7 +402,15 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
 	else if(CopyBufferCPUCommand *OnFly =
 						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
 		ExitStatus = Execute(*OnFly);
-		
+	
+	else if(MapBufferCPUCommand *OnFly =
+						llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
+		ExitStatus = Execute(*OnFly);
+	
+	else if(UnmapMemObjectCPUCommand *OnFly =
+						llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
+		ExitStatus = Execute(*OnFly);
+	
   else if(NDRangeKernelBlockCPUCommand *OnFly =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -423,6 +439,40 @@ int CPUThread::Execute(WriteBufferCPUCommand &Cmd) {
 
 int CPUThread::Execute(CopyBufferCPUCommand &Cmd) {
 	std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+	
+	return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(MapBufferCPUCommand &Cmd) {
+	EnqueueMapBuffer &CmdMap = Cmd.GetQueueCommandAs<EnqueueMapBuffer>();
+	Buffer &Buf = CmdMap.GetSource();
+	
+	// When device and host buffer are distinct we need to copy the specified region to
+	// the host buffer only for CL_MAP_READ and CL_MAP_WRITE mappings, because we have
+	// to guarantee that the host buffer contains the latest bits from the region being
+	// mapped; this is not necessary for CL_MAP_WRITE_INVALIDATE_REGION mappings.
+	if((llvm::isa<DeviceBuffer>(&Buf) || llvm::isa<HostAccessibleBuffer>(&Buf)) &&
+			(CmdMap.IsMapRead() || CmdMap.IsMapWrite()))
+		std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+
+	return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(UnmapMemObjectCPUCommand &Cmd) {
+	EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
+	MemoryObj &MemObj = CmdUnmap.GetMemObj();
+	
+	if(llvm::isa<DeviceBuffer>(&MemObj) || llvm::isa<HostAccessibleBuffer>(&MemObj)) {
+		// Copy data back to the memory object if it was mapped with
+		// CL_MAP_WRITE_INVALIDATE_REGION
+		MemoryObj::MappingInfo *Info = MemObj.GetMappingInfo(Cmd.GetMappedPtr());
+		if(Info && (Info->MapFlags & CL_MAP_WRITE_INVALIDATE_REGION))
+			memcpy(Cmd.GetMemObjAddr(), Cmd.GetMappedPtr(), Info->Size);
+	
+		free(Cmd.GetMappedPtr());
+	}
+	
+	MemObj.RemoveMapping(Cmd.GetMappedPtr());
 	
 	return CPUCommand::NoError;
 }

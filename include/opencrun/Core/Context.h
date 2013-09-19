@@ -75,18 +75,22 @@ public:
   HostBuffer *CreateHostBuffer(size_t Size,
                                void *Storage,
                                MemoryObj::AccessProtection AccessProt,
+															 MemoryObj::HostAccessProtection HostAccessProt,
                                cl_int *ErrCode = NULL);
   HostAccessibleBuffer *CreateHostAccessibleBuffer(
                           size_t Size,
                           void *Src,
                           MemoryObj::AccessProtection AccessProt,
+													MemoryObj::HostAccessProtection HostAccessProt,
                           cl_int *ErrCode = NULL);
   DeviceBuffer *CreateDeviceBuffer(size_t Size,
                                    void *Src,
                                    MemoryObj::AccessProtection AccessProt,
+																	 MemoryObj::HostAccessProtection HostAccessProt,
                                    cl_int *ErrCode = NULL);
   Buffer *CreateVirtualBuffer(size_t Size,
                               MemoryObj::AccessProtection AccessProt,
+															MemoryObj::HostAccessProtection HostAccessProt,
                               cl_int *ErrCode = NULL);
 
   void DestroyMemoryObj(MemoryObj &MemObj);

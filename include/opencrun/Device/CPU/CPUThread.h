@@ -77,6 +77,8 @@ private:
   bool Submit(ReadBufferCPUCommand *Cmd) { return true; }
   bool Submit(WriteBufferCPUCommand *Cmd) { return true; }
 	bool Submit(CopyBufferCPUCommand *Cmd) { return true; }
+	bool Submit(MapBufferCPUCommand *Cmd) { return true; }
+	bool Submit(UnmapMemObjectCPUCommand *Cmd) { return true; }
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
   bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
 
@@ -86,9 +88,12 @@ private:
   void Execute(StopDeviceCPUCommand *Cmd) { Mode = Stopped; }
 
   void Execute(CPUExecCommand *Cmd);
+	
   int Execute(ReadBufferCPUCommand &Cmd);
   int Execute(WriteBufferCPUCommand &Cmd);
 	int Execute(CopyBufferCPUCommand &Cmd);
+	int Execute(MapBufferCPUCommand &Cmd);
+	int Execute(UnmapMemObjectCPUCommand &Cmd);
   int Execute(NDRangeKernelBlockCPUCommand &Cmd);
   int Execute(NativeKernelCPUCommand &Cmd);
 

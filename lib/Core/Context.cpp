@@ -58,8 +58,14 @@ CommandQueue *Context::GetQueueForDevice(Device &Dev,
 HostBuffer *Context::CreateHostBuffer(size_t Size,
                                       void *Storage,
                                       MemoryObj::AccessProtection AccessProt,
+																			MemoryObj::HostAccessProtection HostAccessProt,
                                       cl_int *ErrCode) {
-  HostBuffer *Buf = new HostBuffer(*this, Size, Storage, AccessProt);
+  HostBuffer *Buf = new HostBuffer(*this, 
+																	 Size, 
+																	 Storage, 
+																	 MemoryObj::UseHostPtr, 
+																	 AccessProt, 
+																	 HostAccessProt);
   bool Rollback = false;
 
   for(device_iterator I = Devices.begin(),
@@ -91,8 +97,20 @@ HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
                                  size_t Size,
                                  void *Src,
                                  MemoryObj::AccessProtection AccessProt,
+																 MemoryObj::HostAccessProtection HostAccessProt,
                                  cl_int *ErrCode) {
-	HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this, Size, Src, AccessProt);
+	MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::AllocHostPtr;
+	if(Src)
+		HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+		
+	HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this, 
+																											 Size, 
+																											 Src, 
+																											 HostPtrMode, 
+																											 AccessProt, 
+																											 HostAccessProt);
   bool Rollback = false;
 
   for(device_iterator I = Devices.begin(),
@@ -124,8 +142,20 @@ DeviceBuffer *Context::CreateDeviceBuffer(
                          size_t Size,
                          void *Src,
                          MemoryObj::AccessProtection AccessProt,
+												 MemoryObj::HostAccessProtection HostAccessProt,
                          cl_int *ErrCode) {
-  DeviceBuffer *Buf = new DeviceBuffer(*this, Size, Src, AccessProt);
+	MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::NoHostPtrUsage;
+	if(Src)
+		HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+		
+  DeviceBuffer *Buf = new DeviceBuffer(*this, 
+																			 Size, 
+																			 Src, 
+																			 HostPtrMode,
+																			 AccessProt, 
+																			 HostAccessProt);
   bool Rollback = false;
 
   for(device_iterator I = Devices.begin(),
@@ -155,11 +185,12 @@ DeviceBuffer *Context::CreateDeviceBuffer(
 
 Buffer *Context::CreateVirtualBuffer(size_t Size,
                                      MemoryObj::AccessProtection AccessProt,
+																		 MemoryObj::HostAccessProtection HostAccessProt,
                                      cl_int *ErrCode) {
   if(!Size)
     RETURN_WITH_ERROR(ErrCode, CL_INVALID_BUFFER_SIZE, "buffer size is zero");
 
-  VirtualBuffer *Buf = new VirtualBuffer(*this, Size, AccessProt);
+  VirtualBuffer *Buf = new VirtualBuffer(*this, Size, AccessProt, HostAccessProt);
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;

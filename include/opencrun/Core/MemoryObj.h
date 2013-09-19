@@ -6,6 +6,10 @@
 
 #include "opencrun/Util/MTRefCounted.h"
 
+#include "llvm/Support/Mutex.h"
+
+#include <map>
+
 struct _cl_mem { };
 
 namespace opencrun {
@@ -22,24 +26,55 @@ public:
     LastBuffer
   };
 
+	enum HostPtrUsageMode {
+		UseHostPtr			= CL_MEM_USE_HOST_PTR,
+		AllocHostPtr		= CL_MEM_ALLOC_HOST_PTR,
+		CopyHostPtr			= CL_MEM_COPY_HOST_PTR,
+		NoHostPtrUsage	= 0
+	};
+	
   enum AccessProtection {
-    ReadWrite         = (1 << 0),
-    WriteOnly         = (1 << 1),
-    ReadOnly          = (1 << 2),
+    ReadWrite         = CL_MEM_READ_WRITE,
+    WriteOnly         = CL_MEM_WRITE_ONLY,
+    ReadOnly          = CL_MEM_READ_ONLY,
     InvalidProtection = 0
   };
-
+	
+	enum HostAccessProtection {
+		HostWriteOnly			= CL_MEM_HOST_WRITE_ONLY,
+		HostReadOnly			= CL_MEM_HOST_READ_ONLY,
+		HostNoAccess			= CL_MEM_HOST_NO_ACCESS,
+		HostNoProtection	= 0
+	};
+	
 public:
   static bool classof(const _cl_mem *MemObj) { return true; }
 
+public:
+	typedef struct {
+		size_t Offset;
+		size_t Size;
+		unsigned long MapFlags;
+	} MappingInfo;
+	
+	typedef std::multimap<void *, MappingInfo> MappingsContainer;
+	
+public:
+	typedef MappingsContainer::iterator maps_iterator;
+	typedef MappingsContainer::const_iterator const_maps_iterator;
+	
 protected:
   MemoryObj(Type MemTy,
             Context &Ctx,
             size_t Size,
-            AccessProtection AccessProt) : MemTy(MemTy),
-                                           Ctx(&Ctx),
-                                           Size(Size),
-                                           AccessProt(AccessProt) { }
+						HostPtrUsageMode HostPtrMode,
+            AccessProtection AccessProt,
+						HostAccessProtection HostAccessProt) : MemTy(MemTy),
+																									 Ctx(&Ctx),
+																									 Size(Size),
+																									 HostPtrMode(HostPtrMode),
+																									 AccessProt(AccessProt),
+																									 HostAccessProt(HostAccessProt)	{ }
 
 public:
   virtual ~MemoryObj();
@@ -48,13 +83,43 @@ public:
   size_t GetSize() const { return Size; }
   Type GetType() const { return MemTy; }
   Context &GetContext() const { return *Ctx; }
-
+	
+	HostPtrUsageMode GetHostPtrUsageMode() const { return HostPtrMode; }
+	AccessProtection GetAccessProtection() const { return AccessProt; }
+	HostAccessProtection GetHostAccessProtection() const { return HostAccessProt; }
+	
+	unsigned long GetMemFlags() const { 
+		return static_cast<unsigned long>(HostPtrMode | 
+																			AccessProt | 
+																			HostAccessProt); 
+	}
+	
+public:
+	bool AddNewMapping(void *MapBuf, 
+										 size_t Offset, 
+										 size_t Size, 
+										 unsigned long MapFlags);
+	
+	bool RemoveMapping(void *MapBuf);
+	
+	bool IsValidMappingPtr(void *MapBuf);
+	
+	MappingInfo *GetMappingInfo(void *MapBuf);
+  
+  size_t GetMappedCount() const { return Maps.size(); }
+	
 private:
   Type MemTy;
 
   llvm::IntrusiveRefCntPtr<Context> Ctx;
   size_t Size;
+	
+	HostPtrUsageMode HostPtrMode;
   AccessProtection AccessProt;
+	HostAccessProtection HostAccessProt;
+	
+	llvm::sys::Mutex ThisLock;
+	MappingsContainer Maps;
 };
 
 class Buffer : public MemoryObj {
@@ -67,17 +132,26 @@ protected:
   Buffer(Type MemTy,
          Context &Ctx,
          size_t Size,
-         MemoryObj::AccessProtection AccessProt) :
-  MemoryObj(MemTy, Ctx, Size, AccessProt) { }
+				 MemoryObj::HostPtrUsageMode HostPtrMode,
+         MemoryObj::AccessProtection AccessProt,
+				 MemoryObj::HostAccessProtection HostAccessProt) :
+  MemoryObj(MemTy, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt) { }
 };
 
 class HostBuffer : public Buffer {
+public:
+	static bool classof(const MemoryObj *MemObj) {
+		return MemObj->GetType() == MemoryObj::HostBuffer;
+	}
+	
 private:
   HostBuffer(Context &Ctx,
              size_t Size,
              void *Storage,
-             MemoryObj::AccessProtection AccessProt)
-    : Buffer(MemoryObj::HostBuffer, Ctx, Size, AccessProt) { }
+						 MemoryObj::HostPtrUsageMode HostPtrMode,
+             MemoryObj::AccessProtection AccessProt,
+						 MemoryObj::HostAccessProtection HostAccessProt)
+    : Buffer(MemoryObj::HostBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostBuffer(const HostBuffer &That); // Do not implement.
   void operator=(const HostBuffer &That); // Do not implement.
@@ -92,12 +166,19 @@ private:
 };
 
 class HostAccessibleBuffer : public Buffer {
+public:
+	static bool classof(const MemoryObj *MemObj) {
+		return MemObj->GetType() == MemoryObj::HostAccessibleBuffer;
+	}
+	
 private:
   HostAccessibleBuffer(Context &Ctx,
                        size_t Size,
                        void *Src,
-                       MemoryObj::AccessProtection AccessProt)
-    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, AccessProt),
+											 MemoryObj::HostPtrUsageMode HostPtrMode,
+                       MemoryObj::AccessProtection AccessProt,
+											 MemoryObj::HostAccessProtection HostAccessProt)
+    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
 			Src(Src) { }
 
   HostAccessibleBuffer(const HostAccessibleBuffer &That); // Do not implement.
@@ -114,12 +195,19 @@ private:
 };
 
 class DeviceBuffer : public Buffer {
+public:
+	static bool classof(const MemoryObj *MemObj) {
+		return MemObj->GetType() == MemoryObj::DeviceBuffer;
+	}
+	
 private:
   DeviceBuffer(Context &Ctx,
                size_t Size,
                void *Src,
-               MemoryObj::AccessProtection AccessProt)
-    : Buffer(MemoryObj::DeviceBuffer, Ctx, Size, AccessProt),
+							 MemoryObj::HostPtrUsageMode HostPtrMode,
+               MemoryObj::AccessProtection AccessProt,
+							 MemoryObj::HostAccessProtection HostAccessProt)
+    : Buffer(MemoryObj::DeviceBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
       Src(Src) { }
 
   DeviceBuffer(const DeviceBuffer &That); // Do not implement.
@@ -136,11 +224,17 @@ private:
 };
 
 class VirtualBuffer : public Buffer {
+public:
+	static bool classof(const MemoryObj *MemObj) {
+		return MemObj->GetType() == MemoryObj::VirtualBuffer;
+	}
+	
 private:
   VirtualBuffer(Context &Ctx,
                 size_t Size,
-                MemoryObj::AccessProtection AccessProt)
-    : Buffer(MemoryObj::VirtualBuffer, Ctx, Size, AccessProt) { }
+                MemoryObj::AccessProtection AccessProt,
+								MemoryObj::HostAccessProtection HostAccessProt)
+    : Buffer(MemoryObj::VirtualBuffer, Ctx, Size, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
 
   VirtualBuffer(const VirtualBuffer &That); // Do not implement.
   void operator=(const VirtualBuffer &That); // Do not implement.
@@ -160,7 +254,10 @@ public:
   BufferBuilder &SetReadWrite(bool Enabled);
   BufferBuilder &SetWriteOnly(bool Enabled);
   BufferBuilder &SetReadOnly(bool Enabled);
-
+	BufferBuilder &SetHostWriteOnly(bool Enabled);
+	BufferBuilder &SetHostReadOnly(bool Enabled);
+	BufferBuilder &SetHostNoAccess(bool Enabled);
+	
   Buffer *Create(cl_int *ErrCode = NULL);
 
 private:
@@ -170,12 +267,11 @@ private:
   Context &Ctx;
   size_t Size;
 
-  bool UseHostMemory;
-  bool AllocHost;
-  bool CopyHost;
   void *HostPtr;
 
+	MemoryObj::HostPtrUsageMode HostPtrMode;
   MemoryObj::AccessProtection AccessProt;
+	MemoryObj::HostAccessProtection HostAccessProt;
 
   cl_int ErrCode;
 };

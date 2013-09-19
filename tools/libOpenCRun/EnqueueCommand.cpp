@@ -10,6 +10,15 @@
 
 #include <algorithm>
 
+#define CL_MAP_FIELD_ALL   \
+  (CL_MAP_READ |     \
+   CL_MAP_WRITE |     \
+   CL_MAP_WRITE_INVALIDATE_REGION)
+
+static inline bool clValidMapField(cl_mem_flags map_flags) {
+  return !(map_flags & ~CL_MAP_FIELD_ALL);
+}
+
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueReadBuffer(cl_command_queue command_queue,
                     cl_mem buffer,
@@ -274,8 +283,61 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
                    const cl_event *event_wait_list,
                    cl_event *event,
                    cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+	if(!command_queue)
+		RETURN_WITH_ERROR(errcode_ret, CL_INVALID_COMMAND_QUEUE);
+  
+  if(!clValidMapField(map_flags))
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+		
+	if(!cb)
+		RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+	
+  opencrun::CommandQueue *Queue;
+  opencrun::MemoryObj *MemObj;
+  
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+  MemObj = llvm::cast<opencrun::MemoryObj>(buffer);
+  
+	cl_int ErrCode;
+  
+  void *MapBuf = 
+		Queue->GetDevice().CreateMapBuffer(*MemObj,
+																			 offset,
+																			 cb,
+																			 map_flags,
+																			 &ErrCode);
+	if(!MapBuf)
+		RETURN_WITH_ERROR(errcode_ret, ErrCode);
+	
+  opencrun::EnqueueMapBufferBuilder Bld(Queue->GetContext(), buffer);
+  opencrun::Command *Cmd = Bld.SetBlocking(blocking_map)
+															.SetMapFlags(map_flags)
+															.SetMapArea(offset, cb)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+															.SetMapBuffer(MapBuf)
+                              .Create(errcode_ret);
+
+  if(!Cmd) {
+		if(MemObj->GetType() != opencrun::MemoryObj::HostBuffer)
+			free(MapBuf);			
+		return NULL;
+	}
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, errcode_ret);
+
+  if(!Ev) {
+		if(MemObj->GetType() != opencrun::MemoryObj::HostBuffer)
+			free(MapBuf);			
+    return NULL;
+	}
+	
+	if(event)
+		*event = Ev;
+	else
+		Ev->Release();
+	
+	return MapBuf;
 }
 
 CL_API_ENTRY void * CL_API_CALL
@@ -302,8 +364,37 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
                         cl_uint num_events_in_wait_list,
                         const cl_event *event_wait_list,
                         cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+	if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+      
+	if(!mapped_ptr)
+		return CL_INVALID_VALUE;
+	
+  opencrun::CommandQueue *Queue;
+  opencrun::MemoryObj *MemObj;
+  
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+  MemObj = llvm::cast<opencrun::MemoryObj>(memobj);
+  
+	cl_int ErrCode;
+	
+  if(!MemObj->IsValidMappingPtr(mapped_ptr))
+		return CL_INVALID_VALUE;
+  
+  opencrun::EnqueueUnmapMemObjectBuilder Bld(Queue->GetContext(), memobj, mapped_ptr);
+  opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

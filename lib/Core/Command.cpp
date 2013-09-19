@@ -86,6 +86,35 @@ EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Src,
 		Size(Size) { }
 
 //
+// EnqueueMapBuffer implementation.
+//
+
+EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Src,
+																	 bool Blocking,
+																	 cl_map_flags MapFlags,
+																	 size_t Offset,
+																	 size_t Size,
+                                   void *MapBuf,
+																	 EventsContainer &WaitList)
+	:	Command(Command::MapBuffer, WaitList, Blocking),
+		Source(&Src),
+		MapFlags(MapFlags),
+		Offset(Offset),
+		Size(Size),
+		MapBuf(MapBuf) { }
+
+//
+// EnqueueUnmapMemObject implementation.
+//
+
+EnqueueUnmapMemObject::EnqueueUnmapMemObject(MemoryObj &MemObj,
+                                             void *MappedPtr,
+                                             EventsContainer &WaitList)
+	:	Command(Command::UnmapMemObject, WaitList),
+		MemObj(&MemObj),
+    MappedPtr(MappedPtr) { }    
+    
+//
 // EnqueueNDRangeKernel implementation.
 //
 
@@ -400,6 +429,158 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
 
   return new EnqueueCopyBuffer(*Target, *Source, Source_Offset, Target_Offset, Size, WaitList);
 }
+
+//
+// EnqueueMapBufferBuilder implementation.
+//
+
+EnqueueMapBufferBuilder::EnqueueMapBufferBuilder(
+	Context &Ctx,
+	cl_mem Buf) : CommandBuilder(CommandBuilder::EnqueueMapBufferBuilder,
+															 Ctx),
+								Source(NULL),
+								Blocking(false),
+                MapFlags(0),
+								Offset(0),
+								Size(0),
+								MapBuf(NULL) {
+  if(!Buf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "map source is null");
+
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "map source is not a buffer");	
+    
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetBlocking(bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapFlags(cl_map_flags MapFlags) {
+	if(MapFlags & CL_MAP_READ) {
+		if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+		if(Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly ||
+		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");		
+	}
+	
+	if(MapFlags & CL_MAP_WRITE) {
+		if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+		if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+	}
+	
+	if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION) {
+		if((MapFlags & CL_MAP_READ) || (MapFlags & CL_MAP_WRITE))
+			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+		if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+	}
+
+	this->MapFlags = MapFlags;
+
+	return *this;
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset, 
+																														 size_t Size) {
+  if(!Source)
+    return *this;
+
+  if(Offset + Size > Source->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "out of bounds buffer mapping");
+
+  // TODO: checking for sub-buffers.
+
+  this->Offset = Offset;
+  this->Size = Size;
+
+  return *this;
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  return llvm::cast<EnqueueMapBufferBuilder>(Super);
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapBuffer(void *MapBuf) {
+	if(!MapBuf)
+		return *this;
+		
+	this->MapBuf = MapBuf;
+	
+	return *this;
+}
+
+EnqueueMapBuffer *EnqueueMapBufferBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueMapBuffer(*Source, Blocking, MapFlags, Offset, Size, MapBuf, WaitList);
+}
+
+
+//
+// EnqueueUnmapMemObjectBuilder implementation.
+//
+
+EnqueueUnmapMemObjectBuilder::EnqueueUnmapMemObjectBuilder(
+	Context &Ctx, 
+	cl_mem MemObj, 
+	void *MappedPtr) : CommandBuilder(CommandBuilder::EnqueueUnmapMemObjectBuilder,
+																		Ctx),
+										 MemObj(llvm::cast<MemoryObj>(MemObj)),
+										 MappedPtr(MappedPtr) {
+  if(!MemObj)
+    NotifyError(CL_INVALID_MEM_OBJECT, "memory object is null");
+  
+  else if(!MappedPtr)
+    NotifyError(CL_INVALID_VALUE, "pointer to mapped data is null");
+
+  else if(Ctx != llvm::cast<MemoryObj>(MemObj)->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+}
+
+EnqueueUnmapMemObjectBuilder &
+EnqueueUnmapMemObjectBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  return llvm::cast<EnqueueUnmapMemObjectBuilder>(Super);
+}
+
+EnqueueUnmapMemObject *EnqueueUnmapMemObjectBuilder::Create(cl_int *ErrCode) {
+	if(this->ErrCode != CL_SUCCESS)
+		RETURN_WITH_ERROR(ErrCode);
+		
+	if(ErrCode)
+		*ErrCode = CL_SUCCESS;
+		
+	return new EnqueueUnmapMemObject(*MemObj, MappedPtr, WaitList);
+}
+
 //
 // EnqueueNDRangeKernelBuilder implementation.
 //

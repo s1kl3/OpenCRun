@@ -73,6 +73,47 @@ void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
   Global.Free(MemObj);
 }
 
+void *CPUDevice::CreateMapBuffer(MemoryObj &MemObj, 
+																 size_t Offset,
+																 size_t Size,
+																 cl_map_flags MapFlags,
+																 cl_int *ErrCode) {
+	void *MapBuf;
+	
+	if(llvm::isa<HostBuffer>(&MemObj)) {		
+		// An host buffer is already allocated and it's the same storage area
+		// we have used for the memory object.
+		MapBuf = reinterpret_cast<void *>(
+                reinterpret_cast<uintptr_t>(Global[MemObj]) + Offset);
+		
+		if(!MemObj.AddNewMapping(MapBuf, 
+														 Offset, 
+														 Size, 
+														 static_cast<unsigned long>(MapFlags))) {
+			MapBuf = NULL;
+			*ErrCode = CL_INVALID_OPERATION;
+		}
+	}
+	
+	else if(llvm::isa<DeviceBuffer>(&MemObj) || 
+					llvm::isa<HostAccessibleBuffer>(&MemObj)) {
+		MapBuf = malloc(MemObj.GetSize());
+		if(!MapBuf)
+			*ErrCode = CL_OUT_OF_HOST_MEMORY;
+		
+		else if(!MemObj.AddNewMapping(MapBuf,
+                                  Offset,
+                                  Size,
+                                  static_cast<unsigned long>(MapFlags))) {
+			free(MapBuf);
+			MapBuf = NULL;
+			*ErrCode = CL_INVALID_OPERATION;
+		}
+	}
+	
+	return MapBuf;
+}
+
 bool CPUDevice::Submit(Command &Cmd) {
   bool Submitted = false;
   llvm::OwningPtr<ProfileSample> Sample;
@@ -92,6 +133,12 @@ bool CPUDevice::Submit(Command &Cmd) {
 
 	else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
 		Submitted = Submit(*Copy);
+
+	else if(EnqueueMapBuffer *Map = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
+		Submitted = Submit(*Map);
+	
+	else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
+		Submitted = Submit(*Unmap);
 		
   else if(EnqueueNDRangeKernel *NDRange =
             llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
@@ -294,6 +341,20 @@ bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new MapBufferCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, Global[Cmd.GetMemObj()], Cmd.GetMappedPtr()));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {

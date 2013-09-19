@@ -19,6 +19,8 @@ public:
     ReadBuffer,
     WriteBuffer,
 		CopyBuffer,
+		MapBuffer,
+		UnmapMemObject,
     NativeKernel,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
@@ -266,7 +268,7 @@ public:
 public:
 	CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
 											 void *Target, 
-											 void *Source)
+											 const void *Source)
 		:	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
 			Target(Target),
 			Source(Source) { }
@@ -292,7 +294,63 @@ public:
 
 private:
 	void *Target;
-	void *Source;
+	const void *Source;
+};
+
+class MapBufferCPUCommand : public CPUExecCommand {
+public:
+	static bool classof(const CPUCommand *Cmd) {
+		return Cmd->GetType() == CPUCommand::MapBuffer;
+	}
+		
+public:
+	MapBufferCPUCommand(EnqueueMapBuffer &Cmd,
+											const void *Source)
+		:	CPUExecCommand(CPUCommand::MapBuffer, Cmd),
+			Source(Source) { }
+
+public:
+	void *GetTarget() {
+		return GetQueueCommandAs<EnqueueMapBuffer>().GetMapBuffer();		
+	}
+			
+	const void *GetSource() {
+		uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+		EnqueueMapBuffer &Cmd = GetQueueCommandAs<EnqueueMapBuffer>();
+		
+		return reinterpret_cast<void *>(Base + Cmd.GetOffset());
+	}
+	
+	size_t GetSize() {
+		return GetQueueCommandAs<EnqueueMapBuffer>().GetSize();
+	}
+	
+private:
+	const void *Source;
+};
+
+class UnmapMemObjectCPUCommand : public CPUExecCommand {
+public:
+	static bool classof(const CPUCommand *Cmd) {
+		return Cmd->GetType() == CPUCommand::UnmapMemObject;
+	}
+	
+public:
+	UnmapMemObjectCPUCommand(EnqueueUnmapMemObject &Cmd,
+													 void *MemObjAddr,
+													 void *MappedPtr)
+		: CPUExecCommand(CPUCommand::UnmapMemObject, Cmd),
+			MemObjAddr(MemObjAddr),
+			MappedPtr(MappedPtr) { }
+		
+public:
+	void *GetMemObjAddr() const { return MemObjAddr; }
+	
+	void *GetMappedPtr() const { return MappedPtr; }
+	
+private:
+	void *MemObjAddr;
+	void *MappedPtr;
 };
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {
