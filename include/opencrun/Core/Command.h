@@ -149,17 +149,17 @@ private:
 										EventsContainer &WaitList);
 										
 public:
-	Buffer &GetTarget() { return *Target; }
 	Buffer &GetSource() { return *Source; }
+  Buffer &GetTarget() { return *Target; }
+  size_t GetSourceOffset() { return Source_Offset; }
 	size_t GetTargetOffset() { return Target_Offset; }
-	size_t GetSourceOffset() { return Source_Offset; }
 	size_t GetSize() { return Size; }
 	
 private:
-	llvm::IntrusiveRefCntPtr<Buffer> Target;
 	llvm::IntrusiveRefCntPtr<Buffer> Source;
-	size_t Target_Offset;
+  llvm::IntrusiveRefCntPtr<Buffer> Target;
 	size_t Source_Offset;
+  size_t Target_Offset;
 	size_t Size;
 	
 	friend class EnqueueCopyBufferBuilder;
@@ -397,10 +397,10 @@ public:
   }
 
 public:
-  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
+  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem SrcBuf, cl_mem DstBuf);
 
 public:
-  EnqueueCopyBufferBuilder &SetCopyArea(size_t DstOffset, size_t SrcOffset, size_t Size);
+  EnqueueCopyBufferBuilder &SetCopyArea(size_t SrcOffset, size_t DstOffset, size_t Size);
   EnqueueCopyBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueCopyBuffer *Create(cl_int *ErrCode);
@@ -413,10 +413,10 @@ private:
   }
 
 private:
-  Buffer *Target;
   Buffer *Source;
+  Buffer *Target;
+  size_t Source_Offset;
   size_t Target_Offset;
-	size_t Source_Offset;
   size_t Size;
 };
 

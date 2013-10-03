@@ -163,8 +163,8 @@ clEnqueueCopyBuffer(cl_command_queue command_queue,
 
   cl_int ErrCode;
 	
-  opencrun::EnqueueCopyBufferBuilder Bld(Queue->GetContext(), dst_buffer, src_buffer);
-  opencrun::Command *Cmd = Bld.SetCopyArea(dst_offset, src_offset, cb)
+  opencrun::EnqueueCopyBufferBuilder Bld(Queue->GetContext(), src_buffer, dst_buffer);
+  opencrun::Command *Cmd = Bld.SetCopyArea(src_offset, dst_offset, cb)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);

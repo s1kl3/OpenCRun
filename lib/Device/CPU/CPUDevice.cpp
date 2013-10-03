@@ -340,7 +340,7 @@ bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetSource()], Global[Cmd.GetTarget()]));
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {

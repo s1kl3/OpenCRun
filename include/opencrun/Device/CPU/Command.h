@@ -267,25 +267,25 @@ public:
 	
 public:
 	CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
-											 void *Target, 
-											 const void *Source)
+											 const void *Source, 
+											 void *Target)
 		:	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
-			Target(Target),
-			Source(Source) { }
+			Source(Source),
+			Target(Target) { }
 		
 public:
-	void *GetTarget() {
+	const void *GetSource() {
+		uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
+		
+		return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
+	}
+  
+  void *GetTarget() {
 		uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
 		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
 		
 		return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
-	}
-	
-	const void *GetSource() {
-		uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
-		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
-		
-		return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
 	}
 	
 	size_t GetSize() {
@@ -293,8 +293,8 @@ public:
 	}
 
 private:
+  const void *Source;
 	void *Target;
-	const void *Source;
 };
 
 class MapBufferCPUCommand : public CPUExecCommand {
