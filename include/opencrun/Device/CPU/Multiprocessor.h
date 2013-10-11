@@ -29,9 +29,12 @@ public:
 public:
   bool Submit(ReadBufferCPUCommand *Cmd);
   bool Submit(WriteBufferCPUCommand *Cmd);
-	bool Submit(CopyBufferCPUCommand *Cmd);
-	bool Submit(MapBufferCPUCommand *Cmd);
-	bool Submit(UnmapMemObjectCPUCommand *Cmd);
+  bool Submit(CopyBufferCPUCommand *Cmd);
+  bool Submit(MapBufferCPUCommand *Cmd);
+  bool Submit(UnmapMemObjectCPUCommand *Cmd);
+  bool Submit(ReadBufferRectCPUCommand *Cmd);
+  bool Submit(WriteBufferRectCPUCommand *Cmd);
+  bool Submit(CopyBufferRectCPUCommand *Cmd);
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd);
   bool Submit(NativeKernelCPUCommand *Cmd);
 

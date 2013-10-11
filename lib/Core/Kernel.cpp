@@ -103,8 +103,8 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
       RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
 
     Buf = Ctx.CreateVirtualBuffer(Size, 
-																	MemoryObj::ReadWrite, 
-																	MemoryObj::HostNoProtection);
+                                  MemoryObj::ReadWrite, 
+                                  MemoryObj::HostNoProtection);
 
     break;
 

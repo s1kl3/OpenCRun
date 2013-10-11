@@ -12,9 +12,9 @@
    CL_MEM_USE_HOST_PTR |    \
    CL_MEM_ALLOC_HOST_PTR |  \
    CL_MEM_COPY_HOST_PTR |   \
-	 CL_MEM_HOST_WRITE_ONLY | \
-	 CL_MEM_HOST_READ_ONLY |  \
-	 CL_MEM_HOST_NO_ACCESS)
+   CL_MEM_HOST_WRITE_ONLY | \
+   CL_MEM_HOST_READ_ONLY |  \
+   CL_MEM_HOST_NO_ACCESS)
 
 static inline bool clValidMemField(cl_mem_flags flags) {
   return !(flags & ~CL_MEM_FIELD_ALL);
@@ -43,9 +43,9 @@ clCreateBuffer(cl_context context,
            .SetReadWrite(flags & CL_MEM_READ_WRITE)
            .SetWriteOnly(flags & CL_MEM_WRITE_ONLY)
            .SetReadOnly(flags & CL_MEM_READ_ONLY)
-					 .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
-					 .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
-					 .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
+           .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
+           .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
+           .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
            .Create(errcode_ret);
 
   if(Buf)
@@ -140,22 +140,22 @@ clGetMemObjectInfo(cl_mem memobj,
              param_value_size_ret);
   #include "MemoryObjectProperties.def"
   #undef PROPERTY
-	
-	case CL_MEM_HOST_PTR:
-		if(opencrun::HostBuffer *HostBuf 
-				= llvm::dyn_cast<opencrun::HostBuffer>(&MemObj))
-			return clFillValue<void *, void *>(
-							 static_cast<void **>(param_value),
-							 HostBuf->GetStorageData(),
-							 param_value_size,
-							 param_value_size_ret);
-			
-		return clFillValue<void *, void *>(
-						 static_cast<void **>(param_value),
-						 NULL,
-						 param_value_size,
-						 param_value_size_ret);
-	
+  
+  case CL_MEM_HOST_PTR:
+    if(opencrun::HostBuffer *HostBuf 
+        = llvm::dyn_cast<opencrun::HostBuffer>(&MemObj))
+      return clFillValue<void *, void *>(
+               static_cast<void **>(param_value),
+               HostBuf->GetStorageData(),
+               param_value_size,
+               param_value_size_ret);
+      
+    return clFillValue<void *, void *>(
+             static_cast<void **>(param_value),
+             NULL,
+             param_value_size,
+             param_value_size_ret);
+  
   default:
     return CL_INVALID_VALUE;
   }

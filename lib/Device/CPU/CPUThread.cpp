@@ -328,19 +328,31 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
   else if(WriteBufferCPUCommand *Write =
             llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
     return Submit(Write);
-	
-	else if(CopyBufferCPUCommand *Copy =
-						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
-		return Submit(Copy);
+  
+  else if(CopyBufferCPUCommand *Copy =
+            llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
+    return Submit(Copy);
 
-	else if(MapBufferCPUCommand *Map =
-						llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
-		return Submit(Map);
-	
-	else if(UnmapMemObjectCPUCommand *Unmap =
-						llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
-		return Submit(Unmap);
-		
+  else if(MapBufferCPUCommand *Map =
+            llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
+    return Submit(Map);
+  
+  else if(UnmapMemObjectCPUCommand *Unmap =
+            llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
+    return Submit(Unmap);
+  
+  else if(ReadBufferRectCPUCommand *ReadRect =
+            llvm::dyn_cast<ReadBufferRectCPUCommand>(Cmd))
+    return Submit(ReadRect);
+  
+  else if(WriteBufferRectCPUCommand *WriteRect =
+            llvm::dyn_cast<WriteBufferRectCPUCommand>(Cmd))
+    return Submit(WriteRect);
+  
+  else if(CopyBufferRectCPUCommand *CopyRect =
+            llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
+    return Submit(CopyRect);
+  
   else if(NDRangeKernelBlockCPUCommand *NDBlock =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     return Submit(NDBlock);
@@ -399,18 +411,30 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
             llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
 
-	else if(CopyBufferCPUCommand *OnFly =
-						llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
-		ExitStatus = Execute(*OnFly);
-	
-	else if(MapBufferCPUCommand *OnFly =
-						llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
-		ExitStatus = Execute(*OnFly);
-	
-	else if(UnmapMemObjectCPUCommand *OnFly =
-						llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
-		ExitStatus = Execute(*OnFly);
-	
+  else if(CopyBufferCPUCommand *OnFly =
+            llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
+  else if(MapBufferCPUCommand *OnFly =
+            llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
+  else if(UnmapMemObjectCPUCommand *OnFly =
+            llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
+  else if(ReadBufferRectCPUCommand *OnFly =
+            llvm::dyn_cast<ReadBufferRectCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+
+  else if(WriteBufferRectCPUCommand *OnFly =
+            llvm::dyn_cast<WriteBufferRectCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
+  else if(CopyBufferRectCPUCommand *OnFly =
+            llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);    
+    
   else if(NDRangeKernelBlockCPUCommand *OnFly =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -438,43 +462,79 @@ int CPUThread::Execute(WriteBufferCPUCommand &Cmd) {
 }
 
 int CPUThread::Execute(CopyBufferCPUCommand &Cmd) {
-	std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
-	
-	return CPUCommand::NoError;
+  std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+  
+  return CPUCommand::NoError;
 }
 
 int CPUThread::Execute(MapBufferCPUCommand &Cmd) {
-	EnqueueMapBuffer &CmdMap = Cmd.GetQueueCommandAs<EnqueueMapBuffer>();
-	Buffer &Buf = CmdMap.GetSource();
-	
-	// When device and host buffer are distinct we need to copy the specified region to
-	// the host buffer only for CL_MAP_READ and CL_MAP_WRITE mappings, because we have
-	// to guarantee that the host buffer contains the latest bits from the region being
-	// mapped; this is not necessary for CL_MAP_WRITE_INVALIDATE_REGION mappings.
-	if((llvm::isa<DeviceBuffer>(&Buf) || llvm::isa<HostAccessibleBuffer>(&Buf)) &&
-			(CmdMap.IsMapRead() || CmdMap.IsMapWrite()))
-		std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+  EnqueueMapBuffer &CmdMap = Cmd.GetQueueCommandAs<EnqueueMapBuffer>();
+  Buffer &Buf = CmdMap.GetSource();
+  
+  // When device and host buffer are distinct we need to copy the specified region to
+  // the host buffer only for CL_MAP_READ and CL_MAP_WRITE mappings, because we have
+  // to guarantee that the host buffer contains the latest bits from the region being
+  // mapped; this is not necessary for CL_MAP_WRITE_INVALIDATE_REGION mappings.
+  if((llvm::isa<DeviceBuffer>(&Buf) || llvm::isa<HostAccessibleBuffer>(&Buf)) &&
+      (CmdMap.IsMapRead() || CmdMap.IsMapWrite()))
+    std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
 
-	return CPUCommand::NoError;
+  return CPUCommand::NoError;
 }
 
 int CPUThread::Execute(UnmapMemObjectCPUCommand &Cmd) {
-	EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
-	MemoryObj &MemObj = CmdUnmap.GetMemObj();
-	
-	if(llvm::isa<DeviceBuffer>(&MemObj) || llvm::isa<HostAccessibleBuffer>(&MemObj)) {
-		// Copy data back to the memory object if it was mapped with
-		// CL_MAP_WRITE_INVALIDATE_REGION
-		MemoryObj::MappingInfo *Info = MemObj.GetMappingInfo(Cmd.GetMappedPtr());
-		if(Info && (Info->MapFlags & CL_MAP_WRITE_INVALIDATE_REGION))
-			memcpy(Cmd.GetMemObjAddr(), Cmd.GetMappedPtr(), Info->Size);
-	
-		free(Cmd.GetMappedPtr());
-	}
-	
-	MemObj.RemoveMapping(Cmd.GetMappedPtr());
-	
-	return CPUCommand::NoError;
+  EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
+  MemoryObj &MemObj = CmdUnmap.GetMemObj();
+  
+  if(llvm::isa<DeviceBuffer>(&MemObj) || llvm::isa<HostAccessibleBuffer>(&MemObj)) {
+    // Copy data back to the memory object if it was mapped with
+    // CL_MAP_WRITE_INVALIDATE_REGION
+    MemoryObj::MappingInfo *Info = MemObj.GetMappingInfo(Cmd.GetMappedPtr());
+    if(Info && (Info->MapFlags & CL_MAP_WRITE_INVALIDATE_REGION))
+      memcpy(Cmd.GetMemObjAddr(), Cmd.GetMappedPtr(), Info->Size);
+  
+    free(Cmd.GetMappedPtr());
+  }
+  
+  MemObj.RemoveMapping(Cmd.GetMappedPtr());
+  
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(ReadBufferRectCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+             
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(WriteBufferRectCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+             
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(CopyBufferRectCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+             
+  return CPUCommand::NoError;
 }
 
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
@@ -515,6 +575,27 @@ int CPUThread::Execute(NativeKernelCPUCommand &Cmd) {
   Func(Args);
 
   return CPUCommand::NoError;
+}
+
+// Used by: EnqueueReadBufferRect
+//          EnqueueWriteBufferRect
+//          EnqueueCopyBufferRect
+void CPUThread::MemRectCpy(void *Target, 
+                           const void *Source,
+                           const size_t *Region,
+                           size_t TargetRowPitch,
+                           size_t TargetSlicePitch,
+                           size_t SourceRowPitch,
+                           size_t SourceSlicePitch) {
+  for(size_t Z = 0; Z < Region[2]; ++Z)
+    for(size_t Y = 0; Y < Region[1]; ++Y)
+      std::memcpy(reinterpret_cast<void *>(
+                    reinterpret_cast<uintptr_t>(Target) + TargetRowPitch * Y + TargetSlicePitch * Z
+                  ),
+                  reinterpret_cast<const void *>(
+                    reinterpret_cast<uintptr_t>(Source) + SourceRowPitch * Y + SourceSlicePitch * Z
+                  ),
+                  Region[0]);                               
 }
 
 //

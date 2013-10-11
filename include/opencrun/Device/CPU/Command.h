@@ -18,9 +18,12 @@ public:
     LastCPUServiceCommand,
     ReadBuffer,
     WriteBuffer,
-		CopyBuffer,
-		MapBuffer,
-		UnmapMemObject,
+    CopyBuffer,
+    MapBuffer,
+    UnmapMemObject,
+    ReadBufferRect,
+    WriteBufferRect,
+    CopyBufferRect,
     NativeKernel,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
@@ -261,96 +264,255 @@ private:
 
 class CopyBufferCPUCommand : public CPUExecCommand {
 public:
-	static bool classof(const CPUCommand *Cmd) {
-		return Cmd->GetType() == CPUCommand::CopyBuffer;
-	}
-	
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::CopyBuffer;
+  }
+
 public:
-	CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
-											 const void *Source, 
-											 void *Target)
-		:	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
-			Source(Source),
-			Target(Target) { }
-		
+  CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
+                       void *Target,
+                       const void *Source)
+    :	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
+      Target(Target),
+      Source(Source) { }
+    
 public:
-	const void *GetSource() {
-		uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
-		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
-		
-		return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
-	}
-  
   void *GetTarget() {
-		uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
-		EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
-		
-		return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
-	}
-	
-	size_t GetSize() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
+    EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+  
+  const void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+    EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
+  }
+  
+  size_t GetSize() {
     return GetQueueCommandAs<EnqueueCopyBuffer>().GetSize();	
-	}
+  }
 
 private:
+  void *Target;
   const void *Source;
-	void *Target;
 };
 
 class MapBufferCPUCommand : public CPUExecCommand {
 public:
-	static bool classof(const CPUCommand *Cmd) {
-		return Cmd->GetType() == CPUCommand::MapBuffer;
-	}
-		
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::MapBuffer;
+  }
+    
 public:
-	MapBufferCPUCommand(EnqueueMapBuffer &Cmd,
-											const void *Source)
-		:	CPUExecCommand(CPUCommand::MapBuffer, Cmd),
-			Source(Source) { }
+  MapBufferCPUCommand(EnqueueMapBuffer &Cmd,
+                      const void *Source)
+    :	CPUExecCommand(CPUCommand::MapBuffer, Cmd),
+      Source(Source) { }
 
 public:
-	void *GetTarget() {
-		return GetQueueCommandAs<EnqueueMapBuffer>().GetMapBuffer();		
-	}
-			
-	const void *GetSource() {
-		uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
-		EnqueueMapBuffer &Cmd = GetQueueCommandAs<EnqueueMapBuffer>();
-		
-		return reinterpret_cast<void *>(Base + Cmd.GetOffset());
-	}
-	
-	size_t GetSize() {
-		return GetQueueCommandAs<EnqueueMapBuffer>().GetSize();
-	}
-	
+  void *GetTarget() {
+    return GetQueueCommandAs<EnqueueMapBuffer>().GetMapBuffer();		
+  }
+      
+  const void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+    EnqueueMapBuffer &Cmd = GetQueueCommandAs<EnqueueMapBuffer>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetOffset());
+  }
+  
+  size_t GetSize() {
+    return GetQueueCommandAs<EnqueueMapBuffer>().GetSize();
+  }
+  
 private:
-	const void *Source;
+  const void *Source;
 };
 
 class UnmapMemObjectCPUCommand : public CPUExecCommand {
 public:
-	static bool classof(const CPUCommand *Cmd) {
-		return Cmd->GetType() == CPUCommand::UnmapMemObject;
-	}
-	
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::UnmapMemObject;
+  }
+  
 public:
-	UnmapMemObjectCPUCommand(EnqueueUnmapMemObject &Cmd,
-													 void *MemObjAddr,
-													 void *MappedPtr)
-		: CPUExecCommand(CPUCommand::UnmapMemObject, Cmd),
-			MemObjAddr(MemObjAddr),
-			MappedPtr(MappedPtr) { }
-		
+  UnmapMemObjectCPUCommand(EnqueueUnmapMemObject &Cmd,
+                           void *MemObjAddr,
+                           void *MappedPtr)
+    : CPUExecCommand(CPUCommand::UnmapMemObject, Cmd),
+      MemObjAddr(MemObjAddr),
+      MappedPtr(MappedPtr) { }
+    
 public:
-	void *GetMemObjAddr() const { return MemObjAddr; }
-	
-	void *GetMappedPtr() const { return MappedPtr; }
-	
+  void *GetMemObjAddr() const { return MemObjAddr; }
+  
+  void *GetMappedPtr() const { return MappedPtr; }
+  
 private:
-	void *MemObjAddr;
-	void *MappedPtr;
+  void *MemObjAddr;
+  void *MappedPtr;
+};
+
+class ReadBufferRectCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::ReadBufferRect;
+  }
+  
+public:
+  ReadBufferRectCPUCommand(EnqueueReadBufferRect &Cmd,
+                           void *Dst,
+                           void *Src)
+    : CPUExecCommand(CPUCommand::ReadBufferRect, Cmd),
+      Dst(Dst),
+      Src(Src) { }
+
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueReadBufferRect &Cmd = GetQueueCommandAs<EnqueueReadBufferRect>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+
+  void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
+    EnqueueReadBufferRect &Cmd = GetQueueCommandAs<EnqueueReadBufferRect>();
+
+    return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());
+  }
+  
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueReadBufferRect>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueReadBufferRect>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueReadBufferRect>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueReadBufferRect>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueReadBufferRect>().GetRegion();
+  }
+
+private:
+  void *Dst;
+  void *Src;
+};
+
+class WriteBufferRectCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::WriteBufferRect;
+  }
+  
+public:
+  WriteBufferRectCPUCommand(EnqueueWriteBufferRect &Cmd,
+                            void *Dst,
+                            const void *Src)
+    : CPUExecCommand(CPUCommand::WriteBufferRect, Cmd),
+      Dst(Dst),
+      Src(Src) { }
+
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueWriteBufferRect &Cmd = GetQueueCommandAs<EnqueueWriteBufferRect>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+
+  const void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
+    EnqueueWriteBufferRect &Cmd = GetQueueCommandAs<EnqueueWriteBufferRect>();
+
+    return reinterpret_cast<const void *>(Base + Cmd.GetSourceOffset());
+  }
+    
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueWriteBufferRect>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueWriteBufferRect>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueWriteBufferRect>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueWriteBufferRect>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueWriteBufferRect>().GetRegion();
+  }
+  
+private:
+  void *Dst;
+  const void *Src;
+};
+
+class CopyBufferRectCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::CopyBufferRect;
+  }
+  
+public:
+  CopyBufferRectCPUCommand(EnqueueCopyBufferRect &Cmd,
+                            void *Dst,
+                            void *Src)
+    : CPUExecCommand(CPUCommand::CopyBufferRect, Cmd),
+      Dst(Dst),
+      Src(Src) { }
+
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueCopyBufferRect &Cmd = GetQueueCommandAs<EnqueueCopyBufferRect>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+
+  void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
+    EnqueueCopyBufferRect &Cmd = GetQueueCommandAs<EnqueueCopyBufferRect>();
+
+    return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());
+  }
+  
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueCopyBufferRect>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueCopyBufferRect>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueCopyBufferRect>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueCopyBufferRect>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueCopyBufferRect>().GetRegion();
+  }
+  
+private:
+  void *Dst;
+  void *Src;
 };
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {

@@ -58,7 +58,7 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
 }
 
 bool CPUDevice::CreateHostBuffer(HostBuffer &Buf) {
-	return Global.Alloc(Buf);
+  return Global.Alloc(Buf);
 }
 
 bool CPUDevice::CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) {
@@ -74,44 +74,44 @@ void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
 }
 
 void *CPUDevice::CreateMapBuffer(MemoryObj &MemObj, 
-																 size_t Offset,
-																 size_t Size,
-																 cl_map_flags MapFlags,
-																 cl_int *ErrCode) {
-	void *MapBuf;
-	
-	if(llvm::isa<HostBuffer>(&MemObj)) {		
-		// An host buffer is already allocated and it's the same storage area
-		// we have used for the memory object.
-		MapBuf = reinterpret_cast<void *>(
+                                 size_t Offset,
+                                 size_t Size,
+                                 cl_map_flags MapFlags,
+                                 cl_int *ErrCode) {
+  void *MapBuf;
+  
+  if(llvm::isa<HostBuffer>(&MemObj)) {		
+    // An host buffer is already allocated and it's the same storage area
+    // we have used for the memory object.
+    MapBuf = reinterpret_cast<void *>(
                 reinterpret_cast<uintptr_t>(Global[MemObj]) + Offset);
-		
-		if(!MemObj.AddNewMapping(MapBuf, 
-														 Offset, 
-														 Size, 
-														 static_cast<unsigned long>(MapFlags))) {
-			MapBuf = NULL;
-			*ErrCode = CL_INVALID_OPERATION;
-		}
-	}
-	
-	else if(llvm::isa<DeviceBuffer>(&MemObj) || 
-					llvm::isa<HostAccessibleBuffer>(&MemObj)) {
-		MapBuf = malloc(MemObj.GetSize());
-		if(!MapBuf)
-			*ErrCode = CL_OUT_OF_HOST_MEMORY;
-		
-		else if(!MemObj.AddNewMapping(MapBuf,
+    
+    if(!MemObj.AddNewMapping(MapBuf, 
+                             Offset, 
+                             Size, 
+                             static_cast<unsigned long>(MapFlags))) {
+      MapBuf = NULL;
+      *ErrCode = CL_INVALID_OPERATION;
+    }
+  }
+  
+  else if(llvm::isa<DeviceBuffer>(&MemObj) || 
+          llvm::isa<HostAccessibleBuffer>(&MemObj)) {
+    MapBuf = malloc(MemObj.GetSize());
+    if(!MapBuf)
+      *ErrCode = CL_OUT_OF_HOST_MEMORY;
+    
+    else if(!MemObj.AddNewMapping(MapBuf,
                                   Offset,
                                   Size,
                                   static_cast<unsigned long>(MapFlags))) {
-			free(MapBuf);
-			MapBuf = NULL;
-			*ErrCode = CL_INVALID_OPERATION;
-		}
-	}
-	
-	return MapBuf;
+      free(MapBuf);
+      MapBuf = NULL;
+      *ErrCode = CL_INVALID_OPERATION;
+    }
+  }
+  
+  return MapBuf;
 }
 
 bool CPUDevice::Submit(Command &Cmd) {
@@ -131,15 +131,24 @@ bool CPUDevice::Submit(Command &Cmd) {
   else if(EnqueueWriteBuffer *Write = llvm::dyn_cast<EnqueueWriteBuffer>(&Cmd))
     Submitted = Submit(*Write);
 
-	else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
-		Submitted = Submit(*Copy);
+  else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
+    Submitted = Submit(*Copy);
 
-	else if(EnqueueMapBuffer *Map = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
-		Submitted = Submit(*Map);
-	
-	else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
-		Submitted = Submit(*Unmap);
-		
+  else if(EnqueueMapBuffer *Map = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
+    Submitted = Submit(*Map);
+  
+  else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
+    Submitted = Submit(*Unmap);
+
+  else if(EnqueueReadBufferRect *ReadRect = llvm::dyn_cast<EnqueueReadBufferRect>(&Cmd))
+    Submitted = Submit(*ReadRect);
+
+  else if(EnqueueWriteBufferRect *WriteRect = llvm::dyn_cast<EnqueueWriteBufferRect>(&Cmd))
+    Submitted = Submit(*WriteRect);
+    
+  else if(EnqueueCopyBufferRect *CopyRect = llvm::dyn_cast<EnqueueCopyBufferRect>(&Cmd))
+    Submitted = Submit(*CopyRect);
+
   else if(EnqueueNDRangeKernel *NDRange =
             llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
     Submitted = Submit(*NDRange);
@@ -340,7 +349,7 @@ bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetSource()], Global[Cmd.GetTarget()]));
+  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
@@ -355,6 +364,27 @@ bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, Global[Cmd.GetMemObj()], Cmd.GetMappedPtr()));
+}
+
+bool CPUDevice::Submit(EnqueueReadBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueWriteBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new WriteBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Cmd.GetSource()));
+}
+
+bool CPUDevice::Submit(EnqueueCopyBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {

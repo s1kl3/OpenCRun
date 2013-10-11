@@ -72,36 +72,36 @@ EnqueueWriteBuffer::EnqueueWriteBuffer(Buffer &Target,
 // EnqueueCopyBuffer implementation.
 //
 
-EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Src,
-																		 Buffer &Dst,
-																		 size_t Src_Offset,
-																		 size_t Dst_Offset,
-																		 size_t Size,
-																		 EventsContainer &WaitList)
-	: Command(Command::CopyBuffer, WaitList, true),
-		Source(&Src),
+EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Dst,
+                                     Buffer &Src,
+                                     size_t Dst_Offset,
+                                     size_t Src_Offset,
+                                     size_t Size,
+                                     EventsContainer &WaitList)
+  : Command(Command::CopyBuffer, WaitList),
     Target(&Dst),
+    Source(&Src),
+    Target_Offset(Dst_Offset),
     Source_Offset(Src_Offset),
-		Target_Offset(Dst_Offset),
-		Size(Size) { }
+    Size(Size) { }
 
 //
 // EnqueueMapBuffer implementation.
 //
 
 EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Src,
-																	 bool Blocking,
-																	 cl_map_flags MapFlags,
-																	 size_t Offset,
-																	 size_t Size,
+                                   bool Blocking,
+                                   cl_map_flags MapFlags,
+                                   size_t Offset,
+                                   size_t Size,
                                    void *MapBuf,
-																	 EventsContainer &WaitList)
-	:	Command(Command::MapBuffer, WaitList, Blocking),
-		Source(&Src),
-		MapFlags(MapFlags),
-		Offset(Offset),
-		Size(Size),
-		MapBuf(MapBuf) { }
+                                   EventsContainer &WaitList)
+  :	Command(Command::MapBuffer, WaitList, Blocking),
+    Source(&Src),
+    MapFlags(MapFlags),
+    Offset(Offset),
+    Size(Size),
+    MapBuf(MapBuf) { }
 
 //
 // EnqueueUnmapMemObject implementation.
@@ -110,9 +110,74 @@ EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Src,
 EnqueueUnmapMemObject::EnqueueUnmapMemObject(MemoryObj &MemObj,
                                              void *MappedPtr,
                                              EventsContainer &WaitList)
-	:	Command(Command::UnmapMemObject, WaitList),
-		MemObj(&MemObj),
+  :	Command(Command::UnmapMemObject, WaitList),
+    MemObj(&MemObj),
     MappedPtr(MappedPtr) { }    
+
+//
+// EnqueueReadBufferRect implementation.
+//
+
+EnqueueReadBufferRect::EnqueueReadBufferRect(void *Target,
+                                             Buffer &Source,
+                                             bool Blocking,
+                                             const size_t *Region,
+                                             size_t TargetOffset,
+                                             size_t SourceOffset,
+                                             size_t *TargetPitch,
+                                             size_t *SourcePitch,
+                                             EventsContainer &WaitList)
+  : Command(Command::ReadBufferRect, WaitList, Blocking),
+    Target(Target),
+    Source(&Source),
+    Region(Region),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset),
+    TargetPitch(TargetPitch),
+    SourcePitch(SourcePitch) { }
+
+//
+// EnqueueWriteBufferRect implementation.
+//
+
+EnqueueWriteBufferRect::EnqueueWriteBufferRect(Buffer &Target,
+                                               const void *Source,
+                                               bool Blocking,
+                                               const size_t *Region,
+                                               size_t TargetOffset,
+                                               size_t SourceOffset,
+                                               size_t *TargetPitch,
+                                               size_t *SourcePitch,
+                                               EventsContainer &WaitList)
+  : Command(Command::WriteBufferRect, WaitList, Blocking),
+    Target(&Target),
+    Source(Source),
+    Region(Region),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset),
+    TargetPitch(TargetPitch),
+    SourcePitch(SourcePitch) { }
+
+//
+// EnqueueCopyBufferRect implementation.
+//
+
+EnqueueCopyBufferRect::EnqueueCopyBufferRect(Buffer &Target,
+                                             Buffer &Source,
+                                             const size_t *Region,
+                                             size_t TargetOffset,
+                                             size_t SourceOffset,
+                                             size_t *TargetPitch,
+                                             size_t *SourcePitch,
+                                             EventsContainer &WaitList)
+  : Command(Command::CopyBufferRect, WaitList),
+    Target(&Target),
+    Source(&Source),
+    Region(Region),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset),
+    TargetPitch(TargetPitch),
+    SourcePitch(SourcePitch) { }
     
 //
 // EnqueueNDRangeKernel implementation.
@@ -237,7 +302,14 @@ EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
 
   else if(!(Src = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
-
+  
+  else if((Src->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
+          (Src->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+          
+    NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
+  else if(Ctx != Src->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+    
   if(!Target)
     NotifyError(CL_INVALID_VALUE, "pointer to data sink is null");
 }
@@ -278,6 +350,15 @@ EnqueueReadBufferBuilder &EnqueueReadBufferBuilder::SetWaitList(
     return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
                        "cannot block on an inconsistent wait list");
 
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
   return llvm::cast<EnqueueReadBufferBuilder>(Super);
 }
 
@@ -310,7 +391,10 @@ EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
 
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
-
+  
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+    
   if(!Src)
     NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
 }
@@ -351,6 +435,15 @@ EnqueueWriteBufferBuilder &EnqueueWriteBufferBuilder::SetWaitList(
     return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
                        "cannot block on an inconsistent wait list");
 
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
   return llvm::cast<EnqueueWriteBufferBuilder>(Super);
 }
 
@@ -369,47 +462,53 @@ EnqueueWriteBuffer *EnqueueWriteBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
-	Context &Ctx,
-	cl_mem SrcBuf,
-	cl_mem DstBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
-																	Ctx),
-									 Source(NULL),
+  Context &Ctx,
+  cl_mem DstBuf,
+  cl_mem SrcBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
+                                  Ctx),
                    Target(NULL),
+                   Source(NULL),
+                   Target_Offset(0),
                    Source_Offset(0),
-									 Target_Offset(0),
-									 Size(0) {
+                   Size(0) {
   if(!DstBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
-	
-	else if(!SrcBuf)
-		NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
+  
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
+    
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
+  
+  if(!SrcBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SrcBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not a buffer");				 
     
-  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
-    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context"); 
 }
 
-EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t SrcOffset,
-																																size_t DstOffset,
-																																size_t Size) {
+EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t DstOffset,
+                                                                size_t SrcOffset,
+                                                                size_t Size) {
   if(!Target || !Source)
     return *this;
 
-	if(SrcOffset + Size > Source->GetSize())
-		return NotifyError(CL_INVALID_VALUE, "data size exceed source buffer capacity");
-
   if(DstOffset + Size > Target->GetSize())
     return NotifyError(CL_INVALID_VALUE, "data size exceed destination buffer capacity");
-		
+    
+  if(SrcOffset + Size > Source->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "data size exceed source buffer capacity");
+  
   // TODO: checking for sub-buffers.
 
-  this->Source_Offset = SrcOffset;
   this->Target_Offset = DstOffset;
+  this->Source_Offset = SrcOffset;
   this->Size = Size;
 
-  return *this;																																
+  return *this;
 }
 
 EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetWaitList(
@@ -417,6 +516,15 @@ EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetWaitList(
   const cl_event *Evs) {
   CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
 
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
   return llvm::cast<EnqueueCopyBufferBuilder>(Super);
 }
 
@@ -427,7 +535,7 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return new EnqueueCopyBuffer(*Source, *Target, Source_Offset, Target_Offset, Size, WaitList);
+  return new EnqueueCopyBuffer(*Target, *Source, Target_Offset, Source_Offset, Size, WaitList);
 }
 
 //
@@ -435,22 +543,22 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueMapBufferBuilder::EnqueueMapBufferBuilder(
-	Context &Ctx,
-	cl_mem Buf) : CommandBuilder(CommandBuilder::EnqueueMapBufferBuilder,
-															 Ctx),
-								Source(NULL),
-								Blocking(false),
+  Context &Ctx,
+  cl_mem Buf) : CommandBuilder(CommandBuilder::EnqueueMapBufferBuilder,
+                               Ctx),
+                Source(NULL),
+                Blocking(false),
                 MapFlags(0),
-								Offset(0),
-								Size(0),
-								MapBuf(NULL) {
+                Offset(0),
+                Size(0),
+                MapBuf(NULL) {
   if(!Buf)
     NotifyError(CL_INVALID_MEM_OBJECT, "map source is null");
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "map source is not a buffer");	
     
-  else if(Ctx != Source->GetContext())
+  if(Ctx != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
 }
 
@@ -465,40 +573,40 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetBlocking(bool Blocking) {
 }
 
 EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapFlags(cl_map_flags MapFlags) {
-	if(MapFlags & CL_MAP_READ) {
-		if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
-			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+  if(MapFlags & CL_MAP_READ) {
+    if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
 
-		if(Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly ||
-		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
-			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");		
-	}
-	
-	if(MapFlags & CL_MAP_WRITE) {
-		if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
-			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+    if(Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");		
+  }
+  
+  if(MapFlags & CL_MAP_WRITE) {
+    if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
 
-		if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
-		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
-			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
-	}
-	
-	if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION) {
-		if((MapFlags & CL_MAP_READ) || (MapFlags & CL_MAP_WRITE))
-			return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+    if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+  }
+  
+  if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION) {
+    if((MapFlags & CL_MAP_READ) || (MapFlags & CL_MAP_WRITE))
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
 
-		if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
-		   Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
-			return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
-	}
+    if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+  }
 
-	this->MapFlags = MapFlags;
+  this->MapFlags = MapFlags;
 
-	return *this;
+  return *this;
 }
 
 EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset, 
-																														 size_t Size) {
+                                                             size_t Size) {
   if(!Source)
     return *this;
 
@@ -520,16 +628,25 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetWaitList(unsigned N, const 
     return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
                        "cannot block on an inconsistent wait list");
 
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
   return llvm::cast<EnqueueMapBufferBuilder>(Super);
 }
 
 EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapBuffer(void *MapBuf) {
-	if(!MapBuf)
-		return *this;
-		
-	this->MapBuf = MapBuf;
-	
-	return *this;
+  if(!MapBuf)
+    return *this;
+    
+  this->MapBuf = MapBuf;
+  
+  return *this;
 }
 
 EnqueueMapBuffer *EnqueueMapBufferBuilder::Create(cl_int *ErrCode) {
@@ -542,26 +659,25 @@ EnqueueMapBuffer *EnqueueMapBufferBuilder::Create(cl_int *ErrCode) {
   return new EnqueueMapBuffer(*Source, Blocking, MapFlags, Offset, Size, MapBuf, WaitList);
 }
 
-
 //
 // EnqueueUnmapMemObjectBuilder implementation.
 //
 
 EnqueueUnmapMemObjectBuilder::EnqueueUnmapMemObjectBuilder(
-	Context &Ctx, 
-	cl_mem MemObj, 
-	void *MappedPtr) : CommandBuilder(CommandBuilder::EnqueueUnmapMemObjectBuilder,
-																		Ctx),
-										 MemObj(llvm::cast<MemoryObj>(MemObj)),
-										 MappedPtr(MappedPtr) {
+  Context &Ctx, 
+  cl_mem MemObj, 
+  void *MappedPtr) : CommandBuilder(CommandBuilder::EnqueueUnmapMemObjectBuilder,
+                                    Ctx),
+                     MemObj(llvm::cast<MemoryObj>(MemObj)),
+                     MappedPtr(MappedPtr) {
   if(!MemObj)
     NotifyError(CL_INVALID_MEM_OBJECT, "memory object is null");
   
-  else if(!MappedPtr)
-    NotifyError(CL_INVALID_VALUE, "pointer to mapped data is null");
-
   else if(Ctx != llvm::cast<MemoryObj>(MemObj)->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+  
+  if(!MappedPtr)
+    NotifyError(CL_INVALID_VALUE, "pointer to mapped data is null");
 }
 
 EnqueueUnmapMemObjectBuilder &
@@ -572,13 +688,572 @@ EnqueueUnmapMemObjectBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
 }
 
 EnqueueUnmapMemObject *EnqueueUnmapMemObjectBuilder::Create(cl_int *ErrCode) {
-	if(this->ErrCode != CL_SUCCESS)
-		RETURN_WITH_ERROR(ErrCode);
-		
-	if(ErrCode)
-		*ErrCode = CL_SUCCESS;
-		
-	return new EnqueueUnmapMemObject(*MemObj, MappedPtr, WaitList);
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+    
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+    
+  return new EnqueueUnmapMemObject(*MemObj, MappedPtr, WaitList);
+}
+
+//
+// EnqueueReadBufferRectBuilder implementation.
+//
+
+EnqueueReadBufferRectBuilder::EnqueueReadBufferRectBuilder(
+  Context &Ctx,
+  cl_mem Buf,
+  void *Ptr) : CommandBuilder(CommandBuilder::EnqueueReadBufferRectBuilder,
+                              Ctx),
+               Target(Ptr),
+               Source(NULL),
+               Blocking(false),
+               Region(NULL),
+               TargetOrigin(NULL),
+               SourceOrigin(NULL),
+               TargetOffset(0),
+               SourceOffset(0) {
+  if(!Buf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
+
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
+  
+  else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
+          (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+    NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
+  
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+    
+  if(!Target)
+    NotifyError(CL_INVALID_VALUE, "pointer to data sink is null");
+}
+
+EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetBlocking(
+  bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetRegion(
+  const size_t *Region) {
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE,
+                       "invalid region array");
+  
+  this->Region = Region; 
+
+  return *this;
+}
+
+EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetTargetOffset(
+  const size_t *TargetOrigin,
+  size_t TargetRowPitch,
+  size_t TargetSlicePitch) {
+  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  else {
+    if(TargetRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host row pitch");
+    
+    TargetPitch[0] = TargetRowPitch;
+  }
+  
+  if(TargetSlicePitch == 0) 
+    TargetPitch[1] = Region[1] * TargetPitch[0];
+  else {
+    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
+        (TargetSlicePitch % TargetPitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host slice pitch");
+    
+    TargetPitch[1] = TargetSlicePitch;
+  }
+  
+  TargetOffset = TargetOrigin[0]
+               + TargetOrigin[1] * TargetPitch[0]
+               + TargetOrigin[2] * TargetPitch[1];
+               
+  return *this;
+}
+
+EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetSourceOffset(
+  const size_t *SourceOrigin,
+  size_t SourceRowPitch,
+  size_t SourceSlicePitch) {
+  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  else {
+    if(SourceRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid buffer row pitch");
+    
+    SourcePitch[0] = SourceRowPitch;
+  }
+  
+  if(SourceSlicePitch == 0) 
+    SourcePitch[1] = Region[1] * SourcePitch[0];
+  else {
+    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
+        (SourceSlicePitch % SourcePitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid buffer slice pitch");
+    
+    SourcePitch[1] = SourceSlicePitch;
+  }
+  
+  if(Source->GetSize() < (SourceOrigin[0] + (Region[0] - 1))
+                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitch[0]
+                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitch[1])
+    return NotifyError(CL_INVALID_VALUE, "region out of bound");
+    
+  SourceOffset = SourceOrigin[0] 
+               + SourceOrigin[1] * SourcePitch[0]
+               + SourceOrigin[2] * SourcePitch[1];
+               
+  return *this;
+}
+
+EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+  
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueReadBufferRectBuilder>(Super);
+}
+
+EnqueueReadBufferRect *EnqueueReadBufferRectBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueReadBufferRect(Target, 
+                                   *Source, 
+                                   Blocking,
+                                   Region,
+                                   TargetOffset, 
+                                   SourceOffset, 
+                                   TargetPitch, 
+                                   SourcePitch, 
+                                   WaitList);
+}
+
+//
+// EnqueueWriteBufferRectBuilder implementation.
+//
+
+EnqueueWriteBufferRectBuilder::EnqueueWriteBufferRectBuilder(
+  Context &Ctx,
+  cl_mem Buf,
+  const void *Ptr) : CommandBuilder(CommandBuilder::EnqueueWriteBufferRectBuilder,
+                                    Ctx),
+                     Target(NULL),
+                     Source(Ptr),
+                     Blocking(false),
+                     Region(NULL),
+                     TargetOrigin(NULL),
+                     SourceOrigin(NULL),
+                     TargetOffset(0),
+                     SourceOffset(0) {
+  if(!Buf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
+
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
+  
+  else if((Target->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
+          (Target->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+    NotifyError(CL_INVALID_OPERATION, "invalid write buffer operation");
+  
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+    
+  if(!Source)
+    NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
+}
+
+EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetBlocking(
+  bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetRegion(
+  const size_t *Region) {
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE,
+                       "invalid region array");
+  
+  this->Region = Region;
+  
+  return *this;
+}
+
+EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetTargetOffset(
+  const size_t *TargetOrigin,
+  size_t TargetRowPitch,
+  size_t TargetSlicePitch) {
+  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  else {
+    if(TargetRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid buffer row pitch");
+    
+    TargetPitch[0] = TargetRowPitch;
+  }
+  
+  if(TargetSlicePitch == 0) 
+    TargetPitch[1] = Region[1] * TargetPitch[0];
+  else {
+    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
+        (TargetSlicePitch % TargetPitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid buffer slice pitch");
+    
+    TargetPitch[1] = TargetSlicePitch;
+  }
+  
+  if(Target->GetSize() < (TargetOrigin[0] + (Region[0] - 1))
+                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitch[0]
+                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitch[1])
+    return NotifyError(CL_INVALID_VALUE, "region out of bound");
+    
+  TargetOffset = TargetOrigin[0]
+               + TargetOrigin[1] * TargetPitch[0]
+               + TargetOrigin[2] * TargetPitch[1];
+  
+  return *this;
+}
+
+EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetSourceOffset(
+  const size_t *SourceOrigin,
+  size_t SourceRowPitch,
+  size_t SourceSlicePitch) {
+  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  else {
+    if(SourceRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host row pitch");
+    
+    SourcePitch[0] = SourceRowPitch;
+  }
+  
+  if(SourceSlicePitch == 0) 
+    SourcePitch[1] = Region[1] * SourcePitch[0];
+  else {
+    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
+        (SourceSlicePitch % SourcePitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host slice pitch");
+    
+    SourcePitch[1] = SourceSlicePitch;
+  }
+      
+  SourceOffset = SourceOrigin[0] 
+               + SourceOrigin[1] * SourcePitch[0]
+               + SourceOrigin[2] * SourcePitch[1];
+               
+  return *this;
+}
+
+EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+  
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueWriteBufferRectBuilder>(Super);
+}
+
+EnqueueWriteBufferRect *EnqueueWriteBufferRectBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueWriteBufferRect(*Target, 
+                                    Source, 
+                                    Blocking, 
+                                    Region,
+                                    TargetOffset, 
+                                    SourceOffset, 
+                                    TargetPitch, 
+                                    SourcePitch, 
+                                    WaitList);
+}
+
+//
+// EnqueueCopyBufferRectBuilder implementation.
+//
+
+EnqueueCopyBufferRectBuilder::EnqueueCopyBufferRectBuilder(
+  Context &Ctx,
+  cl_mem DstBuf,
+  cl_mem SrcBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferRectBuilder,
+                                  Ctx),
+               Target(NULL),
+               Source(NULL),
+               Region(NULL),
+               TargetOrigin(NULL),
+               SourceOrigin(NULL),
+               TargetOffset(0),
+               SourceOffset(0) {
+  if(!DstBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
+
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
+  
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
+    
+  if(!SrcBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
+
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SrcBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
+  
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context");
+}
+
+EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetRegion(
+  const size_t *Region) {
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE,
+                       "invalid region array");
+  
+  this->Region = Region;
+  
+  return *this;
+}
+
+EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetTargetOffset(
+  const size_t *TargetOrigin,
+  size_t TargetRowPitch,
+  size_t TargetSlicePitch) {
+  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  else {
+    if(TargetRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid target buffer row pitch");
+    
+    TargetPitch[0] = TargetRowPitch;
+  }
+  
+  if(TargetSlicePitch == 0) 
+    TargetPitch[1] = Region[1] * TargetPitch[0];
+  else {
+    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
+        (TargetSlicePitch % TargetPitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid target buffer slice pitch");
+    
+    TargetPitch[1] = TargetSlicePitch;
+  }
+  
+  if(Target->GetSize() < (TargetOrigin[0] + (Region[0] - 1))
+                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitch[0]
+                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitch[1])
+    return NotifyError(CL_INVALID_VALUE, "region out of bound");
+    
+  TargetOffset = TargetOrigin[0]
+               + TargetOrigin[1] * TargetPitch[0]
+               + TargetOrigin[2] * TargetPitch[1];
+               
+  this->TargetOrigin = TargetOrigin;
+             
+  return *this;
+}
+
+EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetSourceOffset(
+  const size_t *SourceOrigin,
+  size_t SourceRowPitch,
+  size_t SourceSlicePitch) {
+  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  else {
+    if(SourceRowPitch < Region[0])
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host row pitch");
+    
+    SourcePitch[0] = SourceRowPitch;
+  }
+  
+  if(SourceSlicePitch == 0) 
+    SourcePitch[1] = Region[1] * SourcePitch[0];
+  else {
+    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
+        (SourceSlicePitch % SourcePitch[0] !=0))
+      return NotifyError(CL_INVALID_VALUE,
+                         "invalid host slice pitch");
+    
+    SourcePitch[1] = SourceSlicePitch;
+  }
+
+  if(Source->GetSize() < (SourceOrigin[0] + (Region[0] - 1))
+                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitch[0]
+                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitch[1])
+    return NotifyError(CL_INVALID_VALUE, "region out of bound");
+    
+  SourceOffset = SourceOrigin[0] 
+               + SourceOrigin[1] * SourcePitch[0]
+               + SourceOrigin[2] * SourcePitch[1];
+               
+  this->SourceOrigin = SourceOrigin;
+  
+  return *this;
+}
+
+// The algorithm for overlap checking is taken from OpenCL v.1.2 specifications
+// Appendix E.
+EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::CheckCopyOverlap() {
+  if(Target == Source) {
+    // Since target and source buffers are the same object they must have the
+    // same row and slice pitches.
+    if((TargetPitch[0] != SourcePitch[0]) && 
+       (TargetPitch[1] != SourcePitch[1]))
+      return NotifyError(CL_INVALID_VALUE, "different pitches for the same buffer");
+   
+    // Row and slice pitches are the same.
+    size_t RowPitch = TargetPitch[0];
+    size_t SlicePitch = TargetPitch[1];
+    
+    const size_t SourceMin[] = { SourceOrigin[0], SourceOrigin[1], SourceOrigin[2] };
+    const size_t SourceMax[] = { SourceOrigin[0] + Region[0],    
+                                 SourceOrigin[1] + Region[1],
+                                 SourceOrigin[2] + Region[2] };
+
+    const size_t TargetMin[] = { TargetOrigin[0], TargetOrigin[1], TargetOrigin[2] };
+    const size_t TargetMax[] = { TargetOrigin[0] + Region[0],
+                                 TargetOrigin[1] + Region[1],
+                                 TargetOrigin[2] + Region[2] };
+
+    // Check for overlap
+    bool Overlap = true;
+    for(unsigned I = 0; I < 3 && !Overlap; ++I) {
+      Overlap = Overlap && (SourceMin[I] < TargetMax[I])
+                        && (SourceMax[I] > TargetMin[I]);
+    }
+
+    size_t TargetStart = TargetOffset;
+    size_t TargetEnd = TargetStart + (Region[2] * SlicePitch +
+                                      Region[1] * RowPitch + Region[0]);
+    
+    size_t SourceStart = SourceOffset;
+    size_t SourceEnd = SourceStart + (Region[2] * SlicePitch +
+                                      Region[1] * RowPitch + Region[0]);
+    
+    if(!Overlap) {
+      size_t DeltaSourceX = (SourceOrigin[0] + Region[0] > RowPitch) ?
+                             SourceOrigin[0] + Region[0] - RowPitch : 0;
+      size_t DeltaTargetX = (TargetOrigin[0] + Region[0] > RowPitch) ?
+                             TargetOrigin[0] + Region[0] - RowPitch : 0;
+      
+      if((DeltaSourceX > 0 && DeltaSourceX > TargetOrigin[0]) ||
+         (DeltaTargetX > 0 && DeltaTargetX > SourceOrigin[0])) {
+        
+        if((SourceStart <= TargetStart && TargetStart < SourceEnd) ||
+           (TargetStart <= SourceStart && SourceStart < TargetEnd))
+          Overlap = true;
+          
+      }
+      
+      if(Region[2] > 1) {
+        size_t SourceHeight = SlicePitch / RowPitch;
+        size_t TargetHeight = SlicePitch / RowPitch;
+      
+        size_t DeltaSourceY = (SourceOrigin[1] + Region[1] > SourceHeight) ?
+                               SourceOrigin[1] + Region[1] - SourceHeight : 0;
+        size_t DeltaTargetY = (TargetOrigin[1] + Region[1] > TargetHeight) ?
+                               TargetOrigin[1] + Region[1] - TargetHeight : 0;
+      
+        if((DeltaSourceY > 0 && DeltaSourceY > TargetOrigin[1]) ||
+           (DeltaTargetY > 0 && DeltaTargetY > SourceOrigin[1])) {    
+          if((SourceStart <= TargetStart && TargetStart < SourceEnd) ||
+             (TargetStart <= SourceStart && SourceStart < TargetEnd))
+            Overlap = true;            
+        }
+      }
+    }
+    
+    if(Overlap)
+      return NotifyError(CL_MEM_COPY_OVERLAP, "source and target regions overlap");
+  }
+  
+  return *this;
+}
+
+EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueCopyBufferRectBuilder>(Super);
+}
+
+EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueCopyBufferRect(*Target, 
+                                   *Source,
+                                   Region,
+                                   TargetOffset, 
+                                   SourceOffset, 
+                                   TargetPitch, 
+                                   SourcePitch, 
+                                   WaitList);
 }
 
 //

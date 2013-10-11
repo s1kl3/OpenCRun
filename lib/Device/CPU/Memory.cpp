@@ -42,20 +42,20 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
 // directly operate on the host buffer which will be always coherent and
 // we use a half of memory.
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
-	size_t HostBufferSize = Buf.GetSize();
-	
-	llvm::sys::ScopedLock Lock(ThisLock);
-	
-	if(Available < HostBufferSize)
-		return NULL;
-		
-	void *Addr = Buf.GetStorageData();
-	
-	if(Addr) {
-		Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
-		Available -= HostBufferSize;
-	}
-	
+  size_t HostBufferSize = Buf.GetSize();
+  
+  llvm::sys::ScopedLock Lock(ThisLock);
+  
+  if(Available < HostBufferSize)
+    return NULL;
+    
+  void *Addr = Buf.GetStorageData();
+  
+  if(Addr) {
+    Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
+    Available -= HostBufferSize;
+  }
+  
   return Addr;
 }
 
@@ -65,8 +65,8 @@ void *GlobalMemory::Alloc(HostBuffer &Buf) {
 void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
 
-	// CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
-	// togheter.
+  // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
+  // togheter.
   if(Buf.HasInitializationData())
     std::memcpy(Addr, Buf.GetInitializationData(), Buf.GetSize());
 
@@ -88,15 +88,15 @@ void GlobalMemory::Free(MemoryObj &MemObj) {
   MappingsContainer::iterator I = Mappings.find(&MemObj);
   if(!Mappings.count(&MemObj))
     return;
-		
+    
   Available += MemObj.GetSize();
 
-	// For an HostBuffer memory allocation/deallocation is under control
-	// and responsability of the host code, because we've used the host buffer
-	// as a device buffer.
-	if(!llvm::isa<HostBuffer>(MemObj))
-		sys::Free(I->second);
-		
+  // For an HostBuffer memory allocation/deallocation is under control
+  // and responsability of the host code, because we've used the host buffer
+  // as a device buffer.
+  if(!llvm::isa<HostBuffer>(MemObj))
+    sys::Free(I->second);
+    
   Mappings.erase(I);
 }
 

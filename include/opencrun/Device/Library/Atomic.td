@@ -73,7 +73,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn<string name> : OCLGenericBuiltin<name, [
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_global, [ocl_mod_volatile]>,
     ocl_int,
-	  ocl_int
+    ocl_int
   ],
   [],
   "nP1nnn">,
@@ -81,7 +81,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn<string name> : OCLGenericBuiltin<name, [
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_global, [ocl_mod_volatile]>,
     ocl_uint,
-	  ocl_uint
+    ocl_uint
   ],
   [],
   "UnP1UnUnUn">
@@ -92,7 +92,7 @@ class AtomicBuiltin_nP2nnn_UnP2UnUnUn<string name> : OCLGenericBuiltin<name, [
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_local, [ocl_mod_volatile]>,
     ocl_int,
-	  ocl_int
+    ocl_int
   ],
   [],
   "nP2nnn">,
@@ -100,7 +100,7 @@ class AtomicBuiltin_nP2nnn_UnP2UnUnUn<string name> : OCLGenericBuiltin<name, [
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_local, [ocl_mod_volatile]>,
     ocl_uint,
-	  ocl_uint
+    ocl_uint
   ],
   [],
   "UnP2UnUnUn">
@@ -214,7 +214,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_global, [ocl_mod_volatile]>,
     ocl_int,
-	  ocl_int
+    ocl_int
   ],
   [],
   "nP1nnn">,
@@ -222,7 +222,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_global, [ocl_mod_volatile]>,
     ocl_uint,
-	  ocl_uint
+    ocl_uint
   ],
   [],
   "UnP1UnUnUn">,
@@ -230,7 +230,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_int,
     OCLPointerType<ocl_int, ocl_as_local, [ocl_mod_volatile]>,
     ocl_int,
-	  ocl_int
+    ocl_int
   ],
   [],
   "nP2nnn">,
@@ -238,7 +238,7 @@ class AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<string name> : OCLGeneri
     ocl_uint,
     OCLPointerType<ocl_uint, ocl_as_local, [ocl_mod_volatile]>,
     ocl_uint,
-	  ocl_uint
+    ocl_uint
   ],
   [],
   "UnP2UnUnUn">
@@ -307,7 +307,7 @@ class AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<string name> : OCLGeneri
     ocl_long,
     OCLPointerType<ocl_long, ocl_as_global, [ocl_mod_volatile]>,
     ocl_long,
-	  ocl_long
+    ocl_long
   ],
   [],
   "lP1lll">,
@@ -315,7 +315,7 @@ class AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<string name> : OCLGeneri
     ocl_ulong,
     OCLPointerType<ocl_ulong, ocl_as_global, [ocl_mod_volatile]>,
     ocl_ulong,
-	  ocl_ulong
+    ocl_ulong
   ],
   [],
   "UlP1UlUlUl">,
@@ -323,7 +323,7 @@ class AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<string name> : OCLGeneri
     ocl_long,
     OCLPointerType<ocl_long, ocl_as_local, [ocl_mod_volatile]>,
     ocl_long,
-	  ocl_long
+    ocl_long
   ],
   [],
   "lP2lll">,
@@ -331,7 +331,7 @@ class AtomicBuiltin_lP1lll_UlP1UlUlUl_lP2lll_UlP2UlUlUl<string name> : OCLGeneri
     ocl_ulong,
     OCLPointerType<ocl_ulong, ocl_as_local, [ocl_mod_volatile]>,
     ocl_ulong,
-	  ocl_ulong
+    ocl_ulong
   ],
   [],
   "UlP2UlUlUl">
@@ -437,9 +437,9 @@ def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
   return __sync_lock_test_and_set_4(
-				(volatile uint __global*)param1, 
-				(uint) param2
-			  );
+        (volatile uint __global*)param1, 
+        (uint) param2
+        );
 }]>, "fP1ff">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
@@ -452,9 +452,9 @@ def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
   return __sync_lock_test_and_set_4(
-				(volatile uint __local *) param1, 
-				(uint) param2
-			  );
+        (volatile uint __local *) param1, 
+        (uint) param2
+        );
 }]>, "fP2ff">;
 
 //----------------------------------------------------------------------------//

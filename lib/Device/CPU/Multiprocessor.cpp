@@ -60,6 +60,27 @@ bool Multiprocessor::Submit(UnmapMemObjectCPUCommand *Cmd) {
   return Thr.Submit(static_cast<CPUCommand *>(Cmd));
 }
 
+bool Multiprocessor::Submit(ReadBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(WriteBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(CopyBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
 bool Multiprocessor::Submit(NDRangeKernelBlockCPUCommand *Cmd) {
   CPUThread &Thr = GetLesserLoadedThread();
 

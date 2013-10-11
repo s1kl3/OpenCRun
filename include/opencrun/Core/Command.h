@@ -26,9 +26,12 @@ public:
   enum Type {
     ReadBuffer = CL_COMMAND_READ_BUFFER,
     WriteBuffer = CL_COMMAND_WRITE_BUFFER,
-		CopyBuffer = CL_COMMAND_COPY_BUFFER,
-		MapBuffer = CL_COMMAND_MAP_BUFFER,
-		UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
+    CopyBuffer = CL_COMMAND_COPY_BUFFER,
+    MapBuffer = CL_COMMAND_MAP_BUFFER,
+    UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
+    ReadBufferRect = CL_COMMAND_READ_BUFFER_RECT,
+    WriteBufferRect = CL_COMMAND_WRITE_BUFFER_RECT,
+    CopyBufferRect = CL_COMMAND_COPY_BUFFER_RECT,
     NDRangeKernel = CL_COMMAND_NDRANGE_KERNEL,
     NativeKernel = CL_COMMAND_NATIVE_KERNEL
   };
@@ -136,96 +139,215 @@ private:
 
 class EnqueueCopyBuffer : public Command {
 public:
-	static bool classof(const Command *Cmd) {
-		return Cmd->GetType() == Command::CopyBuffer;
-	}
-	
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::CopyBuffer;
+  }
+  
 private:
-	EnqueueCopyBuffer(Buffer &Src,
-										Buffer &Dst,
-										size_t Src_Offset,
-										size_t Dst_Offset,
-										size_t Size,
-										EventsContainer &WaitList);
-										
+  EnqueueCopyBuffer(Buffer &Dst,
+                    Buffer &Src,
+                    size_t Src_Offset,
+                    size_t Dst_Offset,
+                    size_t Size,
+                    EventsContainer &WaitList);
+                    
 public:
-	Buffer &GetSource() { return *Source; }
   Buffer &GetTarget() { return *Target; }
+  Buffer &GetSource() { return *Source; }
+  size_t GetTargetOffset() { return Target_Offset; }
   size_t GetSourceOffset() { return Source_Offset; }
-	size_t GetTargetOffset() { return Target_Offset; }
-	size_t GetSize() { return Size; }
-	
+  size_t GetSize() { return Size; }
+  
 private:
-	llvm::IntrusiveRefCntPtr<Buffer> Source;
   llvm::IntrusiveRefCntPtr<Buffer> Target;
-	size_t Source_Offset;
+  llvm::IntrusiveRefCntPtr<Buffer> Source;
   size_t Target_Offset;
-	size_t Size;
-	
-	friend class EnqueueCopyBufferBuilder;
+  size_t Source_Offset;
+  size_t Size;
+  
+  friend class EnqueueCopyBufferBuilder;
 };
 
 class EnqueueMapBuffer : public Command {
 public:
-	static bool classof(const Command *Cmd) {
-		return Cmd->GetType() == Command::MapBuffer;
-	}
-	
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::MapBuffer;
+  }
+  
 private:
-	EnqueueMapBuffer(Buffer &Src,
-									 bool Blocking,
-									 cl_map_flags MapFlags,
-									 size_t Offset,
-									 size_t Size,
+  EnqueueMapBuffer(Buffer &Src,
+                   bool Blocking,
+                   cl_map_flags MapFlags,
+                   size_t Offset,
+                   size_t Size,
                    void *MapBuf,
-									 EventsContainer &WaitList);
+                   EventsContainer &WaitList);
 
 public:
-	Buffer &GetSource() { return *Source; }
-	cl_map_flags GetMapFlags() { return MapFlags; }
+  Buffer &GetSource() { return *Source; }
+  cl_map_flags GetMapFlags() { return MapFlags; }
   size_t GetOffset() { return Offset; }
   size_t GetSize() { return Size; }
-	void *GetMapBuffer() { return MapBuf; }
+  void *GetMapBuffer() { return MapBuf; }
 
 public:
-	bool IsMapRead() const { return MapFlags & CL_MAP_READ; }
-	bool IsMapWrite() const { return MapFlags & CL_MAP_WRITE; }
-	bool IsMapInvalidate() const { return MapFlags & CL_MAP_WRITE_INVALIDATE_REGION; }
-	
+  bool IsMapRead() const { return MapFlags & CL_MAP_READ; }
+  bool IsMapWrite() const { return MapFlags & CL_MAP_WRITE; }
+  bool IsMapInvalidate() const { return MapFlags & CL_MAP_WRITE_INVALIDATE_REGION; }
+  
 public:
-	void SetMapBuffer(void *MapBuf) { this->MapBuf = MapBuf;}
-	
+  void SetMapBuffer(void *MapBuf) { this->MapBuf = MapBuf;}
+  
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Source;
-	cl_map_flags MapFlags;
+  cl_map_flags MapFlags;
   size_t Offset;
   size_t Size;
 
-	void *MapBuf;
-	
+  void *MapBuf;
+  
   friend class EnqueueMapBufferBuilder;	
 };
 
 class EnqueueUnmapMemObject : public Command {
 public:
-	static bool classof(const Command *Cmd) {
-		return Cmd->GetType() == Command::UnmapMemObject;
-	}
-	
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::UnmapMemObject;
+  }
+  
 private:
-	EnqueueUnmapMemObject(MemoryObj &MemObj,
-												void *MappedPtr,
-												EventsContainer &WaitList);
-	
+  EnqueueUnmapMemObject(MemoryObj &MemObj,
+                        void *MappedPtr,
+                        EventsContainer &WaitList);
+  
 public:
-	MemoryObj &GetMemObj() { return *MemObj; }
-	void *GetMappedPtr() { return MappedPtr; }
+  MemoryObj &GetMemObj() { return *MemObj; }
+  void *GetMappedPtr() { return MappedPtr; }
 
 private:
-	llvm::IntrusiveRefCntPtr<MemoryObj> MemObj;
-	void *MappedPtr;
-	
-	friend class EnqueueUnmapMemObjectBuilder;
+  llvm::IntrusiveRefCntPtr<MemoryObj> MemObj;
+  void *MappedPtr;
+  
+  friend class EnqueueUnmapMemObjectBuilder;
+};
+
+class EnqueueReadBufferRect : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::ReadBufferRect;
+  }
+
+private:
+  EnqueueReadBufferRect(void *Target,
+                        Buffer &Source,
+                        bool Blocking,
+                        const size_t *Region,
+                        size_t TargetOffset,
+                        size_t SourceOffset,
+                        size_t *TargetPitch,
+                        size_t *SourcePitch,
+                        EventsContainer &WaitList);
+
+public:
+  void *GetTarget() { return Target; }
+  Buffer &GetSource() { return *Source; }
+  const size_t *GetRegion() { return Region; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetSourceOffset() { return SourceOffset; }
+  size_t GetTargetRowPitch() { return TargetPitch[0]; }
+  size_t GetTargetSlicePitch() { return TargetPitch[1]; }
+  size_t GetSourceRowPitch() { return SourcePitch[0]; }
+  size_t GetSourceSlicePitch() { return SourcePitch[1]; }
+
+private:
+  void *Target;
+  llvm::IntrusiveRefCntPtr<Buffer> Source;
+  const size_t *Region;
+  size_t TargetOffset;
+  size_t SourceOffset;
+  size_t *TargetPitch;
+  size_t *SourcePitch;
+  
+  friend class EnqueueReadBufferRectBuilder;
+};
+
+class EnqueueWriteBufferRect : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::WriteBufferRect;
+  }
+
+private:
+  EnqueueWriteBufferRect(Buffer &Target,
+                         const void *Source,
+                         bool Blocking,
+                         const size_t *Region,
+                         size_t TargetOffset,
+                         size_t SourceOffset,
+                         size_t *TargetPitch,
+                         size_t *SourcePitch,
+                         EventsContainer &WaitList);
+
+public:
+  Buffer &GetTarget() { return *Target; }
+  const void *GetSource() { return Source; }
+  const size_t *GetRegion() { return Region; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetSourceOffset() { return SourceOffset; }
+  size_t GetTargetRowPitch() { return TargetPitch[0]; }
+  size_t GetTargetSlicePitch() { return TargetPitch[1]; }
+  size_t GetSourceRowPitch() { return SourcePitch[0]; }
+  size_t GetSourceSlicePitch() { return SourcePitch[1]; }
+
+private:
+  llvm::IntrusiveRefCntPtr<Buffer> Target;
+  const void *Source;
+  const size_t *Region;
+  size_t TargetOffset;
+  size_t SourceOffset;
+  size_t *TargetPitch;
+  size_t *SourcePitch;
+  
+  friend class EnqueueWriteBufferRectBuilder;
+};
+
+class EnqueueCopyBufferRect : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::CopyBufferRect;
+  }
+
+public:
+  EnqueueCopyBufferRect(Buffer &Target,
+                        Buffer &Source,
+                        const size_t *Region,
+                        size_t TargetOffset,
+                        size_t SourceOffset,
+                        size_t *TargetPitch,
+                        size_t *SourcePitch,
+                        EventsContainer &WaitList);
+                        
+public:
+  Buffer &GetTarget() { return *Target; }
+  Buffer &GetSource() { return *Source; }
+  const size_t *GetRegion() { return Region; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetSourceOffset() { return SourceOffset; }
+  size_t GetTargetRowPitch() { return TargetPitch[0]; }
+  size_t GetTargetSlicePitch() { return TargetPitch[1]; }
+  size_t GetSourceRowPitch() { return SourcePitch[0]; }
+  size_t GetSourceSlicePitch() { return SourcePitch[1]; }
+
+private:
+  llvm::IntrusiveRefCntPtr<Buffer> Target;
+  llvm::IntrusiveRefCntPtr<Buffer> Source;
+  const size_t *Region;
+  size_t TargetOffset;
+  size_t SourceOffset;
+  size_t *TargetPitch;
+  size_t *SourcePitch;
+  
+  friend class EnqueueCopyBufferRectBuilder;
 };
 
 class EnqueueNDRangeKernel : public Command {
@@ -295,9 +417,12 @@ public:
   enum Type {
     EnqueueReadBufferBuilder,
     EnqueueWriteBufferBuilder,
-		EnqueueCopyBufferBuilder,
-		EnqueueMapBufferBuilder,
-		EnqueueUnmapMemObjectBuilder,
+    EnqueueCopyBufferBuilder,
+    EnqueueMapBufferBuilder,
+    EnqueueUnmapMemObjectBuilder,
+    EnqueueReadBufferRectBuilder,
+    EnqueueWriteBufferRectBuilder,
+    EnqueueCopyBufferRectBuilder,
     EnqueueNDRangeKernelBuilder,
     EnqueueNativeKernelBuilder
   };
@@ -397,10 +522,10 @@ public:
   }
 
 public:
-  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem SrcBuf, cl_mem DstBuf);
+  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
 
 public:
-  EnqueueCopyBufferBuilder &SetCopyArea(size_t SrcOffset, size_t DstOffset, size_t Size);
+  EnqueueCopyBufferBuilder &SetCopyArea(size_t DstOffset, size_t SrcOffset, size_t Size);
   EnqueueCopyBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueCopyBuffer *Create(cl_int *ErrCode);
@@ -413,30 +538,30 @@ private:
   }
 
 private:
-  Buffer *Source;
   Buffer *Target;
-  size_t Source_Offset;
+  Buffer *Source;
   size_t Target_Offset;
+  size_t Source_Offset;
   size_t Size;
 };
 
 class EnqueueMapBufferBuilder : public CommandBuilder {
 public:
-	static bool classof(const CommandBuilder *Bld) {
-		return Bld->GetType() == CommandBuilder::EnqueueMapBufferBuilder;
-	}
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueMapBufferBuilder;
+  }
 
 public:
-	EnqueueMapBufferBuilder(Context &Ctx, cl_mem Buf);
-	
+  EnqueueMapBufferBuilder(Context &Ctx, cl_mem Buf);
+  
 public:
-	EnqueueMapBufferBuilder &SetBlocking(bool Blocking = true);
-	EnqueueMapBufferBuilder &SetMapFlags(cl_map_flags MapFlags);
-	EnqueueMapBufferBuilder &SetMapArea(size_t Offset, size_t Size);
-	EnqueueMapBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
-	EnqueueMapBufferBuilder &SetMapBuffer(void *MapBuf);
-	
-	EnqueueMapBuffer *Create(cl_int *ErrCode);
+  EnqueueMapBufferBuilder &SetBlocking(bool Blocking = true);
+  EnqueueMapBufferBuilder &SetMapFlags(cl_map_flags MapFlags);
+  EnqueueMapBufferBuilder &SetMapArea(size_t Offset, size_t Size);
+  EnqueueMapBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  EnqueueMapBufferBuilder &SetMapBuffer(void *MapBuf);
+  
+  EnqueueMapBuffer *Create(cl_int *ErrCode);
 
 private:
   EnqueueMapBufferBuilder &NotifyError(cl_int ErrCode,
@@ -444,41 +569,165 @@ private:
     CommandBuilder::NotifyError(ErrCode, Msg);
     return *this;
   }
-	
+  
 private:
-	Buffer *Source;
-	bool Blocking;
-	cl_map_flags MapFlags;
-	size_t Offset;
-	size_t Size;
-	
-	void *MapBuf;
+  Buffer *Source;
+  bool Blocking;
+  cl_map_flags MapFlags;
+  size_t Offset;
+  size_t Size;
+  void *MapBuf;
 };
 
 class EnqueueUnmapMemObjectBuilder : public CommandBuilder {
 public:
-	static bool classof(const CommandBuilder *Bld) {
-		return Bld->GetType() == CommandBuilder::EnqueueUnmapMemObjectBuilder;
-	}
-	
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueUnmapMemObjectBuilder;
+  }
+  
 public:
-	EnqueueUnmapMemObjectBuilder(Context &Ctx, cl_mem MemObj, void *MappedPtr);
-	
+  EnqueueUnmapMemObjectBuilder(Context &Ctx, cl_mem MemObj, void *MappedPtr);
+  
 public:
-	EnqueueUnmapMemObjectBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  EnqueueUnmapMemObjectBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueUnmapMemObject *Create(cl_int *ErrCode);
 
 private:
   EnqueueUnmapMemObjectBuilder &NotifyError(cl_int ErrCode,
-																						const char *Msg = "") {
+                                            const char *Msg = "") {
     CommandBuilder::NotifyError(ErrCode, Msg);
     return *this;
   }
 
 private:
-	MemoryObj *MemObj;
-	void *MappedPtr;
+  MemoryObj *MemObj;
+  void *MappedPtr;
+};
+
+class EnqueueReadBufferRectBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueReadBufferRectBuilder;
+  }
+
+public:
+  EnqueueReadBufferRectBuilder(Context &Ctx, cl_mem Buf, void *Ptr);
+  
+public:
+  EnqueueReadBufferRectBuilder &SetBlocking(bool Blocking = true);
+  EnqueueReadBufferRectBuilder &SetRegion(const size_t *Region);
+  EnqueueReadBufferRectBuilder &SetTargetOffset(const size_t *TargetOrigin,
+                                                size_t TargetRowPitch,
+                                                size_t TargetSlicePitch);
+  EnqueueReadBufferRectBuilder &SetSourceOffset(const size_t *SourceOrigin,
+                                                size_t SourceRowPitch,
+                                                size_t SourceSlicePitch);
+  EnqueueReadBufferRectBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueReadBufferRect *Create(cl_int *ErrCode);
+
+private:
+  EnqueueReadBufferRectBuilder &NotifyError(cl_int ErrCode,
+                                            const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+  void *Target;
+  Buffer *Source;
+  bool Blocking;
+  const size_t *Region;
+  const size_t *TargetOrigin;
+  const size_t *SourceOrigin;
+  size_t TargetPitch[2];
+  size_t SourcePitch[2];
+  size_t TargetOffset;
+  size_t SourceOffset;
+};
+
+class EnqueueWriteBufferRectBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueWriteBufferRectBuilder;
+  }
+
+public:
+  EnqueueWriteBufferRectBuilder(Context &Ctx, cl_mem Buf, const void *Ptr);
+
+public:
+  EnqueueWriteBufferRectBuilder &SetBlocking(bool Blocking = true);
+  EnqueueWriteBufferRectBuilder &SetRegion(const size_t *Region);
+  EnqueueWriteBufferRectBuilder &SetTargetOffset(const size_t *TargetOrigin,
+                                                 size_t TargetRowPitch,
+                                                 size_t TargetSlicePitch);
+  EnqueueWriteBufferRectBuilder &SetSourceOffset(const size_t *SourceOrigin,
+                                                 size_t SourceRowPitch,
+                                                 size_t SourceSlicePitch);  
+  EnqueueWriteBufferRectBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueWriteBufferRect *Create(cl_int *ErrCode);
+
+private:
+  EnqueueWriteBufferRectBuilder &NotifyError(cl_int ErrCode,
+                                             const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+  Buffer *Target;
+  const void *Source;
+  bool Blocking;
+  const size_t *Region;
+  const size_t *TargetOrigin;
+  const size_t *SourceOrigin;
+  size_t TargetPitch[2];
+  size_t SourcePitch[2];
+  size_t TargetOffset;
+  size_t SourceOffset;  
+};
+
+class EnqueueCopyBufferRectBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueCopyBufferRectBuilder;
+  }
+  
+public:
+  EnqueueCopyBufferRectBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
+  
+public:
+  EnqueueCopyBufferRectBuilder &SetRegion(const size_t *Region);
+  EnqueueCopyBufferRectBuilder &SetTargetOffset(const size_t *TargetOrigin,
+                                                size_t TargetRowPitch,
+                                                size_t TargetSlicePitch);
+  EnqueueCopyBufferRectBuilder &SetSourceOffset(const size_t *SourceOrigin,
+                                                size_t SourceRowPitch,
+                                                size_t SourceSlicePitch);
+  EnqueueCopyBufferRectBuilder &CheckCopyOverlap();
+  EnqueueCopyBufferRectBuilder &SetWaitList(unsigned N, const cl_event *Evs);                                                
+  
+  EnqueueCopyBufferRect *Create(cl_int *ErrCode);
+
+private:
+  EnqueueCopyBufferRectBuilder &NotifyError(cl_int ErrCode,
+                                            const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+  
+private:
+  Buffer *Target;
+  Buffer *Source;
+  const size_t *Region;
+  const size_t *TargetOrigin;
+  const size_t *SourceOrigin;
+  size_t TargetPitch[2];
+  size_t SourcePitch[2];
+  size_t TargetOffset;
+  size_t SourceOffset;
 };
 
 class EnqueueNDRangeKernelBuilder : public CommandBuilder {

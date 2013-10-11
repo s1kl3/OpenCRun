@@ -14,53 +14,53 @@ MemoryObj::~MemoryObj() {
 }
 
 bool MemoryObj::AddNewMapping(void *MapBuf,
-															size_t Offset,
-															size_t Size,
-															unsigned long MapFlags) {
-	if(!MapBuf)
-		return false;
-		
-	if(Size == 0)
-		return false;
+                              size_t Offset,
+                              size_t Size,
+                              unsigned long MapFlags) {
+  if(!MapBuf)
+    return false;
+    
+  if(Size == 0)
+    return false;
     
   if(MapFlags == 0)
     return false;
-	
+  
   MappingInfo Infos;
 
-	Infos.Offset = Offset;
-	Infos.Size = Size;
-	Infos.MapFlags = MapFlags;
-	
+  Infos.Offset = Offset;
+  Infos.Size = Size;
+  Infos.MapFlags = MapFlags;
+  
   llvm::sys::ScopedLock Lock(ThisLock);
-	
+  
   // This will handle also the (CL_MAP_READ | CL_MAP_WRITE) case.
-	if(MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
+  if(MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
     if(Maps.count(MapBuf))
-			return false;
+      return false;
 
-		// We have to check that the mapped region doesn't overlap
-		// with any other mapped region of the same memory object.
-		for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I) {
-			if((Offset <= (I->second.Offset + I->second.Size))
-				&& ((Offset + Size) >=  I->second.Offset))
-				return false;
-		}
-	
-		Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
-	}
-	
+    // We have to check that the mapped region doesn't overlap
+    // with any other mapped region of the same memory object.
+    for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I) {
+      if((Offset <= (I->second.Offset + I->second.Size))
+        && ((Offset + Size) >=  I->second.Offset))
+        return false;
+    }
+  
+    Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
+  }
+  
   // This will handle read-only mappings.
-	else if(MapFlags & CL_MAP_READ)
-		// There can be multiple read mappings of overlapped regions.
-		Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
-	
-	return true;
+  else if(MapFlags & CL_MAP_READ)
+    // There can be multiple read mappings of overlapped regions.
+    Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
+  
+  return true;
 }
 
 bool MemoryObj::RemoveMapping(void *MapBuf) {
-	llvm::sys::ScopedLock Lock(ThisLock);
-	
+  llvm::sys::ScopedLock Lock(ThisLock);
+  
   // We remove the first found element with the given key value. In case of
   // read mappings with the same host address, this will remove the first
   // mapping record in the container (despite of its MappingInfo values). 
@@ -76,16 +76,16 @@ bool MemoryObj::RemoveMapping(void *MapBuf) {
 }													
 
 bool MemoryObj::IsValidMappingPtr(void *MapBuf) {
-	llvm::sys::ScopedLock Lock(ThisLock);
-	
-	return Maps.count(MapBuf) > 0 ? true : false;
+  llvm::sys::ScopedLock Lock(ThisLock);
+  
+  return Maps.count(MapBuf) > 0 ? true : false;
 }
 
 MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
-	maps_iterator it = Maps.find(MapBuf);
-	if(it == Maps.end())
+  maps_iterator it = Maps.find(MapBuf);
+  if(it == Maps.end())
     return NULL;
-		
+    
   return &(it->second);
 }
 
@@ -104,9 +104,9 @@ BufferBuilder::BufferBuilder(Context &Ctx, size_t Size) :
   Ctx(Ctx),
   Size(Size),
   HostPtr(NULL),
-	HostPtrMode(MemoryObj::NoHostPtrUsage),
+  HostPtrMode(MemoryObj::NoHostPtrUsage),
   AccessProt(MemoryObj::InvalidProtection),
-	HostAccessProt(MemoryObj::HostNoProtection),
+  HostAccessProt(MemoryObj::HostNoProtection),
   ErrCode(CL_SUCCESS) {
   if(!Size) {
     NotifyError(CL_INVALID_BUFFER_SIZE, "buffer size must be greater than 0");
@@ -132,7 +132,7 @@ BufferBuilder &BufferBuilder::SetUseHostMemory(bool Enabled, void* Storage) {
       return NotifyError(CL_INVALID_VALUE,
                          "multiple buffer storage specifiers not allowed");
 
-		HostPtrMode = MemoryObj::UseHostPtr;
+    HostPtrMode = MemoryObj::UseHostPtr;
     HostPtr = Storage;
   }
 
@@ -205,45 +205,45 @@ BufferBuilder &BufferBuilder::SetReadOnly(bool Enabled) {
 }
 
 BufferBuilder &BufferBuilder::SetHostWriteOnly(bool Enabled) {
-	if(Enabled) {
-		if(HostAccessProt == MemoryObj::HostReadOnly || 
-				HostAccessProt == MemoryObj::HostNoAccess)
-			return NotifyError(CL_INVALID_VALUE,
-												 "multiple host access protection flags not allowed");
-		
-		// TODO: Implement optimization strategy.
-		HostAccessProt = MemoryObj::HostWriteOnly;
-	}
-	
-	return *this;
+  if(Enabled) {
+    if(HostAccessProt == MemoryObj::HostReadOnly || 
+        HostAccessProt == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_VALUE,
+                         "multiple host access protection flags not allowed");
+    
+    // TODO: Implement optimization strategy.
+    HostAccessProt = MemoryObj::HostWriteOnly;
+  }
+  
+  return *this;
 }
 
 BufferBuilder &BufferBuilder::SetHostReadOnly(bool Enabled) {
-	if(Enabled) {
-		if(HostAccessProt == MemoryObj::HostWriteOnly || 
-				HostAccessProt == MemoryObj::HostNoAccess)
-			return NotifyError(CL_INVALID_VALUE,
-												 "multiple host access protection flags not allowed");
-		
-		// TODO: Implement optimization strategy.
-		HostAccessProt = MemoryObj::HostReadOnly;
-	}
-	
-	return *this;
+  if(Enabled) {
+    if(HostAccessProt == MemoryObj::HostWriteOnly || 
+        HostAccessProt == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_VALUE,
+                         "multiple host access protection flags not allowed");
+    
+    // TODO: Implement optimization strategy.
+    HostAccessProt = MemoryObj::HostReadOnly;
+  }
+  
+  return *this;
 }
 
 BufferBuilder &BufferBuilder::SetHostNoAccess(bool Enabled) {
-	if(Enabled) {
-		if(HostAccessProt == MemoryObj::HostWriteOnly || 
-				HostAccessProt == MemoryObj::HostReadOnly)
-			return NotifyError(CL_INVALID_VALUE,
-												 "multiple host access protection flags not allowed");
-		
-		// TODO: Implement optimization strategy.
-		HostAccessProt = MemoryObj::HostNoAccess;
-	}
-	
-	return *this;
+  if(Enabled) {
+    if(HostAccessProt == MemoryObj::HostWriteOnly || 
+        HostAccessProt == MemoryObj::HostReadOnly)
+      return NotifyError(CL_INVALID_VALUE,
+                         "multiple host access protection flags not allowed");
+    
+    // TODO: Implement optimization strategy.
+    HostAccessProt = MemoryObj::HostNoAccess;
+  }
+  
+  return *this;
 }
 
 Buffer *BufferBuilder::Create(cl_int *ErrCode) {
