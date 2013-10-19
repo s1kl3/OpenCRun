@@ -24,6 +24,7 @@ public:
     ReadBufferRect,
     WriteBufferRect,
     CopyBufferRect,
+    FillBuffer,
     NativeKernel,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
@@ -238,13 +239,13 @@ public:
   }
 
 public:
-  WriteBufferCPUCommand(EnqueueWriteBuffer &Cmd, void *Target)
+  WriteBufferCPUCommand(EnqueueWriteBuffer &Cmd, void *Dst)
     : CPUExecCommand(CPUCommand::WriteBuffer, Cmd),
-      Target(Target) { }
+      Dst(Dst) { }
 
 public:
   void *GetTarget() {
-    uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
     EnqueueWriteBuffer &Cmd = GetQueueCommandAs<EnqueueWriteBuffer>();
     
     return reinterpret_cast<void *>(Base + Cmd.GetOffset());
@@ -259,7 +260,7 @@ public:
   }
 
 private:
-  void *Target;
+  void *Dst;
 };
 
 class CopyBufferCPUCommand : public CPUExecCommand {
@@ -270,22 +271,22 @@ public:
 
 public:
   CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
-                       void *Target,
-                       const void *Source)
+                       void *Dst,
+                       const void *Src)
     :	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
-      Target(Target),
-      Source(Source) { }
+      Dst(Dst),
+      Src(Src) { }
     
 public:
   void *GetTarget() {
-    uintptr_t Base = reinterpret_cast<uintptr_t>(Target);
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
     EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
     
     return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
   }
   
   const void *GetSource() {
-    uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
     EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
     
     return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
@@ -296,8 +297,8 @@ public:
   }
 
 private:
-  void *Target;
-  const void *Source;
+  void *Dst;
+  const void *Src;
 };
 
 class MapBufferCPUCommand : public CPUExecCommand {
@@ -308,9 +309,9 @@ public:
     
 public:
   MapBufferCPUCommand(EnqueueMapBuffer &Cmd,
-                      const void *Source)
+                      const void *Src)
     :	CPUExecCommand(CPUCommand::MapBuffer, Cmd),
-      Source(Source) { }
+      Src(Src) { }
 
 public:
   void *GetTarget() {
@@ -318,7 +319,7 @@ public:
   }
       
   const void *GetSource() {
-    uintptr_t Base = reinterpret_cast<uintptr_t>(Source);
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
     EnqueueMapBuffer &Cmd = GetQueueCommandAs<EnqueueMapBuffer>();
     
     return reinterpret_cast<void *>(Base + Cmd.GetOffset());
@@ -329,7 +330,7 @@ public:
   }
   
 private:
-  const void *Source;
+  const void *Src;
 };
 
 class UnmapMemObjectCPUCommand : public CPUExecCommand {
@@ -513,6 +514,41 @@ public:
 private:
   void *Dst;
   void *Src;
+};
+
+class FillBufferCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::FillBuffer;
+  }
+
+public:
+  FillBufferCPUCommand(EnqueueFillBuffer &Cmd,
+                       void *Dst)
+    : CPUExecCommand(CPUCommand::FillBuffer, Cmd),
+      Dst(Dst) { }
+      
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueFillBuffer &Cmd = GetQueueCommandAs<EnqueueFillBuffer>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());  
+  }
+  
+  const void *GetSource() {
+    return GetQueueCommandAs<EnqueueFillBuffer>().GetSource();
+  }
+
+  size_t GetTargetSize() {
+    return GetQueueCommandAs<EnqueueFillBuffer>().GetTargetSize();
+  }
+
+  size_t GetSourceSize() {
+    return GetQueueCommandAs<EnqueueFillBuffer>().GetSourceSize();
+  }
+  
+private:
+  void *Dst;
 };
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {

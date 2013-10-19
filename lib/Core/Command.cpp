@@ -41,14 +41,14 @@ bool Command::IsProfiled() const {
 //
 
 EnqueueReadBuffer::EnqueueReadBuffer(void *Target,
-                                     Buffer &Src,
+                                     Buffer &Source,
                                      bool Blocking,
                                      size_t Offset,
                                      size_t Size,
                                      EventsContainer &WaitList)
   : Command(Command::ReadBuffer, WaitList, Blocking),
     Target(Target),
-    Src(&Src),
+    Source(&Source),
     Offset(Offset),
     Size(Size) { }
 
@@ -57,14 +57,14 @@ EnqueueReadBuffer::EnqueueReadBuffer(void *Target,
 //
 
 EnqueueWriteBuffer::EnqueueWriteBuffer(Buffer &Target,
-                                       const void *Src,
+                                       const void *Source,
                                        bool Blocking,
                                        size_t Offset,
                                        size_t Size,
                                        EventsContainer &WaitList)
   : Command(Command::WriteBuffer, WaitList, Blocking),
     Target(&Target),
-    Src(Src),
+    Source(Source),
     Offset(Offset),
     Size(Size) { }
 
@@ -72,24 +72,24 @@ EnqueueWriteBuffer::EnqueueWriteBuffer(Buffer &Target,
 // EnqueueCopyBuffer implementation.
 //
 
-EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Dst,
-                                     Buffer &Src,
-                                     size_t Dst_Offset,
-                                     size_t Src_Offset,
+EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Target,
+                                     Buffer &Source,
+                                     size_t TargetOffset,
+                                     size_t SourceOffset,
                                      size_t Size,
                                      EventsContainer &WaitList)
   : Command(Command::CopyBuffer, WaitList),
-    Target(&Dst),
-    Source(&Src),
-    Target_Offset(Dst_Offset),
-    Source_Offset(Src_Offset),
+    Target(&Target),
+    Source(&Source),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset),
     Size(Size) { }
 
 //
 // EnqueueMapBuffer implementation.
 //
 
-EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Src,
+EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Source,
                                    bool Blocking,
                                    cl_map_flags MapFlags,
                                    size_t Offset,
@@ -97,7 +97,7 @@ EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Src,
                                    void *MapBuf,
                                    EventsContainer &WaitList)
   :	Command(Command::MapBuffer, WaitList, Blocking),
-    Source(&Src),
+    Source(&Source),
     MapFlags(MapFlags),
     Offset(Offset),
     Size(Size),
@@ -178,6 +178,32 @@ EnqueueCopyBufferRect::EnqueueCopyBufferRect(Buffer &Target,
     SourceOffset(SourceOffset),
     TargetPitch(TargetPitch),
     SourcePitch(SourcePitch) { }
+    
+//
+// EnqueueFillBuffer implementation.
+//
+
+EnqueueFillBuffer::EnqueueFillBuffer(Buffer &Target,
+                                     const void *Source,
+                                     size_t SourceSize,
+                                     size_t TargetOffset,
+                                     size_t TargetSize,
+                                     EventsContainer &WaitList)
+  : Command(Command::FillBuffer, WaitList),
+    Target(&Target),
+    Source(NULL),
+    SourceSize(SourceSize),
+    TargetOffset(TargetOffset),
+    TargetSize(TargetSize) { 
+  // The memory associated with pattern can be reused or 
+  // freed after the API clEnqueueFillBuffer returns. 
+  this->Source = std::malloc(SourceSize);
+  std::memcpy(const_cast<void *>(this->Source), Source, SourceSize); 
+}                                     
+
+EnqueueFillBuffer::~EnqueueFillBuffer() {
+  std::free(const_cast<void *>(Source));
+}
     
 //
 // EnqueueNDRangeKernel implementation.
@@ -292,7 +318,7 @@ EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
   cl_mem Buf,
   void *Target) : CommandBuilder(CommandBuilder::EnqueueReadBufferBuilder,
                                  Ctx),
-                  Src(NULL),
+                  Source(NULL),
                   Target(Target),
                   Blocking(false),
                   Offset(0),
@@ -300,14 +326,14 @@ EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
   if(!Buf)
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
 
-  else if(!(Src = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
   
-  else if((Src->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
-          (Src->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+  else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
+          (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
           
     NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
-  else if(Ctx != Src->GetContext())
+  else if(Ctx != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Target)
@@ -327,10 +353,10 @@ EnqueueReadBufferBuilder &EnqueueReadBufferBuilder::SetBlocking(
 
 EnqueueReadBufferBuilder &EnqueueReadBufferBuilder::SetCopyArea(size_t Offset,
                                                                 size_t Size) {
-  if(!Src)
+  if(!Source)
     return *this;
 
-  if(Offset + Size > Src->GetSize())
+  if(Offset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "out of bounds buffer read");
 
   // TODO: checking for sub-buffers.
@@ -369,7 +395,7 @@ EnqueueReadBuffer *EnqueueReadBufferBuilder::Create(cl_int *ErrCode) {
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return new EnqueueReadBuffer(Target, *Src, Blocking, Offset, Size, WaitList);
+  return new EnqueueReadBuffer(Target, *Source, Blocking, Offset, Size, WaitList);
 }
 
 //
@@ -379,13 +405,13 @@ EnqueueReadBuffer *EnqueueReadBufferBuilder::Create(cl_int *ErrCode) {
 EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
   Context &Ctx,
   cl_mem Buf,
-  const void *Src) : CommandBuilder(CommandBuilder::EnqueueWriteBufferBuilder,
+  const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteBufferBuilder,
                                     Ctx),
-                     Target(NULL),
-                     Src(Src),
-                     Blocking(false),
-                     Offset(0),
-                     Size(0) {
+                        Target(NULL),
+                        Source(Source),
+                        Blocking(false),
+                        Offset(0),
+                        Size(0) {
   if(!Buf)
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
 
@@ -395,7 +421,7 @@ EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
   else if(Ctx != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
-  if(!Src)
+  if(!Source)
     NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
 }
 
@@ -416,7 +442,7 @@ EnqueueWriteBufferBuilder &EnqueueWriteBufferBuilder::SetCopyArea(size_t Offset,
     return *this;
 
   if(Offset + Size > Target->GetSize())
-    return NotifyError(CL_INVALID_VALUE, "data size exceed buffer capacity");
+    return NotifyError(CL_INVALID_VALUE, "data size exceeds buffer capacity");
 
   // TODO: checking for sub-buffers.
 
@@ -454,7 +480,7 @@ EnqueueWriteBuffer *EnqueueWriteBufferBuilder::Create(cl_int *ErrCode) {
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return new EnqueueWriteBuffer(*Target, Src, Blocking, Offset, Size, WaitList);
+  return new EnqueueWriteBuffer(*Target, Source, Blocking, Offset, Size, WaitList);
 }
 
 //
@@ -463,49 +489,49 @@ EnqueueWriteBuffer *EnqueueWriteBufferBuilder::Create(cl_int *ErrCode) {
 
 EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
   Context &Ctx,
-  cl_mem DstBuf,
-  cl_mem SrcBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
+  cl_mem TargetBuf,
+  cl_mem SourceBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
                                   Ctx),
-                   Target(NULL),
-                   Source(NULL),
-                   Target_Offset(0),
-                   Source_Offset(0),
-                   Size(0) {
-  if(!DstBuf)
+                      Target(NULL),
+                      Source(NULL),
+                      TargetOffset(0),
+                      SourceOffset(0),
+                      Size(0) {
+  if(!TargetBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
   
-  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
     
   else if(Ctx != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
   
-  if(!SrcBuf)
+  if(!SourceBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
 
-  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SrcBuf))))
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not a buffer");				 
     
   else if(Ctx != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context"); 
 }
 
-EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t DstOffset,
-                                                                size_t SrcOffset,
+EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t TargetOffset,
+                                                                size_t SourceOffset,
                                                                 size_t Size) {
   if(!Target || !Source)
     return *this;
 
-  if(DstOffset + Size > Target->GetSize())
-    return NotifyError(CL_INVALID_VALUE, "data size exceed destination buffer capacity");
+  if(TargetOffset + Size > Target->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "data size exceeds destination buffer capacity");
     
-  if(SrcOffset + Size > Source->GetSize())
-    return NotifyError(CL_INVALID_VALUE, "data size exceed source buffer capacity");
+  if(SourceOffset + Size > Source->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "data size exceeds source buffer capacity");
   
   // TODO: checking for sub-buffers.
 
-  this->Target_Offset = DstOffset;
-  this->Source_Offset = SrcOffset;
+  this->TargetOffset = TargetOffset;
+  this->SourceOffset = SourceOffset;
   this->Size = Size;
 
   return *this;
@@ -535,7 +561,7 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return new EnqueueCopyBuffer(*Target, *Source, Target_Offset, Source_Offset, Size, WaitList);
+  return new EnqueueCopyBuffer(*Target, *Source, TargetOffset, SourceOffset, Size, WaitList);
 }
 
 //
@@ -1027,29 +1053,29 @@ EnqueueWriteBufferRect *EnqueueWriteBufferRectBuilder::Create(cl_int *ErrCode) {
 
 EnqueueCopyBufferRectBuilder::EnqueueCopyBufferRectBuilder(
   Context &Ctx,
-  cl_mem DstBuf,
-  cl_mem SrcBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferRectBuilder,
+  cl_mem TargetBuf,
+  cl_mem SourceBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferRectBuilder,
                                   Ctx),
-               Target(NULL),
-               Source(NULL),
-               Region(NULL),
-               TargetOrigin(NULL),
-               SourceOrigin(NULL),
-               TargetOffset(0),
-               SourceOffset(0) {
-  if(!DstBuf)
+                      Target(NULL),
+                      Source(NULL),
+                      Region(NULL),
+                      TargetOrigin(NULL),
+                      SourceOrigin(NULL),
+                      TargetOffset(0),
+                      SourceOffset(0) {
+  if(!TargetBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
 
-  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(DstBuf))))
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
   
   else if(Ctx != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
     
-  if(!SrcBuf)
+  if(!SourceBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
 
-  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SrcBuf))))
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
   
   else if(Ctx != Source->GetContext())
@@ -1257,6 +1283,92 @@ EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
 }
 
 //
+// EnqueueFillBufferBuilder implementation.
+//
+
+EnqueueFillBufferBuilder::EnqueueFillBufferBuilder(
+  Context &Ctx,
+  cl_mem Buf,
+  const void *Pattern) :
+  CommandBuilder(CommandBuilder::EnqueueFillBufferBuilder, Ctx),
+  Target(NULL),
+  Source(Pattern),
+  SourceSize(0),
+  TargetOffset(0),
+  TargetSize(0) {
+  if(!Buf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "fill target is null");
+
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "fill target is not a buffer");
+  
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
+    
+  if(!Source)
+    NotifyError(CL_INVALID_VALUE, "pointer to pattern is null");  
+}
+
+EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetPatternSize(
+  size_t PatternSize) {
+  if(PatternSize == 0)
+    return NotifyError(CL_INVALID_VALUE, "pattern size is zero");
+    
+  if((PatternSize & (PatternSize - 1)) || 
+     (PatternSize > 128))
+    return NotifyError(CL_INVALID_VALUE, "invalid pattern size");
+  
+  SourceSize = PatternSize;
+  
+  return *this;
+}
+
+EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetFillRegion(
+  size_t Offset,
+  size_t Size) {
+  if((Offset % SourceSize) != 0)
+    return NotifyError(CL_INVALID_VALUE, "fill offset is not a multiple of pattern size");
+    
+  if((Size % SourceSize) != 0)
+    return NotifyError(CL_INVALID_VALUE, "fill size is not a multiple of pattern size");
+  
+  if(Offset + Size > Target->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "fill region size exceeds destination buffer capacity");
+  
+  TargetOffset = Offset;
+  TargetSize = Size;
+  
+  return *this;
+}
+
+EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueFillBufferBuilder>(Super);
+}
+
+EnqueueFillBuffer *EnqueueFillBufferBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueFillBuffer(*Target, Source, SourceSize, TargetOffset, TargetSize, WaitList);
+}
+
+//
 // EnqueueNDRangeKernelBuilder implementation.
 //
 
@@ -1348,7 +1460,7 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
   for(unsigned I = 0; I < WorkDimensions; ++I) {
     if(LocalWorkSizes[I] > MaxWorkItemSizes[I])
       return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
-                         "work group size exceed device limits");
+                         "work group size exceeds device limits");
 
     if(GlobalWorkSizes[I] % LocalWorkSizes[I])
       return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
@@ -1367,7 +1479,7 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
 
   if(WorkGroupSize > Dev.GetMaxWorkGroupSize())
     return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
-                       "work group size exceed device limits");
+                       "work group size exceeds device limits");
 
   return *this;
 }

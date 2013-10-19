@@ -35,6 +35,7 @@ public:
   bool Submit(ReadBufferRectCPUCommand *Cmd);
   bool Submit(WriteBufferRectCPUCommand *Cmd);
   bool Submit(CopyBufferRectCPUCommand *Cmd);
+  bool Submit(FillBufferCPUCommand *Cmd);
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd);
   bool Submit(NativeKernelCPUCommand *Cmd);
 

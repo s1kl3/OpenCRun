@@ -353,6 +353,10 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
     return Submit(CopyRect);
   
+  else if(FillBufferCPUCommand *Fill =
+            llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
+    return Submit(Fill);
+  
   else if(NDRangeKernelBlockCPUCommand *NDBlock =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     return Submit(NDBlock);
@@ -433,8 +437,12 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   
   else if(CopyBufferRectCPUCommand *OnFly =
             llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);    
-    
+    ExitStatus = Execute(*OnFly);
+  
+  else if(FillBufferCPUCommand *OnFly =
+            llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
   else if(NDRangeKernelBlockCPUCommand *OnFly =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -534,6 +542,39 @@ int CPUThread::Execute(CopyBufferRectCPUCommand &Cmd) {
              Cmd.GetSourceRowPitch(),
              Cmd.GetSourceSlicePitch());
              
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(FillBufferCPUCommand &Cmd) {
+  size_t NumEls = Cmd.GetTargetSize() / Cmd.GetSourceSize();
+  
+  switch(Cmd.GetSourceSize()) {
+  case 1: 
+    MemFill<cl_uchar>(Cmd.GetTarget(), Cmd.GetSource(), NumEls);
+    break;
+  case 2:
+    MemFill<cl_ushort>(Cmd.GetTarget(), Cmd.GetSource(), NumEls);
+    break;
+  case 4:
+    MemFill<cl_uint>(Cmd.GetTarget(), Cmd.GetSource(), NumEls);
+    break;
+  case 8:
+    MemFill<cl_ulong>(Cmd.GetTarget(), Cmd.GetSource(), NumEls);
+    break;
+  case 16:
+    MemFill<cl_float4>(Cmd.GetTarget(), Cmd.GetSource(), NumEls); 
+    break;
+  case 32:
+    MemFill<cl_float8>(Cmd.GetTarget(), Cmd.GetSource(), NumEls); 
+    break;
+  case 64:
+    MemFill<cl_float16>(Cmd.GetTarget(), Cmd.GetSource(), NumEls); 
+    break;
+  case 128:
+    MemFill<cl_double16>(Cmd.GetTarget(), Cmd.GetSource(), NumEls); 
+    break;
+  }
+  
   return CPUCommand::NoError;
 }
 

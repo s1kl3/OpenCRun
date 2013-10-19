@@ -69,6 +69,7 @@ private:
   bool Submit(EnqueueReadBufferRect &Cmd);
   bool Submit(EnqueueWriteBufferRect &Cmd);
   bool Submit(EnqueueCopyBufferRect &Cmd);
+  bool Submit(EnqueueFillBuffer &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
 

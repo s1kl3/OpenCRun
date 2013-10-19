@@ -24,6 +24,8 @@ class MemoryObj;
 class Command {
 public:
   enum Type {
+    NDRangeKernel = CL_COMMAND_NDRANGE_KERNEL,
+    NativeKernel = CL_COMMAND_NATIVE_KERNEL,
     ReadBuffer = CL_COMMAND_READ_BUFFER,
     WriteBuffer = CL_COMMAND_WRITE_BUFFER,
     CopyBuffer = CL_COMMAND_COPY_BUFFER,
@@ -32,8 +34,7 @@ public:
     ReadBufferRect = CL_COMMAND_READ_BUFFER_RECT,
     WriteBufferRect = CL_COMMAND_WRITE_BUFFER_RECT,
     CopyBufferRect = CL_COMMAND_COPY_BUFFER_RECT,
-    NDRangeKernel = CL_COMMAND_NDRANGE_KERNEL,
-    NativeKernel = CL_COMMAND_NATIVE_KERNEL
+    FillBuffer = CL_COMMAND_FILL_BUFFER
   };
 
 public:
@@ -87,7 +88,7 @@ public:
 
 private:
   EnqueueReadBuffer(void *Target,
-                    Buffer &Src,
+                    Buffer &Source,
                     bool Blocking,
                     size_t Offset,
                     size_t Size,
@@ -95,13 +96,13 @@ private:
 
 public:
   void *GetTarget() { return Target; }
-  Buffer &GetSource() { return *Src; }
+  Buffer &GetSource() { return *Source; }
   size_t GetOffset() { return Offset; }
   size_t GetSize() { return Size; }
 
 private:
   void *Target;
-  llvm::IntrusiveRefCntPtr<Buffer> Src;
+  llvm::IntrusiveRefCntPtr<Buffer> Source;
   size_t Offset;
   size_t Size;
 
@@ -116,7 +117,7 @@ public:
 
 private:
   EnqueueWriteBuffer(Buffer &Target,
-                     const void *Src,
+                     const void *Source,
                      bool Blocking,
                      size_t Offset,
                      size_t Size,
@@ -124,13 +125,13 @@ private:
 
 public:
   Buffer &GetTarget() { return *Target; }
-  const void *GetSource() { return Src; }
+  const void *GetSource() { return Source; }
   size_t GetOffset() { return Offset; }
   size_t GetSize() { return Size; }
 
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Target;
-  const void *Src;
+  const void *Source;
   size_t Offset;
   size_t Size;
 
@@ -144,25 +145,25 @@ public:
   }
   
 private:
-  EnqueueCopyBuffer(Buffer &Dst,
-                    Buffer &Src,
-                    size_t Src_Offset,
-                    size_t Dst_Offset,
+  EnqueueCopyBuffer(Buffer &Target,
+                    Buffer &Source,
+                    size_t SourceOffset,
+                    size_t TargetOffset,
                     size_t Size,
                     EventsContainer &WaitList);
                     
 public:
   Buffer &GetTarget() { return *Target; }
   Buffer &GetSource() { return *Source; }
-  size_t GetTargetOffset() { return Target_Offset; }
-  size_t GetSourceOffset() { return Source_Offset; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetSourceOffset() { return SourceOffset; }
   size_t GetSize() { return Size; }
   
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Target;
   llvm::IntrusiveRefCntPtr<Buffer> Source;
-  size_t Target_Offset;
-  size_t Source_Offset;
+  size_t TargetOffset;
+  size_t SourceOffset;
   size_t Size;
   
   friend class EnqueueCopyBufferBuilder;
@@ -175,7 +176,7 @@ public:
   }
   
 private:
-  EnqueueMapBuffer(Buffer &Src,
+  EnqueueMapBuffer(Buffer &Source,
                    bool Blocking,
                    cl_map_flags MapFlags,
                    size_t Offset,
@@ -350,6 +351,39 @@ private:
   friend class EnqueueCopyBufferRectBuilder;
 };
 
+class EnqueueFillBuffer : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::FillBuffer;
+  }
+  
+private:
+  EnqueueFillBuffer(Buffer &Target,
+                    const void *Source,
+                    size_t SourceSize,
+                    size_t TargetOffset,
+                    size_t TargetSize,
+                    EventsContainer &WaitList);
+public:
+  ~EnqueueFillBuffer();
+                    
+public:
+  Buffer &GetTarget() { return *Target; }
+  const void *GetSource() { return Source; }
+  size_t GetSourceSize() { return SourceSize; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetTargetSize() { return TargetSize; }
+  
+private:
+  llvm::IntrusiveRefCntPtr<Buffer> Target;
+  const void *Source;
+  size_t SourceSize;
+  size_t TargetOffset;
+  size_t TargetSize;
+  
+  friend class EnqueueFillBufferBuilder;
+};
+
 class EnqueueNDRangeKernel : public Command {
 public:
   static bool classof(const Command *Cmd) {
@@ -415,6 +449,8 @@ private:
 class CommandBuilder {
 public:
   enum Type {
+    EnqueueNDRangeKernelBuilder,
+    EnqueueNativeKernelBuilder,
     EnqueueReadBufferBuilder,
     EnqueueWriteBufferBuilder,
     EnqueueCopyBufferBuilder,
@@ -423,8 +459,7 @@ public:
     EnqueueReadBufferRectBuilder,
     EnqueueWriteBufferRectBuilder,
     EnqueueCopyBufferRectBuilder,
-    EnqueueNDRangeKernelBuilder,
-    EnqueueNativeKernelBuilder
+    EnqueueFillBufferBuilder
   };
 
 protected:
@@ -477,7 +512,7 @@ private:
   }
 
 private:
-  Buffer *Src;
+  Buffer *Source;
   void *Target;
   bool Blocking;
   size_t Offset;
@@ -491,7 +526,7 @@ public:
   }
 
 public:
-  EnqueueWriteBufferBuilder(Context &Ctx, cl_mem Buf, const void *Src);
+  EnqueueWriteBufferBuilder(Context &Ctx, cl_mem Buf, const void *Source);
 
 public:
   EnqueueWriteBufferBuilder &SetBlocking(bool Blocking = true);
@@ -509,7 +544,7 @@ private:
 
 private:
   Buffer *Target;
-  const void *Src;
+  const void *Source;
   bool Blocking;
   size_t Offset;
   size_t Size;
@@ -522,10 +557,10 @@ public:
   }
 
 public:
-  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
+  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem TargetBuf, cl_mem SourceBuf);
 
 public:
-  EnqueueCopyBufferBuilder &SetCopyArea(size_t DstOffset, size_t SrcOffset, size_t Size);
+  EnqueueCopyBufferBuilder &SetCopyArea(size_t TargetOffset, size_t SourceOffset, size_t Size);
   EnqueueCopyBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueCopyBuffer *Create(cl_int *ErrCode);
@@ -540,8 +575,8 @@ private:
 private:
   Buffer *Target;
   Buffer *Source;
-  size_t Target_Offset;
-  size_t Source_Offset;
+  size_t TargetOffset;
+  size_t SourceOffset;
   size_t Size;
 };
 
@@ -696,7 +731,7 @@ public:
   }
   
 public:
-  EnqueueCopyBufferRectBuilder(Context &Ctx, cl_mem DstBuf, cl_mem SrcBuf);
+  EnqueueCopyBufferRectBuilder(Context &Ctx, cl_mem TargetBuf, cl_mem SourceBuf);
   
 public:
   EnqueueCopyBufferRectBuilder &SetRegion(const size_t *Region);
@@ -728,6 +763,37 @@ private:
   size_t SourcePitch[2];
   size_t TargetOffset;
   size_t SourceOffset;
+};
+
+class EnqueueFillBufferBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueFillBufferBuilder;
+  }
+  
+public:
+  EnqueueFillBufferBuilder(Context &Ctx, cl_mem Buf, const void *Pattern);
+  
+public:
+  EnqueueFillBufferBuilder &SetPatternSize(size_t PatternSize);
+  EnqueueFillBufferBuilder &SetFillRegion(size_t Offset, size_t Size);
+  EnqueueFillBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  
+  EnqueueFillBuffer *Create(cl_int *ErrCode);
+  
+private:
+  EnqueueFillBufferBuilder &NotifyError(cl_int ErrCode,
+                                            const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }  
+  
+private:
+  Buffer *Target;
+  const void *Source;
+  size_t SourceSize;
+  size_t TargetOffset;
+  size_t TargetSize;
 };
 
 class EnqueueNDRangeKernelBuilder : public CommandBuilder {

@@ -82,6 +82,7 @@ private:
   bool Submit(ReadBufferRectCPUCommand *Cmd) { return true; }
   bool Submit(WriteBufferRectCPUCommand *Cmd) { return true; }
   bool Submit(CopyBufferRectCPUCommand *Cmd) { return true; }
+  bool Submit(FillBufferCPUCommand *Cmd) { return true; }
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
   bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
 
@@ -100,6 +101,7 @@ private:
   int Execute(ReadBufferRectCPUCommand &Cmd);
   int Execute(WriteBufferRectCPUCommand &Cmd);
   int Execute(CopyBufferRectCPUCommand &Cmd);
+  int Execute(FillBufferCPUCommand &Cmd);
   int Execute(NDRangeKernelBlockCPUCommand &Cmd);
   int Execute(NativeKernelCPUCommand &Cmd);
   
@@ -110,6 +112,17 @@ private:
                   size_t TargetSlicePitch,
                   size_t SourceRowPitch,
                   size_t SourceSlicePitch);
+                  
+  template<typename T>
+  void MemFill(void *Target,
+               const void *Source,
+               size_t NumEls) {
+    T *Target_T = reinterpret_cast<T *>(Target);
+    const T Source_T = *(reinterpret_cast<const T *>(Source));
+
+    for(size_t I = 0; I < NumEls; ++I)
+      Target_T[I] = Source_T;
+  }
                   
 private:
   sys::Monitor ThisMnt;

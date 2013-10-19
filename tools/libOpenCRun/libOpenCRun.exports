@@ -57,6 +57,7 @@ clEnqueueReadBuffer
 clEnqueueReadBufferRect
 clEnqueueWriteBuffer
 clEnqueueWriteBufferRect
+clEnqueueFillBuffer
 clEnqueueCopyBuffer
 clEnqueueCopyBufferRect
 clEnqueueReadImage
