@@ -3,6 +3,8 @@
 #include "opencrun/Core/Context.h"
 #include "opencrun/Core/Device.h"
 
+#include <algorithm>
+
 using namespace opencrun;
 
 //
@@ -90,7 +92,7 @@ MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
 }
 
 //
-// BufferBuilder implementation.
+// MemoryObjBuilder implementation.
 //
 
 #define RETURN_WITH_ERROR(VAR) \
@@ -100,37 +102,14 @@ MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
   return NULL;                 \
   }
 
-BufferBuilder::BufferBuilder(Context &Ctx, size_t Size) :
-  Ctx(Ctx),
-  Size(Size),
-  HostPtr(NULL),
-  HostPtrMode(MemoryObj::NoHostPtrUsage),
-  AccessProt(MemoryObj::InvalidProtection),
-  HostAccessProt(MemoryObj::HostNoProtection),
-  ErrCode(CL_SUCCESS) {
-  if(!Size) {
-    NotifyError(CL_INVALID_BUFFER_SIZE, "buffer size must be greater than 0");
-    return;
-  }
-
-  for(Context::device_iterator I = Ctx.device_begin(), E = Ctx.device_end();
-                               I != E;
-                               ++I)
-    if(Size > (*I)->GetMaxMemoryAllocSize()) {
-      NotifyError(CL_INVALID_BUFFER_SIZE,
-                  "buffer size exceed device capabilities");
-      return;
-    }
-}
-
-BufferBuilder &BufferBuilder::SetUseHostMemory(bool Enabled, void* Storage) {
+MemoryObjBuilder &MemoryObjBuilder::SetUseHostMemory(bool Enabled, void* Storage) {
   if(Enabled) {
     if(!Storage)
       return NotifyError(CL_INVALID_HOST_PTR, "missing host storage pointer");
 
     if((HostPtrMode == MemoryObj::AllocHostPtr) || (HostPtrMode == MemoryObj::CopyHostPtr))
       return NotifyError(CL_INVALID_VALUE,
-                         "multiple buffer storage specifiers not allowed");
+                         "multiple memory object storage specifiers not allowed");
 
     HostPtrMode = MemoryObj::UseHostPtr;
     HostPtr = Storage;
@@ -139,11 +118,11 @@ BufferBuilder &BufferBuilder::SetUseHostMemory(bool Enabled, void* Storage) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetAllocHostMemory(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetAllocHostMemory(bool Enabled) {
   if(Enabled) {
     if(HostPtrMode == MemoryObj::UseHostPtr)
       return NotifyError(CL_INVALID_VALUE,
-                         "multiple buffer storage specifiers not allowed");
+                         "multiple memory object storage specifiers not allowed");
 
     HostPtrMode = MemoryObj::AllocHostPtr;
   }
@@ -151,7 +130,7 @@ BufferBuilder &BufferBuilder::SetAllocHostMemory(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
+MemoryObjBuilder &MemoryObjBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
   if(Enabled) {
     if(!Src)
       return NotifyError(CL_INVALID_HOST_PTR,
@@ -159,7 +138,7 @@ BufferBuilder &BufferBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
 
     if(HostPtrMode == MemoryObj::UseHostPtr)
       return NotifyError(CL_INVALID_VALUE,
-                         "multiple buffer storage specifiers not allowed");
+                         "multiple memory object storage specifiers not allowed");
 
     HostPtrMode = MemoryObj::CopyHostPtr;
     HostPtr = Src;
@@ -168,7 +147,7 @@ BufferBuilder &BufferBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetReadWrite(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetReadWrite(bool Enabled) {
   if(Enabled) {
     if(AccessProt == MemoryObj::ReadOnly || AccessProt == MemoryObj::WriteOnly)
       return NotifyError(CL_INVALID_VALUE,
@@ -180,7 +159,7 @@ BufferBuilder &BufferBuilder::SetReadWrite(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetWriteOnly(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetWriteOnly(bool Enabled) {
   if(Enabled) {
     if(AccessProt == MemoryObj::ReadWrite || AccessProt == MemoryObj::ReadOnly)
       return NotifyError(CL_INVALID_VALUE,
@@ -192,7 +171,7 @@ BufferBuilder &BufferBuilder::SetWriteOnly(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetReadOnly(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetReadOnly(bool Enabled) {
   if(Enabled) {
     if(AccessProt == MemoryObj::ReadWrite || AccessProt == MemoryObj::WriteOnly)
       return NotifyError(CL_INVALID_VALUE,
@@ -204,7 +183,7 @@ BufferBuilder &BufferBuilder::SetReadOnly(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetHostWriteOnly(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetHostWriteOnly(bool Enabled) {
   if(Enabled) {
     if(HostAccessProt == MemoryObj::HostReadOnly || 
         HostAccessProt == MemoryObj::HostNoAccess)
@@ -218,7 +197,7 @@ BufferBuilder &BufferBuilder::SetHostWriteOnly(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetHostReadOnly(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetHostReadOnly(bool Enabled) {
   if(Enabled) {
     if(HostAccessProt == MemoryObj::HostWriteOnly || 
         HostAccessProt == MemoryObj::HostNoAccess)
@@ -232,7 +211,7 @@ BufferBuilder &BufferBuilder::SetHostReadOnly(bool Enabled) {
   return *this;
 }
 
-BufferBuilder &BufferBuilder::SetHostNoAccess(bool Enabled) {
+MemoryObjBuilder &MemoryObjBuilder::SetHostNoAccess(bool Enabled) {
   if(Enabled) {
     if(HostAccessProt == MemoryObj::HostWriteOnly || 
         HostAccessProt == MemoryObj::HostReadOnly)
@@ -244,6 +223,35 @@ BufferBuilder &BufferBuilder::SetHostNoAccess(bool Enabled) {
   }
   
   return *this;
+}
+
+MemoryObjBuilder &MemoryObjBuilder::NotifyError(cl_int ErrCode, const char *Msg) {
+  Ctx.ReportDiagnostic(Msg);
+  this->ErrCode = ErrCode;
+
+  return *this;
+}
+
+//
+// BufferBuilder implementation.
+//
+
+BufferBuilder::BufferBuilder(Context &Ctx, size_t Size) :
+  MemoryObjBuilder(MemoryObjBuilder::BufferBuilder, Ctx) {
+  this->Size = Size;  
+  if(!this->Size) {
+    NotifyError(CL_INVALID_BUFFER_SIZE, "buffer size must be greater than 0");
+    return;
+  }
+
+  for(Context::device_iterator I = Ctx.device_begin(), E = Ctx.device_end();
+                               I != E;
+                               ++I)
+    if(this->Size > (*I)->GetMaxMemoryAllocSize()) {
+      NotifyError(CL_INVALID_BUFFER_SIZE,
+                  "buffer size exceed device capabilities");
+      return;
+    }
 }
 
 Buffer *BufferBuilder::Create(cl_int *ErrCode) {
@@ -258,9 +266,516 @@ Buffer *BufferBuilder::Create(cl_int *ErrCode) {
     return Ctx.CreateDeviceBuffer(Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
 }
 
-BufferBuilder &BufferBuilder::NotifyError(cl_int ErrCode, const char *Msg) {
-  Ctx.ReportDiagnostic(Msg);
-  this->ErrCode = ErrCode;
+//
+// ImageBuilder implementation.
+//
+
+ImageBuilder::ImageBuilder(Context &Ctx) :
+  MemoryObjBuilder(MemoryObjBuilder::ImageBuilder, Ctx),
+  ChOrder(Image::ChOrder_Invalid),
+  ChDataType(Image::ChType_Invalid),
+  ElementSize(0),
+  Width(0),
+  Height(0),
+  Depth(0),
+  ArraySize(0),
+  RowPitch(0),
+  SlicePitch(0),
+  NumMipLevels(0),
+  NumSamples(0),
+  Buf(NULL) { }
+  
+ImageBuilder &ImageBuilder::SetFormat(const cl_image_format *ImgFmt) {
+  size_t NumChannels = 0;
+  size_t DataSize = 0;
+  
+  // Check if values specified for the image format are valid and
+  // determine the number of channels and their size.
+  switch(ImgFmt->image_channel_order) {
+  case CL_R:
+  case CL_A:
+    NumChannels = 1;
+    break;
+  
+  case CL_INTENSITY:
+  case CL_LUMINANCE:
+    NumChannels = 1;
+    switch(ImgFmt->image_channel_data_type) {
+    case CL_UNORM_INT8:
+    case CL_UNORM_INT16:
+    case CL_SNORM_INT8:
+    case CL_SNORM_INT16:
+    case CL_HALF_FLOAT:
+    case CL_FLOAT:
+      break;
+    default:
+      return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                         "invalid image channel order and data type combination");
+    }
+    break;
+  
+  case CL_Rx:
+  case CL_RG:
+  case CL_RA:
+    NumChannels = 2;
+    break;
+  
+  case CL_RGx:
+    NumChannels = 3;
+    break;
+    
+  case CL_RGB:
+  case CL_RGBx:
+    NumChannels = (ImgFmt->image_channel_order == CL_RGB) ? 3 : 4;
+    switch(ImgFmt->image_channel_data_type) {
+    case CL_UNORM_SHORT_555:
+		case CL_UNORM_SHORT_565:
+		case CL_UNORM_INT_101010:
+      break;
+    default:
+			return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                         "invalid image channel order and data type combination");
+    }
+    break;
+  
+  case CL_RGBA:
+    NumChannels = 4;
+    break;
+    
+  case CL_ARGB:
+  case CL_BGRA:
+    NumChannels = 4;
+    switch(ImgFmt->image_channel_data_type) {
+    case CL_UNORM_INT8: 
+    case CL_SNORM_INT8:
+    case CL_SIGNED_INT8:
+    case CL_UNSIGNED_INT8:
+      break;
+    default:
+      return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                         "invalid image channel order and data type combination");
+    }
+    break;
+    
+  default:
+    return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                       "invalid image channel order");
+  }
+  
+  switch(ImgFmt->image_channel_data_type) {
+  case CL_SNORM_INT8:
+  case CL_UNORM_INT8:
+  case CL_SIGNED_INT8:
+  case CL_UNSIGNED_INT8:
+    DataSize = 1;
+    break;
+    
+  case CL_SNORM_INT16:
+  case CL_UNORM_INT16:
+  case CL_UNORM_SHORT_565:
+  case CL_UNORM_SHORT_555:
+  case CL_SIGNED_INT16:
+  case CL_UNSIGNED_INT16:
+  case CL_HALF_FLOAT:
+    DataSize = 2;
+    break;
+  
+  case CL_UNORM_INT_101010:
+  case CL_SIGNED_INT32:
+  case CL_UNSIGNED_INT32:
+  case CL_FLOAT:
+    DataSize = 4;
+    break;
+  
+  default:
+    return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                       "invalid image channel data type");
+  }
+  
+  // The element size is the size in bytes of each pixel element.
+  ElementSize = (ImgFmt->image_channel_data_type == CL_UNORM_SHORT_565 ||
+                 ImgFmt->image_channel_data_type == CL_UNORM_SHORT_555 ||
+                 ImgFmt->image_channel_data_type == CL_UNORM_INT_101010) ?
+                 DataSize : DataSize * NumChannels;
+                 
+  // Check if the specified image format is supported.
+  bool FmtSupported = false;
+  for(opencrun::Context::device_iterator I = Ctx.device_begin(),
+                                         E = Ctx.device_end(); 
+                                         I != E;
+                                         ++I) {
+    llvm::ArrayRef<cl_image_format> DevFmts = (*I)->GetSupportedImageFormats();
+    if(DevFmts.size() == 0) continue;
+    
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((ImgFmt->image_channel_order == DevFmts[K].image_channel_order) &&
+         (ImgFmt->image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        // Current device is added to the container for all
+        // devices in context supporting the given image format.
+        TargetDevs.push_back(*I);
+        break;
+      }
+  }
+  
+  if(!FmtSupported)
+    return NotifyError(CL_IMAGE_FORMAT_NOT_SUPPORTED,
+                       "specified image format unsupported");
+
+  // Convert the unsigned parameter types to enum values.
+  ChOrder = Image::ChannelOrder(ImgFmt->image_channel_order);
+  ChDataType = Image::ChannelType(ImgFmt->image_channel_data_type);
 
   return *this;
 }
+
+ImageBuilder &ImageBuilder::SetDesc(const cl_image_desc *ImgDesc) {
+  // In case of an error in SetFormat we cannot proceed.
+  if(this->ErrCode != CL_SUCCESS)
+    return *this;
+
+  if(ImgDesc->num_mip_levels)
+    return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+        "non zero mip levels");
+
+  if(ImgDesc->num_samples)
+    return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+        "non zero samples");
+
+  // Determine the minimum maximum image dimensions.
+  size_t Min_Image2DMaxWidth = TargetDevs[0]->GetImage2DMaxWidth(),
+         Min_Image2DMaxHeight = TargetDevs[0]->GetImage2DMaxHeight(),
+         Min_Image3DMaxWidth = TargetDevs[0]->GetImage3DMaxWidth(),
+         Min_Image3DMaxHeight = TargetDevs[0]->GetImage3DMaxHeight(),
+         Min_Image3DMaxDepth = TargetDevs[0]->GetImage3DMaxDepth(),
+         Min_ImageMaxBufferSize = TargetDevs[0]->GetImageMaxBufferSize(), 
+         Min_ImageMaxArraySize = TargetDevs[0]->GetImageMaxArraySize();
+
+  for(unsigned I = 1; I < TargetDevs.size(); ++I) {
+    Min_Image2DMaxWidth = std::min(Min_Image2DMaxWidth,
+                                   TargetDevs[I]->GetImage2DMaxWidth());
+    Min_Image2DMaxHeight = std::min(Min_Image2DMaxHeight,
+                                    TargetDevs[I]->GetImage2DMaxHeight());
+    Min_Image3DMaxWidth = std::min(Min_Image3DMaxWidth,
+                                   TargetDevs[I]->GetImage3DMaxWidth());
+    Min_Image3DMaxHeight = std::min(Min_Image3DMaxHeight,
+                                    TargetDevs[I]->GetImage3DMaxHeight());
+    Min_Image3DMaxDepth = std::min(Min_Image3DMaxDepth,
+                                   TargetDevs[I]->GetImage3DMaxDepth());
+    Min_ImageMaxBufferSize = std::min(Min_ImageMaxBufferSize,
+                                      TargetDevs[I]->GetImageMaxBufferSize()); 
+    Min_ImageMaxArraySize = std::min(Min_ImageMaxArraySize,
+                                     TargetDevs[I]->GetImageMaxArraySize());
+  }
+
+  switch(ImgDesc->image_type) {
+    case CL_MEM_OBJECT_IMAGE1D:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_width > Min_Image2DMaxWidth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image width bigger than 2D image maximum width");
+
+      if(ImgDesc->buffer != NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is not null");
+
+      ImgTy = Image::Image1D;
+      Width = ImgDesc->image_width;
+      Height = 1;
+      Depth = 1;
+      ArraySize = 1;
+      break;
+    case CL_MEM_OBJECT_IMAGE1D_BUFFER:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_width > Min_ImageMaxBufferSize)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image width bigger than maximum buffer size");
+
+      if(ImgDesc->buffer == NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is null");
+
+      Buf = llvm::cast<Buffer>(llvm::cast<MemoryObj>(ImgDesc->buffer));
+
+      if((ImgDesc->image_width * ElementSize) <= Buf->GetSize())
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, 
+                           "incompatible image width and given buffer size");
+
+      ImgTy = Image::Image1D_Buffer;
+      Width = ImgDesc->image_width;
+      Height = 1;
+      Depth = 1;
+      ArraySize = 1;
+      break;
+    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_array_size == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "array size is zero");
+
+      if(ImgDesc->image_width > Min_Image2DMaxWidth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image width bigger than 2D image maximum width");
+
+      if(ImgDesc->image_array_size < 1 || 
+         ImgDesc->image_array_size > Min_ImageMaxArraySize)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "invalid image array size");
+
+      if(ImgDesc->buffer != NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is not null");
+
+      ImgTy = Image::Image1D_Array;
+      Width = ImgDesc->image_width;
+      Height = 1;
+      Depth = 1;
+      ArraySize = ImgDesc->image_array_size;
+      break;
+    case CL_MEM_OBJECT_IMAGE2D:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_height == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image height is zero");
+
+      if(ImgDesc->image_width > Min_Image2DMaxWidth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image width bigger than 2D image maximum width");
+
+      if(ImgDesc->image_height > Min_Image2DMaxHeight)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image height bigger than 2D image maximum height");
+
+      if(ImgDesc->buffer != NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is not null");
+
+      ImgTy = Image::Image2D;
+      Width = ImgDesc->image_width;
+      Height = ImgDesc->image_height;
+      Depth = 1;
+      ArraySize = 1;
+      break;
+    case CL_MEM_OBJECT_IMAGE2D_ARRAY:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_height == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image height is zero");
+
+      if(ImgDesc->image_array_size == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "array size is zero");
+      
+      if(ImgDesc->image_width > Min_Image2DMaxWidth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image width bigger than 2D image maximum width");
+
+      if(ImgDesc->image_height > Min_Image2DMaxHeight)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "image height bigger than 2D image maximum height");
+
+      if(ImgDesc->image_array_size < 1 || 
+         ImgDesc->image_array_size > Min_ImageMaxArraySize)
+        return NotifyError(CL_INVALID_IMAGE_SIZE, 
+                           "invalid image array size");
+     
+      if(ImgDesc->buffer != NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is not null");
+
+      ImgTy = Image::Image2D_Array;
+      Width = ImgDesc->image_width;
+      Height = ImgDesc->image_height;
+      Depth = 1;
+      ArraySize = ImgDesc->image_array_size;
+      break;
+    case CL_MEM_OBJECT_IMAGE3D:
+      if(ImgDesc->image_width == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image width is zero");
+
+      if(ImgDesc->image_height == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image height is zero");
+
+      if(ImgDesc->image_depth == 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "image depth is zero");
+
+      if(ImgDesc->image_width > Min_Image3DMaxWidth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE,
+                           "image width bigger than 3D image maximum width");
+
+      if(ImgDesc->image_height > Min_Image3DMaxHeight)
+        return NotifyError(CL_INVALID_IMAGE_SIZE,
+                           "image height bigger than 3D image maximum height");
+
+      if(ImgDesc->image_depth > Min_Image3DMaxDepth)
+        return NotifyError(CL_INVALID_IMAGE_SIZE,
+                           "image depth bigger than 3D image maximum depth");
+
+      if(ImgDesc->buffer != NULL)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR, "buffer object is not null");
+
+      ImgTy = Image::Image3D;
+      Width = ImgDesc->image_width;
+      Height = ImgDesc->image_height;
+      Depth = ImgDesc->image_depth;
+      ArraySize = 1;
+      break;
+    default:
+      return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                         "invalid image type");
+  }
+
+  // Total size in bytes required by the image.
+  Size = Width * Height * Depth * ElementSize * ArraySize;
+
+  if(HostPtr == NULL) {
+    if(ImgDesc->image_row_pitch != 0)
+      return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                         "host-ptr is null but row pitch is not zero");
+    if(ImgDesc->image_slice_pitch != 0)
+      return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                         "host-ptr is null but slice pitch is not zero"); 
+  } else {
+    if(ImgDesc->image_row_pitch == 0)
+      RowPitch = Width * ElementSize;
+    else if((ImgDesc->image_row_pitch < Width * ElementSize) ||
+            (ImgDesc->image_row_pitch % ElementSize != 0))
+      return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                         "invalid row pitch for non null host-ptr"); 
+    else
+      RowPitch = ImgDesc->image_row_pitch;
+    
+    // Slice-pitch is used only for 1D image arrays, 2D image arrays and
+    // 3D images.
+    switch(ImgTy) {
+    case Image::Image1D_Array:
+      if(ImgDesc->image_slice_pitch == 0)
+        SlicePitch = RowPitch;
+      else if((ImgDesc->image_slice_pitch < RowPitch) ||
+              (ImgDesc->image_slice_pitch % RowPitch != 0))
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                           "invalid slice pitch for non null host-ptr");
+      else
+        SlicePitch = ImgDesc->image_slice_pitch;
+      break;
+    case Image::Image2D_Array:
+    case Image::Image3D:
+      if(ImgDesc->image_slice_pitch == 0)
+        SlicePitch = RowPitch * Height;
+      else if((ImgDesc->image_slice_pitch < RowPitch * Height) ||
+              (ImgDesc->image_slice_pitch % RowPitch != 0))
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                           "invalid slice pitch for non null host-ptr");
+      else
+        SlicePitch = ImgDesc->image_slice_pitch;
+      break;
+    default:
+      break;
+    }
+  }
+
+  switch(ImgTy) {
+  case Image::Image1D_Buffer:
+    if((Buf->GetAccessProtection() == MemoryObj::WriteOnly &&
+          (AccessProt == MemoryObj::ReadWrite ||
+           AccessProt == MemoryObj::ReadOnly)) ||
+       (Buf->GetAccessProtection() == MemoryObj::ReadOnly &&
+          (AccessProt == MemoryObj::ReadWrite ||
+           AccessProt == MemoryObj::WriteOnly)))
+      return NotifyError(CL_INVALID_VALUE,
+          "access mode incompatible with data buffer");
+
+    if((Buf->GetHostAccessProtection() == MemoryObj::HostWriteOnly && 
+        HostAccessProt == MemoryObj::HostReadOnly) ||
+       (Buf->GetHostAccessProtection() == MemoryObj::HostReadOnly &&
+        HostAccessProt == MemoryObj::HostWriteOnly) ||
+       (Buf->GetHostAccessProtection() == MemoryObj::HostNoAccess &&
+        (HostAccessProt == MemoryObj::HostReadOnly ||
+         HostAccessProt == MemoryObj::HostWriteOnly)))
+      return NotifyError(CL_INVALID_VALUE,
+          "host access mode incompatible with data buffer");
+
+    // 1D image buffers cannot specify host-ptr usage mode as they
+    // inherit it from associated data buffer.
+    if(HostPtrMode)
+      return NotifyError(CL_INVALID_VALUE,
+          "host-ptr usage mode specified");
+
+    HostPtrMode = Buf->GetHostPtrUsageMode();
+
+    // If access protections are not specified withing flags they
+    // are inherited from the corresponding memory access qualifiers
+    // associated with buffer.
+    if(!AccessProt)
+      AccessProt = Buf->GetAccessProtection();
+
+    // The same happens for host access protections.
+    if(!HostAccessProt)
+      HostAccessProt = Buf->GetHostAccessProtection();
+    break;
+  default:
+    // For all image types except CL_MEM_OBJECT_IMAGE1D_BUFFER,
+    // if value specified for flags is 0, the default is used 
+    // which is CL_MEM_READ_WRITE.
+    if(!(HostPtrMode | AccessProt | HostAccessProt))
+      AccessProt = MemoryObj::ReadWrite;
+  }
+
+  return *this;
+}
+
+Image *ImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(HostPtrMode == MemoryObj::UseHostPtr)
+    return Ctx.CreateHostImage(
+        Size,
+        HostPtr,
+        TargetDevs,
+        ChOrder, ChDataType,
+        ElementSize,
+        ImgTy,
+        Width, Height, Depth,
+        ArraySize,
+        RowPitch, SlicePitch,
+        NumMipLevels,
+        NumSamples,
+        Buf,
+        AccessProt, HostAccessProt,
+        ErrCode);
+  else if(HostPtrMode == MemoryObj::AllocHostPtr)
+    return Ctx.CreateHostAccessibleImage(
+        Size,
+        HostPtr,
+        TargetDevs,
+        ChOrder, ChDataType,
+        ElementSize,
+        ImgTy,
+        Width, Height, Depth,
+        ArraySize,
+        RowPitch, SlicePitch,
+        NumMipLevels,
+        NumSamples,
+        Buf,
+        AccessProt, HostAccessProt,
+        ErrCode);
+  else
+    return Ctx.CreateDeviceImage(
+        Size,
+        HostPtr,
+        TargetDevs,
+        ChOrder, ChDataType,
+        ElementSize,
+        ImgTy,
+        Width, Height, Depth,
+        ArraySize,
+        RowPitch, SlicePitch,
+        NumMipLevels,
+        NumSamples,
+        Buf,
+        AccessProt, HostAccessProt,
+        ErrCode);
+}
+

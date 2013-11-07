@@ -37,24 +37,15 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
 }
 
 // For the CPU target the device global memory is in the host AS,
-// hence we return the address of the provided host buffer and update the
-// available global memory size. In this way the OpenCL kernel will
-// directly operate on the host buffer which will be always coherent and
-// we use a half of memory.
+// hence we return the address of the provided host buffer.
+// In this way the OpenCL kernel will directly operate on the host 
+// buffer which will be always coherent and we use a half of memory.
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
-  size_t HostBufferSize = Buf.GetSize();
-  
   llvm::sys::ScopedLock Lock(ThisLock);
-  
-  if(Available < HostBufferSize)
-    return NULL;
     
   void *Addr = Buf.GetStorageData();
   
-  if(Addr) {
-    Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
-    Available -= HostBufferSize;
-  }
+  if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
   
   return Addr;
 }
@@ -82,14 +73,119 @@ void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
   return Addr;
 }
 
+void *GlobalMemory::Alloc(HostImage &Img) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+  
+  void *Addr = Img.GetStorageData();
+  
+  if(Addr) Mappings[llvm::cast<MemoryObj>(&Img)] = Addr;
+
+  if(Img.GetImageType() == Image::Image1D_Buffer) {
+    Buffer *Buf = Img.GetBuffer();
+    if(!Buf)
+      return NULL;
+    
+    if(!Mappings.count(Buf))
+      return NULL;
+    
+    std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+  } 
+
+  return Addr;
+}
+
+void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
+  void *Addr = Alloc(llvm::cast<MemoryObj>(Img));
+
+  if(Img.GetImageType() == Image::Image1D_Buffer) {
+    Buffer *Buf = Img.GetBuffer();
+    if(!Buf)
+      return NULL;
+    
+    if(!Mappings.count(Buf))
+      return NULL;
+    
+    std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+  }
+  
+  // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
+  // togheter.
+  if(Img.HasInitializationData()) {
+    size_t FreeBytes = Img.GetSize();
+    size_t RowSize = Img.GetWidth() * Img.GetElementSize();
+    for(size_t I = 0; I < Img.GetArraySize(); ++I)
+      for(size_t Z = 0; Z < Img.GetDepth(); ++Z)
+        for(size_t Y = 0; Y < Img.GetHeight() && FreeBytes >= RowSize; ++Y, FreeBytes -= RowSize)
+          std::memcpy(
+              reinterpret_cast<void *>(
+                reinterpret_cast<uintptr_t>(Addr) + 
+                Img.GetWidth() * Img.GetHeight() * Img.GetElementSize() * I +
+                Img.GetWidth() * Img.GetElementSize() * Y + 
+                Img.GetHeight() * Img.GetElementSize() * Z
+                ),
+              reinterpret_cast<const void *>(
+                reinterpret_cast<uintptr_t>(Img.GetInitializationData()) + 
+                Img.GetSlicePitch() * I +
+                Img.GetRowPitch() * Y + 
+                Img.GetSlicePitch() * Z
+                ),
+              RowSize
+              );
+  }
+    
+  return Addr;
+}
+
+void *GlobalMemory::Alloc(DeviceImage &Img) {
+  void *Addr = Alloc(llvm::cast<MemoryObj>(Img));
+  
+  if(Img.GetImageType() == Image::Image1D_Buffer) {
+    Buffer *Buf = Img.GetBuffer();
+    if(!Buf)
+      return NULL;
+    
+    if(!Mappings.count(Buf))
+      return NULL;
+    
+    std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+  }
+
+  if(Img.HasInitializationData()) {
+    size_t FreeBytes = Img.GetSize();
+    size_t RowSize = Img.GetWidth() * Img.GetElementSize();
+    for(size_t I = 0; I < Img.GetArraySize(); ++I)
+      for(size_t Z = 0; Z < Img.GetDepth(); ++Z)
+        for(size_t Y = 0; Y < Img.GetHeight() && FreeBytes >= RowSize; ++Y, FreeBytes -= RowSize)
+            std::memcpy(
+                reinterpret_cast<void *>(
+                  reinterpret_cast<uintptr_t>(Addr) + 
+                  Img.GetWidth() * Img.GetHeight() * Img.GetElementSize() * I +
+                  Img.GetWidth() * Img.GetElementSize() * Y + 
+                  Img.GetHeight() * Img.GetElementSize() * Z
+                  ),
+                reinterpret_cast<const void *>(
+                  reinterpret_cast<uintptr_t>(Img.GetInitializationData()) + 
+                  Img.GetSlicePitch() * I +
+                  Img.GetRowPitch() * Y + 
+                  Img.GetSlicePitch() * Z
+                  ),
+                RowSize
+                );
+  }
+
+  return Addr;
+}
+
 void GlobalMemory::Free(MemoryObj &MemObj) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
   MappingsContainer::iterator I = Mappings.find(&MemObj);
   if(!Mappings.count(&MemObj))
     return;
-    
-  Available += MemObj.GetSize();
+  
+  if(MemObj.GetType() != MemoryObj::HostBuffer &&
+     MemObj.GetType() != MemoryObj::HostImage)
+    Available += MemObj.GetSize();
 
   // For an HostBuffer memory allocation/deallocation is under control
   // and responsability of the host code, because we've used the host buffer

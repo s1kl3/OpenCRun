@@ -10,6 +10,7 @@
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/TargetOptions.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/ArrayRef.h"
 
 struct _cl_device_id { };
 
@@ -19,6 +20,9 @@ class MemoryObj;
 class HostBuffer;
 class HostAccessibleBuffer;
 class DeviceBuffer;
+class HostImage;
+class HostAccessibleImage;
+class DeviceImage;
 
 class DeviceInfo {
 public:
@@ -81,7 +85,11 @@ public:
                  Image3DMaxWidth(0),
                  Image3DMaxHeight(0),
                  Image3DMaxDepth(0),
+                 ImageMaxBufferSize(0),
+                 ImageMaxArraySize(0),
                  MaxSamplers(0),
+                 ImgFmts(NULL),
+                 NumImgFmts(0),
                 
                  MaxParameterSize(0),
                 
@@ -183,12 +191,18 @@ public:
   bool HasImageSupport() const { return SupportImages; }
   unsigned GetMaxReadableImages() const { return MaxReadableImages; }
   unsigned GetMaxWriteableImages() const { return MaxWriteableImages; }
-  size_t Get2DImageMaxWidth() const { return Image2DMaxWidth; }
-  size_t Get2DImageMaxHeight() const { return Image2DMaxHeight; }
-  size_t Get3DImageMaxWidth() const { return Image3DMaxWidth; }
-  size_t Get3DImageMaxHeight() const { return Image3DMaxHeight; }
-  size_t Get3DImageMaxDepth() const { return Image3DMaxDepth; }
+  size_t GetImage2DMaxWidth() const { return Image2DMaxWidth; }
+  size_t GetImage2DMaxHeight() const { return Image2DMaxHeight; }
+  size_t GetImage3DMaxWidth() const { return Image3DMaxWidth; }
+  size_t GetImage3DMaxHeight() const { return Image3DMaxHeight; }
+  size_t GetImage3DMaxDepth() const { return Image3DMaxDepth; }
+  size_t GetImageMaxBufferSize() const { return ImageMaxBufferSize; }
+  size_t GetImageMaxArraySize() const { return ImageMaxArraySize; }
   unsigned GetMaxSamplers() const { return MaxSamplers; }
+
+  llvm::ArrayRef<cl_image_format> GetSupportedImageFormats() const { 
+    return llvm::ArrayRef<cl_image_format>(ImgFmts, NumImgFmts); 
+  }
 
   size_t GetMaxParameterSize() const { return MaxParameterSize; }
 
@@ -286,7 +300,11 @@ protected:
   size_t Image3DMaxWidth;
   size_t Image3DMaxHeight;
   size_t Image3DMaxDepth;
+  size_t ImageMaxBufferSize;
+  size_t ImageMaxArraySize;
   unsigned MaxSamplers;
+  const cl_image_format *ImgFmts;
+  size_t NumImgFmts;
 
   size_t MaxParameterSize;
 
@@ -350,6 +368,10 @@ public:
   virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf) = 0;
+
+  virtual bool CreateHostImage(HostImage &Img) = 0;
+  virtual bool CreateHostAccessibleImage(HostAccessibleImage &Img) = 0;
+  virtual bool CreateDeviceImage(DeviceImage &Img) = 0;
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj) = 0;
 

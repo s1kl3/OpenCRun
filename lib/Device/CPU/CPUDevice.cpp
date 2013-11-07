@@ -22,6 +22,93 @@ void SignalJITCallEnd();
 } // End anonymous namespace.
 
 //
+// Supported image formats.
+//
+
+static const cl_image_format CPUImgFmts[] = {
+  { CL_R, CL_SNORM_INT8 },
+  { CL_R, CL_SNORM_INT16 },
+  { CL_R, CL_UNORM_INT8 },
+  { CL_R, CL_UNORM_INT16 },
+  { CL_R, CL_SIGNED_INT8 },
+  { CL_R, CL_SIGNED_INT16 },
+  { CL_R, CL_SIGNED_INT32 },
+  { CL_R, CL_UNSIGNED_INT8 },
+  { CL_R, CL_UNSIGNED_INT16 },
+  { CL_R, CL_UNSIGNED_INT32 },
+  { CL_R, CL_HALF_FLOAT },
+  { CL_R, CL_FLOAT },
+  { CL_A, CL_SNORM_INT8 },
+  { CL_A, CL_SNORM_INT16 },
+  { CL_A, CL_UNORM_INT8 },
+  { CL_A, CL_UNORM_INT16 },
+  { CL_A, CL_SIGNED_INT8 },
+  { CL_A, CL_SIGNED_INT16 },
+  { CL_A, CL_SIGNED_INT32 },
+  { CL_A, CL_UNSIGNED_INT8 },
+  { CL_A, CL_UNSIGNED_INT16 },
+  { CL_A, CL_UNSIGNED_INT32 },
+  { CL_A, CL_HALF_FLOAT },
+  { CL_A, CL_FLOAT },
+  { CL_RG, CL_SNORM_INT8 },
+  { CL_RG, CL_SNORM_INT16 },
+  { CL_RG, CL_UNORM_INT8 },
+  { CL_RG, CL_UNORM_INT16 },
+  { CL_RG, CL_SIGNED_INT8 },
+  { CL_RG, CL_SIGNED_INT16 },
+  { CL_RG, CL_SIGNED_INT32 },
+  { CL_RG, CL_UNSIGNED_INT8 },
+  { CL_RG, CL_UNSIGNED_INT16 },
+  { CL_RG, CL_UNSIGNED_INT32 },
+  { CL_RG, CL_HALF_FLOAT },
+  { CL_RG, CL_FLOAT },
+  { CL_RGBA, CL_SNORM_INT8 },
+  { CL_RGBA, CL_SNORM_INT16 },
+  { CL_RGBA, CL_UNORM_INT8 },
+  { CL_RGBA, CL_UNORM_INT16 },
+  { CL_RGBA, CL_SIGNED_INT8 },
+  { CL_RGBA, CL_SIGNED_INT16 },
+  { CL_RGBA, CL_SIGNED_INT32 },
+  { CL_RGBA, CL_UNSIGNED_INT8 },
+  { CL_RGBA, CL_UNSIGNED_INT16 },
+  { CL_RGBA, CL_UNSIGNED_INT32 },
+  { CL_RGBA, CL_HALF_FLOAT },
+  { CL_RGBA, CL_FLOAT },
+  { CL_ARGB, CL_SNORM_INT8 },
+  { CL_ARGB, CL_UNORM_INT8 },
+  { CL_ARGB, CL_SIGNED_INT8 },
+  { CL_ARGB, CL_UNSIGNED_INT8 },
+  { CL_BGRA, CL_SNORM_INT8 },
+  { CL_BGRA, CL_UNORM_INT8 },
+  { CL_BGRA, CL_SIGNED_INT8 },
+  { CL_BGRA, CL_UNSIGNED_INT8 },
+  { CL_LUMINANCE, CL_SNORM_INT8 },
+  { CL_LUMINANCE, CL_SNORM_INT16 },
+  { CL_LUMINANCE, CL_UNORM_INT8 },
+  { CL_LUMINANCE, CL_UNORM_INT16 },
+  { CL_LUMINANCE, CL_HALF_FLOAT },
+  { CL_LUMINANCE, CL_FLOAT },
+  { CL_INTENSITY, CL_SNORM_INT8 },
+  { CL_INTENSITY, CL_SNORM_INT16 },
+  { CL_INTENSITY, CL_UNORM_INT8 },
+  { CL_INTENSITY, CL_UNORM_INT16 },
+  { CL_INTENSITY, CL_HALF_FLOAT },
+  { CL_INTENSITY, CL_FLOAT },
+  { CL_RA, CL_SNORM_INT8 },
+  { CL_RA, CL_SNORM_INT16 },
+  { CL_RA, CL_UNORM_INT8 },
+  { CL_RA, CL_UNORM_INT16 },
+  { CL_RA, CL_SIGNED_INT8 },
+  { CL_RA, CL_SIGNED_INT16 },
+  { CL_RA, CL_SIGNED_INT32 },
+  { CL_RA, CL_UNSIGNED_INT8 },
+  { CL_RA, CL_UNSIGNED_INT16 },
+  { CL_RA, CL_UNSIGNED_INT32 },
+  { CL_RA, CL_HALF_FLOAT },
+  { CL_RA, CL_FLOAT }
+};
+
+//
 // CPUDevice implementation.
 //
 
@@ -67,6 +154,18 @@ bool CPUDevice::CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) {
 
 bool CPUDevice::CreateDeviceBuffer(DeviceBuffer &Buf) {
   return Global.Alloc(Buf);
+}
+
+bool CPUDevice::CreateHostImage(HostImage &Img) {
+  return Global.Alloc(Img);
+}
+
+bool CPUDevice::CreateHostAccessibleImage(HostAccessibleImage &Img) {
+  return Global.Alloc(Img);
+}
+
+bool CPUDevice::CreateDeviceImage(DeviceImage &Img) {
+  return Global.Alloc(Img);
 }
 
 void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
@@ -232,14 +331,73 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   MaxWorkItemSizes.assign(3, 1024);
   MaxWorkGroupSize = 1024;
 
-  // TODO: Preferred* should be gathered by the compiler.
-  // TODO: Native* should be gathered by the compiler.
+  // Preferred* and Native* gathered by the compiler.
+#if defined(__AVX__)
+  PreferredCharVectorWidth = 16;
+  PreferredShortVectorWidth = 8;
+  PreferredIntVectorWidth = 4;
+  PreferredLongVectorWidth = 2;
+  PreferredFloatVectorWidth = 4;
+  PreferredDoubleVectorWidth = 2;
+
+  NativeCharVectorWidth = 16;
+  NativeShortVectorWidth = 8;
+  NativeIntVectorWidth = 4;
+  NativeLongVectorWidth = 2;
+  NativeFloatVectorWidth = 8;
+  NativeDoubleVectorWidth = 4;
+#elif defined(__SSE2__)
+  PreferredCharVectorWidth = 16;
+  PreferredShortVectorWidth = 8;
+  PreferredIntVectorWidth = 4;
+  PreferredLongVectorWidth = 2;
+  PreferredFloatVectorWidth = 4;
+  PreferredDoubleVectorWidth = 2;
+
+  NativeCharVectorWidth = 16;
+  NativeShortVectorWidth = 8;
+  NativeIntVectorWidth = 4;
+  NativeLongVectorWidth = 2;
+  NativeFloatVectorWidth = 4;
+  NativeDoubleVectorWidth = 2;
+#else
+  PreferredCharVectorWidth = 1;
+  PreferredShortVectorWidth = 1;
+  PreferredIntVectorWidth = 1;
+  PreferredLongVectorWidth = 1;
+  PreferredFloatVectorWidth = 1;
+  PreferredDoubleVectorWidth = 1;
+
+  NativeCharVectorWidth = 1;
+  NativeShortVectorWidth = 1;
+  NativeIntVectorWidth = 1;
+  NativeLongVectorWidth = 1;
+  NativeFloatVectorWidth = 1;
+  NativeDoubleVectorWidth = 1;
+#endif
+
+  PreferredHalfVectorWidth = PreferredShortVectorWidth;
+  NativeHalfVectorWidth = NativeShortVectorWidth;
+
   // TODO: set MaxClockFrequency.
   // TODO: set AddressBits.
 
   MaxMemoryAllocSize = Node.GetMemorySize();
 
-  // TODO: set image properties.
+  // Image properties set to the minimum values for CPU target.
+  SupportImages = true;
+  MaxReadableImages = 128;
+  MaxWriteableImages = 8;
+  Image2DMaxWidth = 8192;
+  Image2DMaxHeight = 8192;
+  Image3DMaxWidth = 2048;
+  Image3DMaxHeight = 2048;
+  Image3DMaxDepth = 2048;
+  ImageMaxBufferSize = 65536;
+  ImageMaxArraySize = 2048;
+  MaxSamplers = 16;
+  NumImgFmts = sizeof(CPUImgFmts)/sizeof(cl_image_format);
+  ImgFmts = CPUImgFmts;
 
   // TODO: set MaxParameterSize.
 

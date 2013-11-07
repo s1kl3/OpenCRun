@@ -37,6 +37,10 @@ public:
   virtual bool CreateHostBuffer(HostBuffer &Buf);
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf);
+  
+  virtual bool CreateHostImage(HostImage &Img);
+  virtual bool CreateHostAccessibleImage(HostAccessibleImage &Img);
+  virtual bool CreateDeviceImage(DeviceImage &Img);
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj);
 
