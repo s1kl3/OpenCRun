@@ -19,6 +19,8 @@ public:
     ReadBuffer,
     WriteBuffer,
     CopyBuffer,
+    ReadImage,
+    WriteImage,
     MapBuffer,
     UnmapMemObject,
     ReadBufferRect,
@@ -299,6 +301,98 @@ public:
 private:
   void *Dst;
   const void *Src;
+};
+
+class ReadImageCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::ReadImage;
+  }
+
+public:
+  ReadImageCPUCommand(EnqueueReadImage &Cmd, const void *Src)
+    : CPUExecCommand(CPUCommand::ReadImage, Cmd),
+      Src(Src) { }
+
+  void *GetTarget() {
+    return GetQueueCommandAs<EnqueueReadImage>().GetTarget();
+  }
+
+  const void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
+    EnqueueReadImage &Cmd = GetQueueCommandAs<EnqueueReadImage>();
+
+    return reinterpret_cast<const void *>(Base + Cmd.GetSourceOffset());
+  }
+
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueReadImage>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueReadImage>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueReadImage>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueReadImage>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueReadImage>().GetRegion();
+  }
+
+private:
+  const void *Src;
+};
+
+class WriteImageCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::WriteImage;
+  }
+
+public:
+  WriteImageCPUCommand(EnqueueWriteImage &Cmd, void *Dst)
+    : CPUExecCommand(CPUCommand::WriteImage, Cmd),
+      Dst(Dst) { }
+
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueWriteImage &Cmd = GetQueueCommandAs<EnqueueWriteImage>();
+
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+
+  const void *GetSource() {
+    return GetQueueCommandAs<EnqueueWriteImage>().GetSource();
+  }
+
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueWriteImage>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueWriteImage>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueWriteImage>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueWriteImage>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueWriteImage>().GetRegion();
+  }
+
+private:
+  void *Dst;
 };
 
 class MapBufferCPUCommand : public CPUExecCommand {

@@ -333,6 +333,14 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
     return Submit(Copy);
 
+  else if(ReadImageCPUCommand *ReadImg = 
+            llvm::dyn_cast<ReadImageCPUCommand>(Cmd))
+    return Submit(ReadImg);
+
+  else if(WriteImageCPUCommand *WriteImg = 
+            llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
+    return Submit(WriteImg);
+
   else if(MapBufferCPUCommand *Map =
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
     return Submit(Map);
@@ -418,6 +426,14 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   else if(CopyBufferCPUCommand *OnFly =
             llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
+
+  else if(ReadImageCPUCommand *OnFly = 
+            llvm::dyn_cast<ReadImageCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+
+  else if(WriteImageCPUCommand *OnFly = 
+            llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
   
   else if(MapBufferCPUCommand *OnFly =
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
@@ -472,6 +488,30 @@ int CPUThread::Execute(WriteBufferCPUCommand &Cmd) {
 int CPUThread::Execute(CopyBufferCPUCommand &Cmd) {
   std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
   
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(ReadImageCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(WriteImageCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+
   return CPUCommand::NoError;
 }
 
@@ -621,6 +661,8 @@ int CPUThread::Execute(NativeKernelCPUCommand &Cmd) {
 // Used by: EnqueueReadBufferRect
 //          EnqueueWriteBufferRect
 //          EnqueueCopyBufferRect
+//          EnqueueReadImage
+//          EnqueueWriteImage
 void CPUThread::MemRectCpy(void *Target, 
                            const void *Source,
                            const size_t *Region,

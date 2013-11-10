@@ -68,6 +68,8 @@ private:
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
   bool Submit(EnqueueCopyBuffer &Cmd);
+  bool Submit(EnqueueReadImage &Cmd);
+  bool Submit(EnqueueWriteImage &Cmd);
   bool Submit(EnqueueMapBuffer &Cmd);
   bool Submit(EnqueueUnmapMemObject &Cmd);
   bool Submit(EnqueueReadBufferRect &Cmd);

@@ -279,8 +279,8 @@ ImageBuilder::ImageBuilder(Context &Ctx) :
   Height(0),
   Depth(0),
   ArraySize(0),
-  RowPitch(0),
-  SlicePitch(0),
+  HostRowPitch(0),
+  HostSlicePitch(0),
   NumMipLevels(0),
   NumSamples(0),
   Buf(NULL) { }
@@ -638,37 +638,37 @@ ImageBuilder &ImageBuilder::SetDesc(const cl_image_desc *ImgDesc) {
                          "host-ptr is null but slice pitch is not zero"); 
   } else {
     if(ImgDesc->image_row_pitch == 0)
-      RowPitch = Width * ElementSize;
+      HostRowPitch = Width * ElementSize;
     else if((ImgDesc->image_row_pitch < Width * ElementSize) ||
             (ImgDesc->image_row_pitch % ElementSize != 0))
       return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
                          "invalid row pitch for non null host-ptr"); 
     else
-      RowPitch = ImgDesc->image_row_pitch;
+      HostRowPitch = ImgDesc->image_row_pitch;
     
     // Slice-pitch is used only for 1D image arrays, 2D image arrays and
     // 3D images.
     switch(ImgTy) {
     case Image::Image1D_Array:
       if(ImgDesc->image_slice_pitch == 0)
-        SlicePitch = RowPitch;
-      else if((ImgDesc->image_slice_pitch < RowPitch) ||
-              (ImgDesc->image_slice_pitch % RowPitch != 0))
+        HostSlicePitch = HostRowPitch;
+      else if((ImgDesc->image_slice_pitch < HostRowPitch) ||
+              (ImgDesc->image_slice_pitch % HostRowPitch != 0))
         return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
                            "invalid slice pitch for non null host-ptr");
       else
-        SlicePitch = ImgDesc->image_slice_pitch;
+        HostSlicePitch = ImgDesc->image_slice_pitch;
       break;
     case Image::Image2D_Array:
     case Image::Image3D:
       if(ImgDesc->image_slice_pitch == 0)
-        SlicePitch = RowPitch * Height;
-      else if((ImgDesc->image_slice_pitch < RowPitch * Height) ||
-              (ImgDesc->image_slice_pitch % RowPitch != 0))
+        HostSlicePitch = HostRowPitch * Height;
+      else if((ImgDesc->image_slice_pitch < HostRowPitch * Height) ||
+              (ImgDesc->image_slice_pitch % HostRowPitch != 0))
         return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
                            "invalid slice pitch for non null host-ptr");
       else
-        SlicePitch = ImgDesc->image_slice_pitch;
+        HostSlicePitch = ImgDesc->image_slice_pitch;
       break;
     default:
       break;
@@ -739,7 +739,7 @@ Image *ImageBuilder::Create(cl_int *ErrCode) {
         ImgTy,
         Width, Height, Depth,
         ArraySize,
-        RowPitch, SlicePitch,
+        HostRowPitch, HostSlicePitch,
         NumMipLevels,
         NumSamples,
         Buf,
@@ -755,7 +755,7 @@ Image *ImageBuilder::Create(cl_int *ErrCode) {
         ImgTy,
         Width, Height, Depth,
         ArraySize,
-        RowPitch, SlicePitch,
+        HostRowPitch, HostSlicePitch,
         NumMipLevels,
         NumSamples,
         Buf,
@@ -771,7 +771,7 @@ Image *ImageBuilder::Create(cl_int *ErrCode) {
         ImgTy,
         Width, Height, Depth,
         ArraySize,
-        RowPitch, SlicePitch,
+        HostRowPitch, HostSlicePitch,
         NumMipLevels,
         NumSamples,
         Buf,

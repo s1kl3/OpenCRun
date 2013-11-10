@@ -227,8 +227,8 @@ protected:
         size_t Height,
         size_t Depth,
         size_t ArraySize,
-        size_t RowPitch,
-        size_t SlicePitch,
+        size_t HostRowPitch,
+        size_t HostSlicePitch,
         unsigned NumMipLevels,
         unsigned NumSamples,
         llvm::IntrusiveRefCntPtr<Buffer> Buf,
@@ -245,10 +245,24 @@ protected:
   Height(Height),
   Depth(Depth),
   ArraySize(ArraySize),
-  RowPitch(RowPitch),
-  SlicePitch(SlicePitch),
   NumMipLevels(NumMipLevels),
-  NumSamples(NumSamples) { }
+  NumSamples(NumSamples) { 
+    if(GetType() == HostImage) {
+      // In case of CL_MEM_USE_HOST_PTR the storage area for the
+      // image object is inside host memory and its address is
+      // given by Storage pointer (see HostImage class) and image
+      // pitches coincide with storage pitches.
+      HostPitches[0] = HostRowPitch;
+      HostPitches[1] = HostSlicePitch;
+      Pitches[0] = HostPitches[0];
+      Pitches[1] = HostPitches[1];
+    } else {
+      HostPitches[0] = HostRowPitch;
+      HostPitches[1] = HostSlicePitch;
+      Pitches[0] = Width * ElementSize;
+      Pitches[1] = Pitches[0] * Height;
+    }
+  }
 
 public:
   ChannelOrder GetChannelOrder() const { return ChOrder; }
@@ -270,8 +284,10 @@ public:
 
   size_t GetArraySize() const { return ArraySize; }
 
-  size_t GetRowPitch() const { return RowPitch; }
-  size_t GetSlicePitch() const { return SlicePitch; }
+  size_t GetRowPitch() const { return Pitches[0]; }
+  size_t GetSlicePitch() const { return Pitches[1]; }
+  size_t GetHostRowPitch() const { return HostPitches[0]; }
+  size_t GetHostSlicePitch() const { return HostPitches[1]; }
 
   unsigned GetNumMipLevels() const { return NumMipLevels; }
   unsigned GetNumSamples() const { return NumSamples; }
@@ -296,8 +312,8 @@ private:
 
   size_t ArraySize;
 
-  size_t RowPitch;
-  size_t SlicePitch;
+  size_t Pitches[2];
+  size_t HostPitches[2];
 
   unsigned NumMipLevels;
   unsigned NumSamples;
@@ -778,8 +794,8 @@ private:
 
   size_t ArraySize;
 
-  size_t RowPitch;
-  size_t SlicePitch;
+  size_t HostRowPitch;
+  size_t HostSlicePitch;
 
   unsigned NumMipLevels;
   unsigned NumSamples;

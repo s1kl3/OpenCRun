@@ -86,6 +86,50 @@ EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Target,
     Size(Size) { }
 
 //
+// EnqueueReadImage implementation.
+//
+
+EnqueueReadImage::EnqueueReadImage(void *Target,
+                                   Image &Source,
+                                   bool Blocking,
+                                   const size_t *Region,
+                                   size_t SourceOffset, 
+                                   size_t *TargetPitches,
+                                   EventsContainer &WaitList)
+  : Command(Command::ReadImage, WaitList),
+    Target(Target),
+    Source(&Source),
+    SourceOffset(SourceOffset) {
+  // Convert the region width in bytes.
+  this->Region[0] = Region[0] * Source.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+}
+
+//
+// EnqueueWriteImage implementation.
+//
+
+EnqueueWriteImage::EnqueueWriteImage(Image &Target, 
+                                     const void *Source, 
+                                     bool Blocking, 
+                                     const size_t *Region, 
+                                     size_t TargetOffset, 
+                                     size_t *SourcePitches, 
+                                     EventsContainer &WaitList)
+  : Command(Command::WriteImage, WaitList),
+    Target(&Target),
+    Source(Source),
+    TargetOffset(TargetOffset) { 
+  // Convert the region width in bytes.
+  this->Region[0] = Region[0] * Target.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+}
+
+//
 // EnqueueMapBuffer implementation.
 //
 
@@ -124,17 +168,18 @@ EnqueueReadBufferRect::EnqueueReadBufferRect(void *Target,
                                              const size_t *Region,
                                              size_t TargetOffset,
                                              size_t SourceOffset,
-                                             size_t *TargetPitch,
-                                             size_t *SourcePitch,
+                                             size_t *TargetPitches,
+                                             size_t *SourcePitches,
                                              EventsContainer &WaitList)
   : Command(Command::ReadBufferRect, WaitList, Blocking),
-    Target(Target),
-    Source(&Source),
-    Region(Region),
-    TargetOffset(TargetOffset),
-    SourceOffset(SourceOffset),
-    TargetPitch(TargetPitch),
-    SourcePitch(SourcePitch) { }
+  Target(Target),
+  Source(&Source),
+  TargetOffset(TargetOffset),
+  SourceOffset(SourceOffset) {
+  std::memcpy(this->Region, Region, 3 * sizeof(size_t));
+  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+}
 
 //
 // EnqueueWriteBufferRect implementation.
@@ -146,17 +191,18 @@ EnqueueWriteBufferRect::EnqueueWriteBufferRect(Buffer &Target,
                                                const size_t *Region,
                                                size_t TargetOffset,
                                                size_t SourceOffset,
-                                               size_t *TargetPitch,
-                                               size_t *SourcePitch,
+                                               size_t *TargetPitches,
+                                               size_t *SourcePitches,
                                                EventsContainer &WaitList)
   : Command(Command::WriteBufferRect, WaitList, Blocking),
-    Target(&Target),
-    Source(Source),
-    Region(Region),
-    TargetOffset(TargetOffset),
-    SourceOffset(SourceOffset),
-    TargetPitch(TargetPitch),
-    SourcePitch(SourcePitch) { }
+  Target(&Target),
+  Source(Source),
+  TargetOffset(TargetOffset),
+  SourceOffset(SourceOffset) { 
+  std::memcpy(this->Region, Region, 3 * sizeof(size_t));
+  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+}
 
 //
 // EnqueueCopyBufferRect implementation.
@@ -167,17 +213,18 @@ EnqueueCopyBufferRect::EnqueueCopyBufferRect(Buffer &Target,
                                              const size_t *Region,
                                              size_t TargetOffset,
                                              size_t SourceOffset,
-                                             size_t *TargetPitch,
-                                             size_t *SourcePitch,
+                                             size_t *TargetPitches,
+                                             size_t *SourcePitches,
                                              EventsContainer &WaitList)
   : Command(Command::CopyBufferRect, WaitList),
-    Target(&Target),
-    Source(&Source),
-    Region(Region),
-    TargetOffset(TargetOffset),
-    SourceOffset(SourceOffset),
-    TargetPitch(TargetPitch),
-    SourcePitch(SourcePitch) { }
+  Target(&Target),
+  Source(&Source),
+  TargetOffset(TargetOffset),
+  SourceOffset(SourceOffset) {
+  std::memcpy(this->Region, Region, 3 * sizeof(size_t));
+  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+}
     
 //
 // EnqueueFillBuffer implementation.
@@ -331,8 +378,8 @@ EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
   
   else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
           (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
-          
     NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
+
   else if(Ctx != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
@@ -418,6 +465,10 @@ EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
   
+  else if((Target->GetHostAccessProtection() == MemoryObj::HostReadOnly) ||
+          (Target->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+    NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
+
   else if(Ctx != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
@@ -563,6 +614,345 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
 
   return new EnqueueCopyBuffer(*Target, *Source, TargetOffset, SourceOffset, Size, WaitList);
 }
+
+//
+// EnqueueReadImageBuilder implementation.
+//
+
+EnqueueReadImageBuilder::EnqueueReadImageBuilder(
+  Context &Ctx,
+  cl_mem Img,
+  void *Target) : CommandBuilder(CommandBuilder::EnqueueReadImageBuilder,
+                                 Ctx),
+                  Source(NULL),
+                  Target(Target),
+                  Blocking(false),
+                  Region(NULL),
+                  SourceOffset(0) {
+  if(!Img)
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
+
+  else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(Img))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "read source is not an image");
+  
+  else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
+          (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+    NotifyError(CL_INVALID_OPERATION, "invalid read image operation");
+
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
+    
+  if(!Target)
+    NotifyError(CL_INVALID_VALUE, "pointer to data sink is null");
+}
+
+EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetBlocking(
+  bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
+    const size_t *Origin,
+    const size_t *Region,
+    size_t RowPitch,
+    size_t SlicePitch) {
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  switch(Source->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(Origin[1] != 0 || Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Origin[0] + Region[0] > Source->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if((Origin[0] + Region[0] > Source->GetWidth()) ||
+       (Origin[1] + Region[1] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if((Origin[0] + Region[0] > Source->GetWidth()) ||
+       (Origin[1] + Region[1] > Source->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((Origin[0] + Region[0] > Source->GetWidth()) ||
+       (Origin[1] + Region[1] > Source->GetHeight()) ||
+       (Origin[2] + Region[2] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((Origin[0] + Region[0] > Source->GetWidth()) ||
+       (Origin[1] + Region[1] > Source->GetHeight()) ||
+       (Origin[2] + Region[2] > Source->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid image type");
+  }
+
+  this->Region = Region;
+
+  // Calculate offset inside the image object.
+  SourceOffset = Origin[0] * Source->GetElementSize() +
+                 Origin[1] * Source->GetRowPitch() +
+                 Origin[2] * Source->GetSlicePitch();
+
+  // Check row and slice picthes.
+  if(RowPitch == 0) 
+    TargetPitches[0] = Region[0] * Source->GetElementSize();
+  else {
+    if(RowPitch < Region[0] * Source->GetElementSize())
+      return NotifyError(CL_INVALID_VALUE, "invalid row pitch");
+    TargetPitches[0] = RowPitch;
+  }
+
+  if(SlicePitch == 0) 
+    TargetPitches[1] = TargetPitches[0] * Region[1];
+  else {
+    if(SlicePitch < TargetPitches[0] * Region[1])
+      return NotifyError(CL_INVALID_VALUE, "invalid slice pitch");
+    TargetPitches[1] = SlicePitch;
+  }
+
+  return *this;
+}
+
+EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueReadImageBuilder>(Super);
+}
+
+EnqueueReadImage *EnqueueReadImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueReadImage(Target,
+                              *Source,
+                              Blocking,
+                              Region,
+                              SourceOffset,
+                              TargetPitches,
+                              WaitList);
+}
+
+//
+// EnqueueWriteImageBuilder implementation.
+//
+
+EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
+  Context &Ctx,
+  cl_mem Img,
+  const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteImageBuilder,
+                                       Ctx),
+                  Source(Source),
+                  Target(NULL),
+                  Blocking(false),
+                  Region(NULL),
+                  TargetOffset(0) {
+  if(!Img)
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
+
+  else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(Img))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "write target is not an image");
+  
+  else if((Target->GetHostAccessProtection() == MemoryObj::HostReadOnly) ||
+          (Target->GetHostAccessProtection() == MemoryObj::HostNoAccess))
+    NotifyError(CL_INVALID_OPERATION, "invalid write image operation");
+
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
+    
+  if(!Target)
+    NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
+}
+
+EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetBlocking(
+  bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
+    const size_t *Origin,
+    const size_t *Region,
+    size_t InputRowPitch,
+    size_t InputSlicePitch) {
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  switch(Target->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(Origin[1] != 0 || Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Origin[0] + Region[0] > Target->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if((Origin[0] + Region[0] > Target->GetWidth()) ||
+       (Origin[1] + Region[1] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(Origin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+
+    if((Origin[0] + Region[0] > Target->GetWidth()) ||
+       (Origin[1] + Region[1] > Target->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((Origin[0] + Region[0] > Target->GetWidth()) ||
+       (Origin[1] + Region[1] > Target->GetHeight()) ||
+       (Origin[2] + Region[2] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((Origin[0] + Region[0] > Target->GetWidth()) ||
+       (Origin[1] + Region[1] > Target->GetHeight()) ||
+       (Origin[2] + Region[2] > Target->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid image type");
+  }
+
+  this->Region = Region;
+
+  // Calculate offset inside the image object.
+  TargetOffset = Origin[0] * Target->GetElementSize() +
+                 Origin[1] * Target->GetRowPitch() +
+                 Origin[2] * Target->GetSlicePitch();
+
+  // Check row and slice picthes.
+  if(InputRowPitch == 0) 
+    SourcePitches[0] = Region[0] * Target->GetElementSize();
+  else {
+    if(InputRowPitch < Region[0] * Target->GetElementSize())
+      return NotifyError(CL_INVALID_VALUE, "invalid input row pitch");
+    SourcePitches[0] = InputRowPitch;
+  }
+
+  if(InputSlicePitch == 0) 
+    SourcePitches[1] = SourcePitches[0] * Region[1];
+  else {
+    if(InputSlicePitch < SourcePitches[0] * Region[1])
+      return NotifyError(CL_INVALID_VALUE, "invalid input slice pitch");
+    SourcePitches[1] = InputSlicePitch;
+  }
+
+  return *this;
+}
+
+EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueWriteImageBuilder>(Super);
+}
+
+EnqueueWriteImage *EnqueueWriteImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueWriteImage(*Target,
+                               Source, 
+                               Blocking,
+                               Region,
+                               TargetOffset,
+                               SourcePitches,
+                               WaitList);
+}
+
 
 //
 // EnqueueMapBufferBuilder implementation.
@@ -772,7 +1162,7 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetRegion(
   const size_t *Region) {
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE,
-                       "invalid region array");
+                       "invalid region");
   
   this->Region = Region; 
 
@@ -783,29 +1173,29 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
-  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host row pitch");
     
-    TargetPitch[0] = TargetRowPitch;
+    TargetPitches[0] = TargetRowPitch;
   }
   
   if(TargetSlicePitch == 0) 
-    TargetPitch[1] = Region[1] * TargetPitch[0];
+    TargetPitches[1] = Region[1] * TargetPitches[0];
   else {
-    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
-        (TargetSlicePitch % TargetPitch[0] !=0))
+    if((TargetSlicePitch < Region[1] * TargetPitches[0]) ||
+        (TargetSlicePitch % TargetPitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host slice pitch");
     
-    TargetPitch[1] = TargetSlicePitch;
+    TargetPitches[1] = TargetSlicePitch;
   }
   
   TargetOffset = TargetOrigin[0]
-               + TargetOrigin[1] * TargetPitch[0]
-               + TargetOrigin[2] * TargetPitch[1];
+               + TargetOrigin[1] * TargetPitches[0]
+               + TargetOrigin[2] * TargetPitches[1];
                
   return *this;
 }
@@ -814,34 +1204,34 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
-  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid buffer row pitch");
     
-    SourcePitch[0] = SourceRowPitch;
+    SourcePitches[0] = SourceRowPitch;
   }
   
   if(SourceSlicePitch == 0) 
-    SourcePitch[1] = Region[1] * SourcePitch[0];
+    SourcePitches[1] = Region[1] * SourcePitches[0];
   else {
-    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
-        (SourceSlicePitch % SourcePitch[0] !=0))
+    if((SourceSlicePitch < Region[1] * SourcePitches[0]) ||
+        (SourceSlicePitch % SourcePitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid buffer slice pitch");
     
-    SourcePitch[1] = SourceSlicePitch;
+    SourcePitches[1] = SourceSlicePitch;
   }
   
   if(Source->GetSize() < (SourceOrigin[0] + (Region[0] - 1))
-                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitch[0]
-                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitch[1])
+                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitches[0]
+                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitches[1])
     return NotifyError(CL_INVALID_VALUE, "region out of bound");
     
   SourceOffset = SourceOrigin[0] 
-               + SourceOrigin[1] * SourcePitch[0]
-               + SourceOrigin[2] * SourcePitch[1];
+               + SourceOrigin[1] * SourcePitches[0]
+               + SourceOrigin[2] * SourcePitches[1];
                
   return *this;
 }
@@ -880,8 +1270,8 @@ EnqueueReadBufferRect *EnqueueReadBufferRectBuilder::Create(cl_int *ErrCode) {
                                    Region,
                                    TargetOffset, 
                                    SourceOffset, 
-                                   TargetPitch, 
-                                   SourcePitch, 
+                                   TargetPitches, 
+                                   SourcePitches, 
                                    WaitList);
 }
 
@@ -934,7 +1324,7 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetRegion(
   const size_t *Region) {
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE,
-                       "invalid region array");
+                       "invalid region");
   
   this->Region = Region;
   
@@ -945,34 +1335,34 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
-  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid buffer row pitch");
     
-    TargetPitch[0] = TargetRowPitch;
+    TargetPitches[0] = TargetRowPitch;
   }
   
   if(TargetSlicePitch == 0) 
-    TargetPitch[1] = Region[1] * TargetPitch[0];
+    TargetPitches[1] = Region[1] * TargetPitches[0];
   else {
-    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
-        (TargetSlicePitch % TargetPitch[0] !=0))
+    if((TargetSlicePitch < Region[1] * TargetPitches[0]) ||
+        (TargetSlicePitch % TargetPitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid buffer slice pitch");
     
-    TargetPitch[1] = TargetSlicePitch;
+    TargetPitches[1] = TargetSlicePitch;
   }
   
   if(Target->GetSize() < (TargetOrigin[0] + (Region[0] - 1))
-                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitch[0]
-                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitch[1])
+                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitches[0]
+                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitches[1])
     return NotifyError(CL_INVALID_VALUE, "region out of bound");
     
   TargetOffset = TargetOrigin[0]
-               + TargetOrigin[1] * TargetPitch[0]
-               + TargetOrigin[2] * TargetPitch[1];
+               + TargetOrigin[1] * TargetPitches[0]
+               + TargetOrigin[2] * TargetPitches[1];
   
   return *this;
 }
@@ -981,29 +1371,29 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
-  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host row pitch");
     
-    SourcePitch[0] = SourceRowPitch;
+    SourcePitches[0] = SourceRowPitch;
   }
   
   if(SourceSlicePitch == 0) 
-    SourcePitch[1] = Region[1] * SourcePitch[0];
+    SourcePitches[1] = Region[1] * SourcePitches[0];
   else {
-    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
-        (SourceSlicePitch % SourcePitch[0] !=0))
+    if((SourceSlicePitch < Region[1] * SourcePitches[0]) ||
+        (SourceSlicePitch % SourcePitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host slice pitch");
     
-    SourcePitch[1] = SourceSlicePitch;
+    SourcePitches[1] = SourceSlicePitch;
   }
       
   SourceOffset = SourceOrigin[0] 
-               + SourceOrigin[1] * SourcePitch[0]
-               + SourceOrigin[2] * SourcePitch[1];
+               + SourceOrigin[1] * SourcePitches[0]
+               + SourceOrigin[2] * SourcePitches[1];
                
   return *this;
 }
@@ -1042,8 +1432,8 @@ EnqueueWriteBufferRect *EnqueueWriteBufferRectBuilder::Create(cl_int *ErrCode) {
                                     Region,
                                     TargetOffset, 
                                     SourceOffset, 
-                                    TargetPitch, 
-                                    SourcePitch, 
+                                    TargetPitches, 
+                                    SourcePitches, 
                                     WaitList);
 }
 
@@ -1086,7 +1476,7 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetRegion(
   const size_t *Region) {
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE,
-                       "invalid region array");
+                       "invalid region");
   
   this->Region = Region;
   
@@ -1097,34 +1487,34 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
-  if(TargetRowPitch == 0) TargetPitch[0] = Region[0];
+  if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid target buffer row pitch");
     
-    TargetPitch[0] = TargetRowPitch;
+    TargetPitches[0] = TargetRowPitch;
   }
   
   if(TargetSlicePitch == 0) 
-    TargetPitch[1] = Region[1] * TargetPitch[0];
+    TargetPitches[1] = Region[1] * TargetPitches[0];
   else {
-    if((TargetSlicePitch < Region[1] * TargetPitch[0]) ||
-        (TargetSlicePitch % TargetPitch[0] !=0))
+    if((TargetSlicePitch < Region[1] * TargetPitches[0]) ||
+        (TargetSlicePitch % TargetPitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid target buffer slice pitch");
     
-    TargetPitch[1] = TargetSlicePitch;
+    TargetPitches[1] = TargetSlicePitch;
   }
   
   if(Target->GetSize() < (TargetOrigin[0] + (Region[0] - 1))
-                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitch[0]
-                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitch[1])
+                       + (TargetOrigin[1] + (Region[1] - 1)) * TargetPitches[0]
+                       + (TargetOrigin[2] + (Region[2] - 1)) * TargetPitches[1])
     return NotifyError(CL_INVALID_VALUE, "region out of bound");
     
   TargetOffset = TargetOrigin[0]
-               + TargetOrigin[1] * TargetPitch[0]
-               + TargetOrigin[2] * TargetPitch[1];
+               + TargetOrigin[1] * TargetPitches[0]
+               + TargetOrigin[2] * TargetPitches[1];
                
   this->TargetOrigin = TargetOrigin;
              
@@ -1135,34 +1525,34 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
-  if(SourceRowPitch == 0) SourcePitch[0] = Region[0];
+  if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host row pitch");
     
-    SourcePitch[0] = SourceRowPitch;
+    SourcePitches[0] = SourceRowPitch;
   }
   
   if(SourceSlicePitch == 0) 
-    SourcePitch[1] = Region[1] * SourcePitch[0];
+    SourcePitches[1] = Region[1] * SourcePitches[0];
   else {
-    if((SourceSlicePitch < Region[1] * SourcePitch[0]) ||
-        (SourceSlicePitch % SourcePitch[0] !=0))
+    if((SourceSlicePitch < Region[1] * SourcePitches[0]) ||
+        (SourceSlicePitch % SourcePitches[0] !=0))
       return NotifyError(CL_INVALID_VALUE,
                          "invalid host slice pitch");
     
-    SourcePitch[1] = SourceSlicePitch;
+    SourcePitches[1] = SourceSlicePitch;
   }
 
   if(Source->GetSize() < (SourceOrigin[0] + (Region[0] - 1))
-                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitch[0]
-                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitch[1])
+                       + (SourceOrigin[1] + (Region[1] - 1)) * SourcePitches[0]
+                       + (SourceOrigin[2] + (Region[2] - 1)) * SourcePitches[1])
     return NotifyError(CL_INVALID_VALUE, "region out of bound");
     
   SourceOffset = SourceOrigin[0] 
-               + SourceOrigin[1] * SourcePitch[0]
-               + SourceOrigin[2] * SourcePitch[1];
+               + SourceOrigin[1] * SourcePitches[0]
+               + SourceOrigin[2] * SourcePitches[1];
                
   this->SourceOrigin = SourceOrigin;
   
@@ -1175,13 +1565,13 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::CheckCopyOverlap() {
   if(Target == Source) {
     // Since target and source buffers are the same object they must have the
     // same row and slice pitches.
-    if((TargetPitch[0] != SourcePitch[0]) && 
-       (TargetPitch[1] != SourcePitch[1]))
+    if((TargetPitches[0] != SourcePitches[0]) && 
+       (TargetPitches[1] != SourcePitches[1]))
       return NotifyError(CL_INVALID_VALUE, "different pitches for the same buffer");
    
     // Row and slice pitches are the same.
-    size_t RowPitch = TargetPitch[0];
-    size_t SlicePitch = TargetPitch[1];
+    size_t RowPitch = TargetPitches[0];
+    size_t SlicePitch = TargetPitches[1];
     
     const size_t SourceMin[] = { SourceOrigin[0], SourceOrigin[1], SourceOrigin[2] };
     const size_t SourceMax[] = { SourceOrigin[0] + Region[0],    
@@ -1277,8 +1667,8 @@ EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
                                    Region,
                                    TargetOffset, 
                                    SourceOffset, 
-                                   TargetPitch, 
-                                   SourcePitch, 
+                                   TargetPitches, 
+                                   SourcePitches, 
                                    WaitList);
 }
 

@@ -233,6 +233,12 @@ bool CPUDevice::Submit(Command &Cmd) {
   else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
     Submitted = Submit(*Copy);
 
+  else if(EnqueueReadImage *ReadImg = llvm::dyn_cast<EnqueueReadImage>(&Cmd))
+    Submitted = Submit(*ReadImg);
+
+  else if(EnqueueWriteImage *WriteImg = llvm::dyn_cast<EnqueueWriteImage>(&Cmd))
+    Submitted = Submit(*WriteImg);
+
   else if(EnqueueMapBuffer *Map = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
     Submitted = Submit(*Map);
   
@@ -511,6 +517,20 @@ bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueReadImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new ReadImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueWriteImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new WriteImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
