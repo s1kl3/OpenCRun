@@ -79,6 +79,7 @@ private:
   bool Submit(CopyBufferCPUCommand *Cmd) { return true; }
   bool Submit(ReadImageCPUCommand *Cmd) { return true; }
   bool Submit(WriteImageCPUCommand *Cmd) { return true; }
+  bool Submit(CopyImageCPUCommand *Cmd) { return true; }
   bool Submit(MapBufferCPUCommand *Cmd) { return true; }
   bool Submit(UnmapMemObjectCPUCommand *Cmd) { return true; }
   bool Submit(ReadBufferRectCPUCommand *Cmd) { return true; }
@@ -100,6 +101,7 @@ private:
   int Execute(CopyBufferCPUCommand &Cmd);
   int Execute(ReadImageCPUCommand &Cmd);
   int Execute(WriteImageCPUCommand &Cmd);
+  int Execute(CopyImageCPUCommand &Cmd);
   int Execute(MapBufferCPUCommand &Cmd);
   int Execute(UnmapMemObjectCPUCommand &Cmd);
   int Execute(ReadBufferRectCPUCommand &Cmd);

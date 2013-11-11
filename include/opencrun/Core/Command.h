@@ -31,6 +31,7 @@ public:
     WriteBuffer = CL_COMMAND_WRITE_BUFFER,
     CopyBuffer = CL_COMMAND_COPY_BUFFER,
     ReadImage = CL_COMMAND_READ_IMAGE,
+    CopyImage = CL_COMMAND_COPY_IMAGE,
     WriteImage = CL_COMMAND_WRITE_IMAGE,
     MapBuffer = CL_COMMAND_MAP_BUFFER,
     UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
@@ -150,8 +151,8 @@ public:
 private:
   EnqueueCopyBuffer(Buffer &Target,
                     Buffer &Source,
-                    size_t SourceOffset,
                     size_t TargetOffset,
+                    size_t SourceOffset,
                     size_t Size,
                     EventsContainer &WaitList);
                     
@@ -192,10 +193,10 @@ public:
   Image &GetSource() { return *Source; }
   const size_t *GetRegion() { return Region; }
   size_t GetSourceOffset() { return SourceOffset; }
-  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
-  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
   size_t GetTargetRowPitch() { return TargetPitches[0]; }
   size_t GetTargetSlicePitch() { return TargetPitches[1]; }
+  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
 
 private:
   void *Target;
@@ -227,10 +228,10 @@ public:
   const void *GetSource() { return Source; }
   const size_t *GetRegion() { return Region; }
   size_t GetTargetOffset() { return TargetOffset; }
-  size_t GetSourceRowPitch() { return SourcePitches[0]; }
-  size_t GetSourceSlicePitch() { return SourcePitches[1]; }
   size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
   size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  size_t GetSourceRowPitch() { return SourcePitches[0]; }
+  size_t GetSourceSlicePitch() { return SourcePitches[1]; }
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
@@ -240,6 +241,41 @@ private:
   size_t SourcePitches[2];
 
   friend class EnqueueWriteImageBuilder;
+};
+
+class EnqueueCopyImage : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::CopyImage;
+  }
+
+private:
+  EnqueueCopyImage(Image &Target,
+                   Image &Source,
+                   size_t TargetOffset,
+                   size_t SourceOffset,
+                   const size_t *Region,
+                   EventsContainer &WaitList);
+
+public:
+  Image &GetTarget() { return *Target; }
+  Image &GetSource() { return *Source; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetSourceOffset() { return SourceOffset; }
+  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+  const size_t *GetRegion() { return Region; }
+
+private:
+  llvm::IntrusiveRefCntPtr<Image> Target;
+  llvm::IntrusiveRefCntPtr<Image> Source;
+  size_t TargetOffset;
+  size_t SourceOffset;
+  size_t Region[3];
+
+  friend class EnqueueCopyImageBuilder;
 };
 
 class EnqueueMapBuffer : public Command {
@@ -528,6 +564,7 @@ public:
     EnqueueWriteBufferBuilder,
     EnqueueCopyBufferBuilder,
     EnqueueReadImageBuilder,
+    EnqueueCopyImageBuilder,
     EnqueueWriteImageBuilder,
     EnqueueMapBufferBuilder,
     EnqueueUnmapMemObjectBuilder,
@@ -717,12 +754,44 @@ private:
   }
 
 private:
-  const void *Source;
   Image *Target;
+  const void *Source;
   bool Blocking;
   const size_t *Region;
   size_t TargetOffset;
   size_t SourcePitches[2];
+};
+
+class EnqueueCopyImageBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueCopyImageBuilder;
+  }
+
+public:
+  EnqueueCopyImageBuilder(Context &Ctx, cl_mem TargetImg, cl_mem SourceImg);
+
+public:
+  EnqueueCopyImageBuilder &SetCopyArea(const size_t *TargetOrigin,
+                                       const size_t *SourceOrigin,
+                                       const size_t *Region);
+  EnqueueCopyImageBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueCopyImage *Create(cl_int *ErrCode);
+
+private:
+  EnqueueCopyImageBuilder &NotifyError(cl_int ErrCode,
+                                       const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+  Image *Target;
+  Image *Source;
+  size_t TargetOffset;
+  size_t SourceOffset;
+  const size_t *Region;
 };
 
 class EnqueueMapBufferBuilder : public CommandBuilder {

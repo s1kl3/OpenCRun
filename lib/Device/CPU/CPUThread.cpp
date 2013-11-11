@@ -341,6 +341,10 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
     return Submit(WriteImg);
 
+  else if(CopyImageCPUCommand *CopyImg = 
+            llvm::dyn_cast<CopyImageCPUCommand>(Cmd))
+    return Submit(CopyImg);
+
   else if(MapBufferCPUCommand *Map =
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
     return Submit(Map);
@@ -434,7 +438,11 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   else if(WriteImageCPUCommand *OnFly = 
             llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
-  
+
+  else if(CopyImageCPUCommand *OnFly = 
+            llvm::dyn_cast<CopyImageCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+
   else if(MapBufferCPUCommand *OnFly =
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -504,6 +512,18 @@ int CPUThread::Execute(ReadImageCPUCommand &Cmd) {
 }
 
 int CPUThread::Execute(WriteImageCPUCommand &Cmd) {
+  MemRectCpy(Cmd.GetTarget(),
+             Cmd.GetSource(),
+             Cmd.GetRegion(),
+             Cmd.GetTargetRowPitch(),
+             Cmd.GetTargetSlicePitch(),
+             Cmd.GetSourceRowPitch(),
+             Cmd.GetSourceSlicePitch());
+
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(CopyImageCPUCommand &Cmd) {
   MemRectCpy(Cmd.GetTarget(),
              Cmd.GetSource(),
              Cmd.GetRegion(),
@@ -663,6 +683,7 @@ int CPUThread::Execute(NativeKernelCPUCommand &Cmd) {
 //          EnqueueCopyBufferRect
 //          EnqueueReadImage
 //          EnqueueWriteImage
+//          EnqueueCopyImage
 void CPUThread::MemRectCpy(void *Target, 
                            const void *Source,
                            const size_t *Region,

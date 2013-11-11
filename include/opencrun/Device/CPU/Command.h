@@ -21,6 +21,7 @@ public:
     CopyBuffer,
     ReadImage,
     WriteImage,
+    CopyImage,
     MapBuffer,
     UnmapMemObject,
     ReadBufferRect,
@@ -291,7 +292,7 @@ public:
     uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
     EnqueueCopyBuffer &Cmd = GetQueueCommandAs<EnqueueCopyBuffer>();
     
-    return reinterpret_cast<void *>(Base + Cmd.GetSourceOffset());	
+    return reinterpret_cast<const void *>(Base + Cmd.GetSourceOffset());	
   }
   
   size_t GetSize() {
@@ -393,6 +394,57 @@ public:
 
 private:
   void *Dst;
+};
+
+class CopyImageCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::CopyImage;
+  }
+
+public:
+  CopyImageCPUCommand(EnqueueCopyImage &Cmd, void *Dst, const void *Src)
+    : CPUExecCommand(CPUCommand::CopyImage, Cmd),
+      Dst(Dst),
+      Src(Src) { }
+
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueCopyImage &Cmd = GetQueueCommandAs<EnqueueCopyImage>();
+
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());
+  }
+
+  const void *GetSource() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Src);
+    EnqueueCopyImage &Cmd = GetQueueCommandAs<EnqueueCopyImage>();
+
+    return reinterpret_cast<const void *>(Base + Cmd.GetSourceOffset());
+  }
+
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueCopyImage>().GetTargetRowPitch();
+  }
+  
+  size_t GetTargetSlicePitch() {
+  return GetQueueCommandAs<EnqueueCopyImage>().GetTargetSlicePitch();  
+  }
+  
+  size_t GetSourceRowPitch() {
+  return GetQueueCommandAs<EnqueueCopyImage>().GetSourceRowPitch();
+  }
+  
+  size_t GetSourceSlicePitch() {
+    return GetQueueCommandAs<EnqueueCopyImage>().GetSourceSlicePitch();
+  }
+  
+  const size_t *GetRegion() {
+    return GetQueueCommandAs<EnqueueCopyImage>().GetRegion();
+  }
+
+private:
+  void *Dst;
+  const void *Src;
 };
 
 class MapBufferCPUCommand : public CPUExecCommand {

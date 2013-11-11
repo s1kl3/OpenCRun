@@ -129,6 +129,29 @@ EnqueueWriteImage::EnqueueWriteImage(Image &Target,
   std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
 }
 
+
+//
+// EnqueueWriteImage implementation.
+//
+
+EnqueueCopyImage::EnqueueCopyImage(Image &Target,
+                                   Image &Source,
+                                   size_t TargetOffset,
+                                   size_t SourceOffset,
+                                   const size_t *Region,
+                                   EventsContainer &WaitList)
+  : Command(Command::CopyImage, WaitList),
+    Target(&Target),
+    Source(&Source),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset) {
+  // Convert the region width in bytes. Target and source images have
+  // the same element size because they have the same image format.
+  this->Region[0] = Region[0] * Target.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+}
+
 //
 // EnqueueMapBuffer implementation.
 //
@@ -662,6 +685,9 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
     const size_t *Region,
     size_t RowPitch,
     size_t SlicePitch) {
+  if(!Source)
+    return *this;
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
@@ -672,7 +698,7 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if(Origin[0] + Region[0] > Source->GetWidth())
       return NotifyError(CL_INVALID_VALUE, "region out of bounds");
@@ -683,7 +709,7 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if((Origin[0] + Region[0] > Source->GetWidth()) ||
        (Origin[1] + Region[1] > Source->GetArraySize()))
@@ -695,7 +721,7 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if((Origin[0] + Region[0] > Source->GetWidth()) ||
        (Origin[1] + Region[1] > Source->GetHeight()))
@@ -793,8 +819,8 @@ EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
   cl_mem Img,
   const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteImageBuilder,
                                        Ctx),
-                  Source(Source),
                   Target(NULL),
+                  Source(Source),
                   Blocking(false),
                   Region(NULL),
                   TargetOffset(0) {
@@ -831,6 +857,9 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
     const size_t *Region,
     size_t InputRowPitch,
     size_t InputSlicePitch) {
+  if(!Target)
+    return *this;
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
@@ -841,7 +870,7 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if(Origin[0] + Region[0] > Target->GetWidth())
       return NotifyError(CL_INVALID_VALUE, "region out of bounds");
@@ -852,7 +881,7 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if((Origin[0] + Region[0] > Target->GetWidth()) ||
        (Origin[1] + Region[1] > Target->GetArraySize()))
@@ -864,7 +893,7 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
       return NotifyError(CL_INVALID_VALUE, "invalid origin");
 
     if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return NotifyError(CL_INVALID_VALUE, "invalid region");
 
     if((Origin[0] + Region[0] > Target->GetWidth()) ||
        (Origin[1] + Region[1] > Target->GetHeight()))
@@ -953,6 +982,209 @@ EnqueueWriteImage *EnqueueWriteImageBuilder::Create(cl_int *ErrCode) {
                                WaitList);
 }
 
+//
+// EnqueueCopyImageBuilder implementation.
+//
+
+EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
+  Context &Ctx,
+  cl_mem TargetImg,
+  cl_mem SourceImg) : CommandBuilder(CommandBuilder::EnqueueCopyImageBuilder,
+                                     Ctx),
+                      Target(NULL),
+                      Source(NULL),
+                      TargetOffset(0),
+                      SourceOffset(0),
+                      Region(NULL) {
+  if(!TargetImg)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
+
+  else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(TargetImg))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not an image");
+
+  else if(Ctx != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
+
+  if(!SourceImg)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
+
+  else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(SourceImg))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an image");
+  
+  else if(Ctx != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
+
+  else if((Source->GetChannelOrder() != Target->GetChannelOrder()) ||
+          (Source->GetChannelType() != Target->GetChannelType()))
+    NotifyError(CL_IMAGE_FORMAT_MISMATCH, "target and source image use different image formats");
+} 
+
+EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
+    const size_t *TargetOrigin,
+    const size_t *SourceOrigin,
+    const size_t *Region) {
+  if(!Target || !Source)
+    return *this;
+
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  switch(Target->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(TargetOrigin[1] != 0 || TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if(TargetOrigin[0] + Region[0] > Target->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
+       (TargetOrigin[2] + Region[2] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
+       (TargetOrigin[2] + Region[2] > Target->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid target image type");
+  }
+
+  switch(Source->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(SourceOrigin[1] != 0 || SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if(SourceOrigin[0] + Region[0] > Source->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
+       (SourceOrigin[2] + Region[2] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
+       (SourceOrigin[2] + Region[2] > Source->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid source image type");
+  }
+
+  this->Region = Region;
+  
+  // Calculate offset inside the target image object.
+  TargetOffset = TargetOrigin[0] * Target->GetElementSize() +
+                 TargetOrigin[1] * Target->GetRowPitch() +
+                 TargetOrigin[2] * Target->GetSlicePitch();
+  
+  // Calculate offset inside the source image object.
+  SourceOffset = SourceOrigin[0] * Source->GetElementSize() +
+                 SourceOrigin[1] * Source->GetRowPitch() +
+                 SourceOrigin[2] * Source->GetSlicePitch();
+
+  return *this;
+}
+
+EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueCopyImageBuilder>(Super);
+}
+
+EnqueueCopyImage *EnqueueCopyImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueCopyImage(*Target,
+                              *Source,
+                              TargetOffset,
+                              SourceOffset,
+                              Region,
+                              WaitList);
+}
 
 //
 // EnqueueMapBufferBuilder implementation.

@@ -60,6 +60,13 @@ bool Multiprocessor::Submit(WriteImageCPUCommand *Cmd) {
   return Thr.Submit(static_cast<CPUCommand *>(Cmd));
 }
 
+bool Multiprocessor::Submit(CopyImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
 bool Multiprocessor::Submit(MapBufferCPUCommand *Cmd) {
   // TODO: implement a smarter selection policy.
   CPUThread &Thr = **Threads.begin();
