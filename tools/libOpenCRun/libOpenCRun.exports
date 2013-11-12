@@ -63,6 +63,7 @@ clEnqueueCopyBuffer
 clEnqueueCopyBufferRect
 clEnqueueReadImage
 clEnqueueWriteImage
+clEnqueueFillImage
 clEnqueueCopyImage
 clEnqueueCopyImageToBuffer
 clEnqueueCopyBufferToImage

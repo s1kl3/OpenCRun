@@ -33,6 +33,8 @@ public:
   bool Submit(ReadImageCPUCommand *Cmd);
   bool Submit(WriteImageCPUCommand *Cmd);
   bool Submit(CopyImageCPUCommand *Cmd);
+  bool Submit(CopyImageToBufferCPUCommand *Cmd);
+  bool Submit(CopyBufferToImageCPUCommand *Cmd);
   bool Submit(MapBufferCPUCommand *Cmd);
   bool Submit(UnmapMemObjectCPUCommand *Cmd);
   bool Submit(ReadBufferRectCPUCommand *Cmd);

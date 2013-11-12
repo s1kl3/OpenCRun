@@ -1,6 +1,7 @@
 
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
+#include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Device.h"
 #include "opencrun/Core/Kernel.h"
 #include "opencrun/Core/MemoryObj.h"
@@ -131,7 +132,7 @@ EnqueueWriteImage::EnqueueWriteImage(Image &Target,
 
 
 //
-// EnqueueWriteImage implementation.
+// EnqueueCopyImage implementation.
 //
 
 EnqueueCopyImage::EnqueueCopyImage(Image &Target,
@@ -147,6 +148,48 @@ EnqueueCopyImage::EnqueueCopyImage(Image &Target,
     SourceOffset(SourceOffset) {
   // Convert the region width in bytes. Target and source images have
   // the same element size because they have the same image format.
+  this->Region[0] = Region[0] * Target.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+}
+
+//
+// EnqueueCopyImageToBuffer implementation.
+//
+EnqueueCopyImageToBuffer::EnqueueCopyImageToBuffer(
+    Buffer &Target,
+    Image &Source,
+    size_t TargetOffset,
+    size_t SourceOffset,
+    const size_t *Region,
+    EventsContainer &WaitList)
+  : Command(Command::CopyImageToBuffer, WaitList),
+    Target(&Target),
+    Source(&Source),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset) {
+  // Convert the source region width in bytes.
+  this->Region[0] = Region[0] * Source.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+}
+
+//
+// EnqueueCopyBufferToImage implementation.
+//
+EnqueueCopyBufferToImage::EnqueueCopyBufferToImage(
+    Image &Target,
+    Buffer &Source,
+    size_t TargetOffset,
+    const size_t *Region,
+    size_t SourceOffset,
+    EventsContainer &WaitList)
+  : Command(Command::CopyBufferToImage, WaitList),
+    Target(&Target),
+    Source(&Source),
+    TargetOffset(TargetOffset),
+    SourceOffset(SourceOffset) {
+  // Convert the target region width in bytes.
   this->Region[0] = Region[0] * Target.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
@@ -643,10 +686,10 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueReadImageBuilder::EnqueueReadImageBuilder(
-  Context &Ctx,
+  CommandQueue *Queue,
   cl_mem Img,
   void *Target) : CommandBuilder(CommandBuilder::EnqueueReadImageBuilder,
-                                 Ctx),
+                                 Queue->GetContext()),
                   Source(NULL),
                   Target(Target),
                   Blocking(false),
@@ -662,11 +705,63 @@ EnqueueReadImageBuilder::EnqueueReadImageBuilder(
           (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid read image operation");
 
-  else if(Ctx != Source->GetContext())
+  else if(Queue->GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
     
   if(!Target)
     NotifyError(CL_INVALID_VALUE, "pointer to data sink is null");
+  
+  if(Source) {
+    // Check if the specified source image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Source->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "read source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "read source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "read source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "read source image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "read source is an unsupported image type");
+    }
+  
+    // Check if the specified source image format is supported by the device
+    // attached to the command queue.
+    llvm::ArrayRef<cl_image_format> DevFmts = 
+      Queue->GetDevice().GetSupportedImageFormats();
+
+    cl_image_format SourceFmt = Source->GetImageFormat();
+    bool FmtSupported = false;
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((SourceFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+         (SourceFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        break;
+      }
+
+    if(!FmtSupported)
+      NotifyError(CL_INVALID_VALUE, 
+          "read source image format unsupported by device associated with queue");
+  }
 }
 
 EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetBlocking(
@@ -815,10 +910,10 @@ EnqueueReadImage *EnqueueReadImageBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
-  Context &Ctx,
+  CommandQueue *Queue,
   cl_mem Img,
   const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteImageBuilder,
-                                       Ctx),
+                                       Queue->GetContext()),
                   Target(NULL),
                   Source(Source),
                   Blocking(false),
@@ -839,6 +934,58 @@ EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
     
   if(!Target)
     NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
+
+  if(Target) {
+    // Check if the specified target image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Target->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "write target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "write target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "write target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "write target image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "write target is an unsupported image type");
+    }
+  
+    // Check if the specified target image format is supported by the device
+    // attached to the command queue.
+    llvm::ArrayRef<cl_image_format> DevFmts = 
+      Queue->GetDevice().GetSupportedImageFormats();
+
+    cl_image_format TargetFmt = Target->GetImageFormat();
+    bool FmtSupported = false;
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        break;
+      }
+
+    if(!FmtSupported)
+      NotifyError(CL_INVALID_VALUE, 
+          "write target image format unsupported by device associated with queue");
+  }
 }
 
 EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetBlocking(
@@ -987,10 +1134,10 @@ EnqueueWriteImage *EnqueueWriteImageBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
-  Context &Ctx,
+  CommandQueue *Queue,
   cl_mem TargetImg,
   cl_mem SourceImg) : CommandBuilder(CommandBuilder::EnqueueCopyImageBuilder,
-                                     Ctx),
+                                     Queue->GetContext()),
                       Target(NULL),
                       Source(NULL),
                       TargetOffset(0),
@@ -1002,7 +1149,7 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
   else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(TargetImg))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not an image");
 
-  else if(Ctx != Target->GetContext())
+  else if(Queue->GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
 
   if(!SourceImg)
@@ -1011,12 +1158,99 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
   else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(SourceImg))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an image");
   
-  else if(Ctx != Source->GetContext())
+  else if(Queue->GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
 
   else if((Source->GetChannelOrder() != Target->GetChannelOrder()) ||
           (Source->GetChannelType() != Target->GetChannelType()))
     NotifyError(CL_IMAGE_FORMAT_MISMATCH, "target and source image use different image formats");
+
+  if(Target) {
+    // Check if the specified target image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Target->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "copy target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy target image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy target image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "copy target is an unsupported image type");
+    }
+  
+    // Check if the specified target image format is supported by the device
+    // attached to the command queue; this checks also for the source image
+    // format because they're the same.
+    llvm::ArrayRef<cl_image_format> DevFmts = 
+      Queue->GetDevice().GetSupportedImageFormats();
+
+    cl_image_format TargetFmt = Target->GetImageFormat();
+    bool FmtSupported = false;
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        break;
+      }
+
+    if(!FmtSupported)
+      NotifyError(CL_INVALID_VALUE, 
+          "copy target image format unsupported by device associated with queue");
+  }
+
+  if(Source) {
+    // Check if the specified source image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Source->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
+    }
+  }
 } 
 
 EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
@@ -1184,6 +1418,412 @@ EnqueueCopyImage *EnqueueCopyImageBuilder::Create(cl_int *ErrCode) {
                               SourceOffset,
                               Region,
                               WaitList);
+}
+
+//
+// EnqueueCopyImageToBuffer implementation.
+//
+
+EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
+  CommandQueue *Queue,
+  cl_mem TargetBuf,
+  cl_mem SourceImg) 
+  : CommandBuilder(CommandBuilder::EnqueueCopyImageToBufferBuilder,
+                   Queue->GetContext()),
+    Target(NULL),
+    Source(NULL),
+    TargetOffset(0),
+    SourceOffset(0),
+    Region(NULL) {
+  if(!TargetBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
+
+  else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
+
+  else if(Queue->GetContext() != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
+
+  if(!SourceImg)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
+
+  else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(SourceImg))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an image");
+
+  else if(Source->GetImageType() == Image::Image1D_Buffer &&
+          Source->GetBuffer() == Target)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source created from target buffer");
+  
+  else if(Queue->GetContext() != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
+
+  if(Source) {
+    // Check if the specified source image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Source->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
+    }
+  
+    // Check if the specified source image format is supported by the device
+    // attached to the command queue.
+    llvm::ArrayRef<cl_image_format> DevFmts = 
+      Queue->GetDevice().GetSupportedImageFormats();
+
+    cl_image_format SourceFmt = Source->GetImageFormat();
+    bool FmtSupported = false;
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((SourceFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+         (SourceFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        break;
+      }
+
+    if(!FmtSupported)
+      NotifyError(CL_INVALID_VALUE, 
+          "copy source image format unsupported by device associated with queue");
+  }
+}
+
+EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
+    size_t TargetOffset,
+    const size_t *SourceOrigin,
+    const size_t *Region) {
+  if(!Target || !Source)
+    return *this;
+
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  switch(Source->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(SourceOrigin[1] != 0 || SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if(SourceOrigin[0] + Region[0] > Source->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(SourceOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
+
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
+       (SourceOrigin[2] + Region[2] > Source->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
+       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
+       (SourceOrigin[2] + Region[2] > Source->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid source image type");
+  }
+
+  this->Region = Region;
+
+  if(TargetOffset + 
+     Region[0] * Region[1] * Region[2] * Source->GetElementSize() > Target->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+  this->TargetOffset = TargetOffset;
+  
+  // Calculate offset inside the source image object.
+  SourceOffset = SourceOrigin[0] * Source->GetElementSize() +
+                 SourceOrigin[1] * Source->GetRowPitch() +
+                 SourceOrigin[2] * Source->GetSlicePitch();
+
+  return *this;
+}
+
+EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueCopyImageToBufferBuilder>(Super);
+}
+
+EnqueueCopyImageToBuffer *EnqueueCopyImageToBufferBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueCopyImageToBuffer(*Target,
+                                      *Source,
+                                      TargetOffset,
+                                      SourceOffset,
+                                      Region,
+                                      WaitList);
+}
+
+//
+// EnqueueCopyBufferToImage implementation.
+//
+
+EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
+  CommandQueue *Queue,
+  cl_mem TargetImg,
+  cl_mem SourceBuf) 
+  : CommandBuilder(CommandBuilder::EnqueueCopyBufferToImageBuilder,
+                   Queue->GetContext()),
+    Target(NULL),
+    Source(NULL),
+    TargetOffset(0),
+    Region(NULL),
+    SourceOffset(0) {
+  if(!SourceBuf)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is null");
+
+  else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an buffer");
+  
+  else if(Queue->GetContext() != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context");
+
+  if(!TargetImg)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
+
+  else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(TargetImg))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not an image");
+
+  else if(Target->GetImageType() == Image::Image1D_Buffer &&
+          Target->GetBuffer() == Source)
+    NotifyError(CL_INVALID_MEM_OBJECT, "copy source created from target buffer");
+
+  else if(Queue->GetContext() != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
+
+  if(Target) {
+    // Check if the specified target image dimensions are supported by the
+    // device attached to the command queue.
+    switch(Target->GetImageType()) {
+    case Image::Image1D:
+    case Image::Image1D_Array:
+      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+        NotifyError(CL_INVALID_IMAGE_SIZE, 
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image1D_Buffer:
+      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image2D:
+    case Image::Image2D_Array:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by target device associated with queue");  
+      break;
+    case Image::Image3D:
+      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+        NotifyError(CL_INVALID_IMAGE_SIZE,
+            "copy source image size unsupported by device associated with queue");  
+      break;
+    default:
+      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
+    }
+  
+    // Check if the specified target image format is supported by the device
+    // attached to the command queue.
+    llvm::ArrayRef<cl_image_format> DevFmts = 
+      Queue->GetDevice().GetSupportedImageFormats();
+
+    cl_image_format TargetFmt = Target->GetImageFormat();
+    bool FmtSupported = false;
+    for(unsigned K = 0; K < DevFmts.size(); ++K)
+      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+        FmtSupported = true;
+        break;
+      }
+
+    if(!FmtSupported)
+      NotifyError(CL_INVALID_VALUE, 
+          "copy target image format unsupported by device associated with queue");
+  }
+}
+
+EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
+    const size_t *TargetOrigin,
+    const size_t *Region,
+    size_t SourceOffset) {
+  if(!Target || !Source)
+    return *this;
+
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  switch(Target->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(TargetOrigin[1] != 0 || TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[1] != 1 || Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if(TargetOrigin[0] + Region[0] > Target->GetWidth())
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image1D_Array:
+    if(TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image2D:
+    if(TargetOrigin[2] != 0)
+      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+
+    if(Region[2] != 1)
+      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image2D_Array:
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
+       (TargetOrigin[2] + Region[2] > Target->GetArraySize()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  case Image::Image3D:
+    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
+       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
+       (TargetOrigin[2] + Region[2] > Target->GetDepth()))
+      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
+
+    break;
+  default:
+    return NotifyError(CL_INVALID_VALUE, "invalid target image type");
+  }
+
+  this->Region = Region;
+
+  if(SourceOffset + 
+     Region[0] * Region[1] * Region[2] * Target->GetElementSize() > Source->GetSize())
+    return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
+
+  this->SourceOffset = SourceOffset;
+  
+  // Calculate offset inside the source image object.
+  TargetOffset = TargetOrigin[0] * Target->GetElementSize() +
+                 TargetOrigin[1] * Target->GetRowPitch() +
+                 TargetOrigin[2] * Target->GetSlicePitch();
+
+  return *this;
+}
+
+EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueCopyBufferToImageBuilder>(Super);
+}
+
+EnqueueCopyBufferToImage *EnqueueCopyBufferToImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueCopyBufferToImage(*Target,
+                                      *Source,
+                                      TargetOffset,
+                                      Region,
+                                      SourceOffset,
+                                      WaitList);
 }
 
 //

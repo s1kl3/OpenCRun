@@ -346,7 +346,7 @@ clEnqueueReadImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueReadImageBuilder Bld(Queue->GetContext(), image, ptr);
+  opencrun::EnqueueReadImageBuilder Bld(Queue, image, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_read)
                               .SetCopyArea(origin, 
                                            region, 
@@ -394,7 +394,7 @@ clEnqueueWriteImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueWriteImageBuilder Bld(Queue->GetContext(), image, ptr);
+  opencrun::EnqueueWriteImageBuilder Bld(Queue, image, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_write)
                               .SetCopyArea(origin,
                                            region, 
@@ -413,6 +413,19 @@ clEnqueueWriteImage(cl_command_queue command_queue,
     return ErrCode;
 
   RETURN_WITH_EVENT(event, Ev);
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clEnqueueFillImage(cl_command_queue command_queue,
+                   cl_mem image,
+                   const void *fill_color,
+                   const size_t *origin,
+                   const size_t *region,
+                   cl_uint num_events_in_wait_list,
+                   const cl_event *event_wait_list,
+                   cl_event *event) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -440,7 +453,7 @@ clEnqueueCopyImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueCopyImageBuilder Bld(Queue->GetContext(), dst_image, src_image);
+  opencrun::EnqueueCopyImageBuilder Bld(Queue, dst_image, src_image);
   opencrun::Command *Cmd = Bld.SetCopyArea(dst_origin, src_origin, region)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
@@ -467,8 +480,36 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
                            cl_uint num_events_in_wait_list,
                            const cl_event *event_wait_list,
                            cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+  if(!src_origin || !region)
+    return CL_INVALID_VALUE;
+
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  if(!Queue->GetDevice().HasImageSupport())
+    return CL_INVALID_OPERATION;
+
+  cl_int ErrCode;
+
+  opencrun::EnqueueCopyImageToBufferBuilder Bld(Queue, dst_buffer, src_image);
+  opencrun::Command *Cmd = Bld.SetCopyArea(dst_offset, src_origin, region)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -481,8 +522,36 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
                            cl_uint num_events_in_wait_list,
                            const cl_event *event_wait_list,
                            cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+  if(!dst_origin || !region)
+    return CL_INVALID_VALUE;
+
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  if(!Queue->GetDevice().HasImageSupport())
+    return CL_INVALID_OPERATION;
+
+  cl_int ErrCode;
+
+  opencrun::EnqueueCopyBufferToImageBuilder Bld(Queue, dst_image, src_buffer);
+  opencrun::Command *Cmd = Bld.SetCopyArea(dst_origin, region, src_offset)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);
 }
 
 CL_API_ENTRY void * CL_API_CALL
@@ -608,6 +677,18 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
     return ErrCode;
 
   RETURN_WITH_EVENT(event, Ev);
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clEnqueueMigrateMemObjects(cl_command_queue command_queue,
+                           cl_uint num_mem_objects,
+                           const cl_mem *mem_objects,
+                           cl_mem_migration_flags flags,
+                           cl_uint num_events_in_wait_list,
+                           const cl_event *event_wait_list,
+                           cl_event *event) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return CL_SUCCESS;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
