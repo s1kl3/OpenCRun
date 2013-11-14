@@ -711,57 +711,8 @@ EnqueueReadImageBuilder::EnqueueReadImageBuilder(
   if(!Target)
     NotifyError(CL_INVALID_VALUE, "pointer to data sink is null");
   
-  if(Source) {
-    // Check if the specified source image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Source->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "read source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "read source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "read source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "read source image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "read source is an unsupported image type");
-    }
-  
-    // Check if the specified source image format is supported by the device
-    // attached to the command queue.
-    llvm::ArrayRef<cl_image_format> DevFmts = 
-      Queue->GetDevice().GetSupportedImageFormats();
-
-    cl_image_format SourceFmt = Source->GetImageFormat();
-    bool FmtSupported = false;
-    for(unsigned K = 0; K < DevFmts.size(); ++K)
-      if((SourceFmt.image_channel_order == DevFmts[K].image_channel_order) &&
-         (SourceFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
-        FmtSupported = true;
-        break;
-      }
-
-    if(!FmtSupported)
-      NotifyError(CL_INVALID_VALUE, 
-          "read source image format unsupported by device associated with queue");
-  }
+  if(Source)
+    CheckDevImgSupport<>(*this, Queue, Source);
 }
 
 EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetBlocking(
@@ -786,61 +737,10 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  switch(Source->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(Origin[1] != 0 || Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
-
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if(Origin[0] + Region[0] > Source->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if((Origin[0] + Region[0] > Source->GetWidth()) ||
-       (Origin[1] + Region[1] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if((Origin[0] + Region[0] > Source->GetWidth()) ||
-       (Origin[1] + Region[1] > Source->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((Origin[0] + Region[0] > Source->GetWidth()) ||
-       (Origin[1] + Region[1] > Source->GetHeight()) ||
-       (Origin[2] + Region[2] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((Origin[0] + Region[0] > Source->GetWidth()) ||
-       (Origin[1] + Region[1] > Source->GetHeight()) ||
-       (Origin[2] + Region[2] > Source->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid image type");
-  }
-
+  if(!IsValidImgRegion<>(*this, Source, Origin, Region))
+    return *this;
+  
+  // Region is valid.
   this->Region = Region;
 
   // Calculate offset inside the image object.
@@ -935,57 +835,8 @@ EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
   if(!Target)
     NotifyError(CL_INVALID_VALUE, "pointer to data source is null");
 
-  if(Target) {
-    // Check if the specified target image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Target->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "write target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "write target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "write target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "write target image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "write target is an unsupported image type");
-    }
-  
-    // Check if the specified target image format is supported by the device
-    // attached to the command queue.
-    llvm::ArrayRef<cl_image_format> DevFmts = 
-      Queue->GetDevice().GetSupportedImageFormats();
-
-    cl_image_format TargetFmt = Target->GetImageFormat();
-    bool FmtSupported = false;
-    for(unsigned K = 0; K < DevFmts.size(); ++K)
-      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
-         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
-        FmtSupported = true;
-        break;
-      }
-
-    if(!FmtSupported)
-      NotifyError(CL_INVALID_VALUE, 
-          "write target image format unsupported by device associated with queue");
-  }
+  if(Target)
+    CheckDevImgSupport<>(*this, Queue, Target);
 }
 
 EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetBlocking(
@@ -1010,61 +861,10 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  switch(Target->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(Origin[1] != 0 || Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
+  if(!IsValidImgRegion<>(*this, Target, Origin, Region))
+    return *this;
 
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if(Origin[0] + Region[0] > Target->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if((Origin[0] + Region[0] > Target->GetWidth()) ||
-       (Origin[1] + Region[1] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(Origin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region");
-
-    if((Origin[0] + Region[0] > Target->GetWidth()) ||
-       (Origin[1] + Region[1] > Target->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((Origin[0] + Region[0] > Target->GetWidth()) ||
-       (Origin[1] + Region[1] > Target->GetHeight()) ||
-       (Origin[2] + Region[2] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((Origin[0] + Region[0] > Target->GetWidth()) ||
-       (Origin[1] + Region[1] > Target->GetHeight()) ||
-       (Origin[2] + Region[2] > Target->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid image type");
-  }
-
+  // Region is valid.
   this->Region = Region;
 
   // Calculate offset inside the image object.
@@ -1165,92 +965,11 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
           (Source->GetChannelType() != Target->GetChannelType()))
     NotifyError(CL_IMAGE_FORMAT_MISMATCH, "target and source image use different image formats");
 
-  if(Target) {
-    // Check if the specified target image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Target->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "copy target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy target image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy target image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "copy target is an unsupported image type");
-    }
-  
-    // Check if the specified target image format is supported by the device
-    // attached to the command queue; this checks also for the source image
-    // format because they're the same.
-    llvm::ArrayRef<cl_image_format> DevFmts = 
-      Queue->GetDevice().GetSupportedImageFormats();
+  if(Target)
+    CheckDevImgSupport<>(*this, Queue, Target);
 
-    cl_image_format TargetFmt = Target->GetImageFormat();
-    bool FmtSupported = false;
-    for(unsigned K = 0; K < DevFmts.size(); ++K)
-      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
-         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
-        FmtSupported = true;
-        break;
-      }
-
-    if(!FmtSupported)
-      NotifyError(CL_INVALID_VALUE, 
-          "copy target image format unsupported by device associated with queue");
-  }
-
-  if(Source) {
-    // Check if the specified source image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Source->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
-    }
-  }
+  if(Source)
+    CheckDevImgSupport<>(*this, Queue, Source);
 } 
 
 EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
@@ -1263,116 +982,13 @@ EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  switch(Target->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(TargetOrigin[1] != 0 || TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+  if(!IsValidImgRegion<>(*this, Target, TargetOrigin, Region))
+    return *this;
 
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
+  if(!IsValidImgRegion<>(*this, Source, SourceOrigin, Region))
+    return *this;
 
-    if(TargetOrigin[0] + Region[0] > Target->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
-
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
-
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
-       (TargetOrigin[2] + Region[2] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
-       (TargetOrigin[2] + Region[2] > Target->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid target image type");
-  }
-
-  switch(Source->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(SourceOrigin[1] != 0 || SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
-
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if(SourceOrigin[0] + Region[0] > Source->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
-       (SourceOrigin[2] + Region[2] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
-       (SourceOrigin[2] + Region[2] > Source->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid source image type");
-  }
-
+  // Region is valid for both image objects.
   this->Region = Region;
   
   // Calculate offset inside the target image object.
@@ -1457,57 +1073,8 @@ EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
   else if(Queue->GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
 
-  if(Source) {
-    // Check if the specified source image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Source->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Source->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Source->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Source->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Source->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
-    }
-  
-    // Check if the specified source image format is supported by the device
-    // attached to the command queue.
-    llvm::ArrayRef<cl_image_format> DevFmts = 
-      Queue->GetDevice().GetSupportedImageFormats();
-
-    cl_image_format SourceFmt = Source->GetImageFormat();
-    bool FmtSupported = false;
-    for(unsigned K = 0; K < DevFmts.size(); ++K)
-      if((SourceFmt.image_channel_order == DevFmts[K].image_channel_order) &&
-         (SourceFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
-        FmtSupported = true;
-        break;
-      }
-
-    if(!FmtSupported)
-      NotifyError(CL_INVALID_VALUE, 
-          "copy source image format unsupported by device associated with queue");
-  }
+  if(Source)
+    CheckDevImgSupport(*this, Queue, Source);
 }
 
 EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
@@ -1520,61 +1087,10 @@ EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  switch(Source->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(SourceOrigin[1] != 0 || SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
+  if(!IsValidImgRegion<>(*this, Source, SourceOrigin, Region))
+    return *this;
 
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if(SourceOrigin[0] + Region[0] > Source->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(SourceOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid source origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for source");
-
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
-       (SourceOrigin[2] + Region[2] > Source->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((SourceOrigin[0] + Region[0] > Source->GetWidth()) ||
-       (SourceOrigin[1] + Region[1] > Source->GetHeight()) ||
-       (SourceOrigin[2] + Region[2] > Source->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "source region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid source image type");
-  }
-
+  // Region is valid.
   this->Region = Region;
 
   if(TargetOffset + 
@@ -1660,57 +1176,8 @@ EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
   else if(Queue->GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
 
-  if(Target) {
-    // Check if the specified target image dimensions are supported by the
-    // device attached to the command queue.
-    switch(Target->GetImageType()) {
-    case Image::Image1D:
-    case Image::Image1D_Array:
-      if(Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
-        NotifyError(CL_INVALID_IMAGE_SIZE, 
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image1D_Buffer:
-      if(Target->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image2D:
-    case Image::Image2D_Array:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by target device associated with queue");  
-      break;
-    case Image::Image3D:
-      if((Target->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-         (Target->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-         (Target->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
-        NotifyError(CL_INVALID_IMAGE_SIZE,
-            "copy source image size unsupported by device associated with queue");  
-      break;
-    default:
-      NotifyError(CL_INVALID_VALUE, "copy source is an unsupported image type");
-    }
-  
-    // Check if the specified target image format is supported by the device
-    // attached to the command queue.
-    llvm::ArrayRef<cl_image_format> DevFmts = 
-      Queue->GetDevice().GetSupportedImageFormats();
-
-    cl_image_format TargetFmt = Target->GetImageFormat();
-    bool FmtSupported = false;
-    for(unsigned K = 0; K < DevFmts.size(); ++K)
-      if((TargetFmt.image_channel_order == DevFmts[K].image_channel_order) &&
-         (TargetFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
-        FmtSupported = true;
-        break;
-      }
-
-    if(!FmtSupported)
-      NotifyError(CL_INVALID_VALUE, 
-          "copy target image format unsupported by device associated with queue");
-  }
+  if(Target)
+    CheckDevImgSupport<>(*this, Queue, Target);
 }
 
 EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
@@ -1723,61 +1190,10 @@ EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  switch(Target->GetImageType()) {
-  case Image::Image1D:
-  case Image::Image1D_Buffer:
-    if(TargetOrigin[1] != 0 || TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
+  if(!IsValidImgRegion<>(*this, Target, TargetOrigin, Region))
+    return *this;
 
-    if(Region[1] != 1 || Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
-
-    if(TargetOrigin[0] + Region[0] > Target->GetWidth())
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image1D_Array:
-    if(TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
-
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image2D:
-    if(TargetOrigin[2] != 0)
-      return NotifyError(CL_INVALID_VALUE, "invalid target origin");
-
-    if(Region[2] != 1)
-      return NotifyError(CL_INVALID_VALUE, "invalid region for target");
-
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image2D_Array:
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
-       (TargetOrigin[2] + Region[2] > Target->GetArraySize()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  case Image::Image3D:
-    if((TargetOrigin[0] + Region[0] > Target->GetWidth()) ||
-       (TargetOrigin[1] + Region[1] > Target->GetHeight()) ||
-       (TargetOrigin[2] + Region[2] > Target->GetDepth()))
-      return NotifyError(CL_INVALID_VALUE, "target region out of bounds");
-
-    break;
-  default:
-    return NotifyError(CL_INVALID_VALUE, "invalid target image type");
-  }
-
+  // Region is valid.
   this->Region = Region;
 
   if(SourceOffset + 
@@ -2823,4 +2239,165 @@ EnqueueNativeKernel *EnqueueNativeKernelBuilder::Create(cl_int *ErrCode) {
     *ErrCode = CL_SUCCESS;
 
   return new EnqueueNativeKernel(Func, RawArgs, Mappings, WaitList);
+}
+
+//
+// Utility functions.
+//
+
+// Function used by image command builders to check for
+// images size and format support by device attached to
+// the given command queue.
+template<class ImgCmdBuilderType>
+ImgCmdBuilderType &opencrun::CheckDevImgSupport(
+    ImgCmdBuilderType &Bld,
+    CommandQueue *Queue,
+    Image *Img) {
+  // Check if the image dimensions are supported by the device attached
+  // to the command queue.
+  switch(Img->GetImageType()) {
+  case Image::Image1D_Array:
+    if(Img->GetArraySize() > Queue->GetDevice().GetImageMaxArraySize())
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
+          "image size unsupported by target device associated with queue");  
+  case Image::Image1D:
+    if(Img->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
+          "image size unsupported by target device associated with queue");  
+    break;
+  case Image::Image1D_Buffer:
+    if(Img->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
+          "image size unsupported by target device associated with queue");  
+    break;
+  case Image::Image2D_Array:
+    if(Img->GetArraySize() > Queue->GetDevice().GetImageMaxArraySize())
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
+          "image size unsupported by target device associated with queue");  
+  case Image::Image2D:
+    if((Img->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
+        (Img->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
+          "image size unsupported by target device associated with queue");  
+    break;
+  case Image::Image3D:
+    if((Img->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
+        (Img->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
+        (Img->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+      Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
+          "image size unsupported by device associated with queue");  
+    break;
+  default:
+    Bld.NotifyError(CL_INVALID_VALUE,
+        "image type unsupported by device associated with queue");
+  }
+
+  // Check if the specified source image format is supported by the device
+  // attached to the command queue.
+  llvm::ArrayRef<cl_image_format> DevFmts = 
+    Queue->GetDevice().GetSupportedImageFormats();
+
+  cl_image_format ImgFmt = Img->GetImageFormat();
+  bool FmtSupported = false;
+  for(unsigned K = 0; K < DevFmts.size(); ++K)
+    if((ImgFmt.image_channel_order == DevFmts[K].image_channel_order) &&
+        (ImgFmt.image_channel_data_type == DevFmts[K].image_channel_data_type)) {
+      FmtSupported = true;
+      break;
+    }
+
+  if(!FmtSupported)
+    Bld.NotifyError(CL_INVALID_VALUE, 
+        "image format unsupported by device associated with queue");
+
+  return Bld;
+}
+
+// Function used by image command builders to check that (Origin, Region) 
+// specifies a valid region for the given image object.
+template<class ImgCmdBuilderType>
+bool opencrun::IsValidImgRegion(
+    ImgCmdBuilderType &Bld,
+    Image *Img,
+    const size_t *Origin,
+    const size_t *Region) {
+  switch(Img->GetImageType()) {
+  case Image::Image1D:
+  case Image::Image1D_Buffer:
+    if(Origin[1] != 0 || Origin[2] != 0) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return false;
+    }
+
+    if(Region[1] != 1 || Region[2] != 1) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid region");
+      return false;
+    }
+
+    if(Origin[0] + Region[0] > Img->GetWidth()) {
+      Bld.NotifyError(CL_INVALID_VALUE, "region out of bounds");
+      return false;
+    }
+
+    break;
+  case Image::Image1D_Array:
+    if(Origin[2] != 0) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return false;
+    }
+
+    if(Region[2] != 1) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid region");
+      return false;
+    }
+
+    if((Origin[0] + Region[0] > Img->GetWidth()) ||
+       (Origin[1] + Region[1] > Img->GetArraySize())) {
+      Bld.NotifyError(CL_INVALID_VALUE, "region out of bounds");
+      return false;
+    }
+
+    break;
+  case Image::Image2D:
+    if(Origin[2] != 0) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid origin");
+      return false;
+    }
+
+    if(Region[2] != 1) {
+      Bld.NotifyError(CL_INVALID_VALUE, "invalid region");
+      return false;
+    }
+
+    if((Origin[0] + Region[0] > Img->GetWidth()) ||
+       (Origin[1] + Region[1] > Img->GetHeight())) {
+      Bld.NotifyError(CL_INVALID_VALUE, "region out of bounds");
+      return false;
+    }
+
+    break;
+  case Image::Image2D_Array:
+    if((Origin[0] + Region[0] > Img->GetWidth()) ||
+       (Origin[1] + Region[1] > Img->GetHeight()) ||
+       (Origin[2] + Region[2] > Img->GetArraySize())) {
+      Bld.NotifyError(CL_INVALID_VALUE, "region out of bounds");
+      return false;
+    }
+
+    break;
+  case Image::Image3D:
+    if((Origin[0] + Region[0] > Img->GetWidth()) ||
+       (Origin[1] + Region[1] > Img->GetHeight()) ||
+       (Origin[2] + Region[2] > Img->GetDepth())) {
+      Bld.NotifyError(CL_INVALID_VALUE, "region out of bounds");
+      return false;
+    }
+
+    break;
+  default:
+    Bld.NotifyError(CL_INVALID_VALUE, "invalid image type");
+    return false;
+  }
+
+  return true;
 }

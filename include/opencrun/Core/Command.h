@@ -23,6 +23,19 @@ class Event;
 class InternalEvent;
 class MemoryObj;
 
+template<class ImgCmdBuilderType>
+ImgCmdBuilderType &CheckDevImgSupport(
+    ImgCmdBuilderType &,
+    CommandQueue *,
+    Image *);
+
+template<class ImgCmdBuilderType>
+bool IsValidImgRegion(
+  ImgCmdBuilderType &,
+  Image *,
+  const size_t *,
+  const size_t *);
+
 class Command {
 public:
   enum Type {
@@ -796,6 +809,17 @@ private:
   const size_t *Region;
   size_t SourceOffset;
   size_t TargetPitches[2];
+
+  friend EnqueueReadImageBuilder &CheckDevImgSupport<>(
+      EnqueueReadImageBuilder &,
+      CommandQueue *,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueReadImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueWriteImageBuilder : public CommandBuilder {
@@ -831,6 +855,17 @@ private:
   const size_t *Region;
   size_t TargetOffset;
   size_t SourcePitches[2];
+
+  friend EnqueueWriteImageBuilder &CheckDevImgSupport<>(
+      EnqueueWriteImageBuilder &,
+      CommandQueue *,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueWriteImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueCopyImageBuilder : public CommandBuilder {
@@ -863,6 +898,17 @@ private:
   size_t TargetOffset;
   size_t SourceOffset;
   const size_t *Region;
+
+  friend EnqueueCopyImageBuilder &CheckDevImgSupport<>(
+      EnqueueCopyImageBuilder &,
+      CommandQueue *,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueCopyImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueCopyImageToBufferBuilder : public CommandBuilder {
@@ -895,6 +941,17 @@ private:
   size_t TargetOffset;
   size_t SourceOffset;
   const size_t *Region;
+
+  friend EnqueueCopyImageToBufferBuilder &CheckDevImgSupport<>(
+      EnqueueCopyImageToBufferBuilder &,
+      CommandQueue *,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueCopyImageToBufferBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueCopyBufferToImageBuilder : public CommandBuilder {
@@ -927,6 +984,17 @@ private:
   size_t TargetOffset;
   const size_t *Region;
   size_t SourceOffset;
+
+  friend EnqueueCopyBufferToImageBuilder &CheckDevImgSupport<>(
+      EnqueueCopyBufferToImageBuilder &,
+      CommandQueue *,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueCopyBufferToImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueMapBufferBuilder : public CommandBuilder {
