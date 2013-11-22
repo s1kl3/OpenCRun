@@ -26,7 +26,7 @@ class MemoryObj;
 template<class ImgCmdBuilderType>
 ImgCmdBuilderType &CheckDevImgSupport(
     ImgCmdBuilderType &,
-    CommandQueue *,
+    CommandQueue &,
     Image *);
 
 template<class ImgCmdBuilderType>
@@ -50,6 +50,7 @@ public:
     CopyImageToBuffer = CL_COMMAND_COPY_IMAGE_TO_BUFFER,
     CopyBufferToImage = CL_COMMAND_COPY_BUFFER_TO_IMAGE,
     MapBuffer = CL_COMMAND_MAP_BUFFER,
+    MapImage = CL_COMMAND_MAP_IMAGE,
     UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
     ReadBufferRect = CL_COMMAND_READ_BUFFER_RECT,
     WriteBufferRect = CL_COMMAND_WRITE_BUFFER_RECT,
@@ -401,6 +402,56 @@ private:
   friend class EnqueueMapBufferBuilder;	
 };
 
+class EnqueueMapImage : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::MapImage;
+  }
+  
+private:
+  EnqueueMapImage(Image &Source,
+                  bool Blocking,
+                  cl_map_flags MapFlags,
+                  const size_t *Origin,
+                  const size_t *Region,
+                  void *MapBuf,
+                  size_t *MapPitches,
+                  EventsContainer &WaitList);
+
+public:
+  Image &GetSource() { return *Source; }
+  cl_map_flags GetMapFlags() { return MapFlags; }
+  const size_t *GetOrigin() { return Origin; }
+  const size_t *GetRegion() { return Region; }
+  size_t GetOffset() { return Origin[0] * Source->GetElementSize() +
+                              Origin[1] * Source->GetRowPitch() +
+                              Origin[2] * Source->GetSlicePitch(); }
+  void *GetMapBuffer() { return MapBuf; }
+  size_t GetMapRowPitch() { return MapPitches[0]; }
+  size_t GetMapSlicePitch() { return MapPitches[1]; }
+  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+
+public:
+  bool IsMapRead() const { return MapFlags & CL_MAP_READ; }
+  bool IsMapWrite() const { return MapFlags & CL_MAP_WRITE; }
+  bool IsMapInvalidate() const { return MapFlags & CL_MAP_WRITE_INVALIDATE_REGION; }
+  
+public:
+  void SetMapBuffer(void *MapBuf) { this->MapBuf = MapBuf;}
+  
+private:
+  llvm::IntrusiveRefCntPtr<Image> Source;
+  cl_map_flags MapFlags;
+  size_t Origin[3];
+  size_t Region[3];
+
+  void *MapBuf;
+  size_t MapPitches[2];
+  
+  friend class EnqueueMapImageBuilder;	
+};
+
 class EnqueueUnmapMemObject : public Command {
 public:
   static bool classof(const Command *Cmd) {
@@ -651,6 +702,7 @@ public:
     EnqueueCopyBufferToImageBuilder,
     EnqueueWriteImageBuilder,
     EnqueueMapBufferBuilder,
+    EnqueueMapImageBuilder,
     EnqueueUnmapMemObjectBuilder,
     EnqueueReadBufferRectBuilder,
     EnqueueWriteBufferRectBuilder,
@@ -783,7 +835,7 @@ public:
   }
 
 public:
-  EnqueueReadImageBuilder(CommandQueue *Queue, cl_mem Img, void *Target);
+  EnqueueReadImageBuilder(CommandQueue &Queue, cl_mem Img, void *Target);
 
 public:
   EnqueueReadImageBuilder &SetBlocking(bool Blocking = true);
@@ -812,7 +864,7 @@ private:
 
   friend EnqueueReadImageBuilder &CheckDevImgSupport<>(
       EnqueueReadImageBuilder &,
-      CommandQueue *,
+      CommandQueue &,
       Image *);
 
   friend bool IsValidImgRegion<>(
@@ -829,7 +881,7 @@ public:
   }
 
 public:
-  EnqueueWriteImageBuilder(CommandQueue *Queue, cl_mem Img, const void *Source);
+  EnqueueWriteImageBuilder(CommandQueue &Queue, cl_mem Img, const void *Source);
 
 public:
   EnqueueWriteImageBuilder &SetBlocking(bool Blocking = true);
@@ -858,7 +910,7 @@ private:
 
   friend EnqueueWriteImageBuilder &CheckDevImgSupport<>(
       EnqueueWriteImageBuilder &,
-      CommandQueue *,
+      CommandQueue &,
       Image *);
 
   friend bool IsValidImgRegion<>(
@@ -875,7 +927,7 @@ public:
   }
 
 public:
-  EnqueueCopyImageBuilder(CommandQueue *Cmd, cl_mem TargetImg, cl_mem SourceImg);
+  EnqueueCopyImageBuilder(CommandQueue &Queue, cl_mem TargetImg, cl_mem SourceImg);
 
 public:
   EnqueueCopyImageBuilder &SetCopyArea(const size_t *TargetOrigin,
@@ -901,7 +953,7 @@ private:
 
   friend EnqueueCopyImageBuilder &CheckDevImgSupport<>(
       EnqueueCopyImageBuilder &,
-      CommandQueue *,
+      CommandQueue &,
       Image *);
 
   friend bool IsValidImgRegion<>(
@@ -918,7 +970,7 @@ public:
   }
 
 public:
-  EnqueueCopyImageToBufferBuilder(CommandQueue *Queue, cl_mem TargetBuf, cl_mem SourceImg);
+  EnqueueCopyImageToBufferBuilder(CommandQueue &Queue, cl_mem TargetBuf, cl_mem SourceImg);
 
 public:
   EnqueueCopyImageToBufferBuilder &SetCopyArea(size_t TargetOffset,
@@ -944,7 +996,7 @@ private:
 
   friend EnqueueCopyImageToBufferBuilder &CheckDevImgSupport<>(
       EnqueueCopyImageToBufferBuilder &,
-      CommandQueue *,
+      CommandQueue &,
       Image *);
 
   friend bool IsValidImgRegion<>(
@@ -961,7 +1013,7 @@ public:
   }
 
 public:
-  EnqueueCopyBufferToImageBuilder(CommandQueue *Queue, cl_mem TargetImg, cl_mem SourceBuf);
+  EnqueueCopyBufferToImageBuilder(CommandQueue &Queue, cl_mem TargetImg, cl_mem SourceBuf);
 
 public:
   EnqueueCopyBufferToImageBuilder &SetCopyArea(const size_t *TargetOrigin,
@@ -987,7 +1039,7 @@ private:
 
   friend EnqueueCopyBufferToImageBuilder &CheckDevImgSupport<>(
       EnqueueCopyBufferToImageBuilder &,
-      CommandQueue *,
+      CommandQueue &,
       Image *);
 
   friend bool IsValidImgRegion<>(
@@ -1004,14 +1056,15 @@ public:
   }
 
 public:
-  EnqueueMapBufferBuilder(Context &Ctx, cl_mem Buf);
+  EnqueueMapBufferBuilder(CommandQueue &Queue, cl_mem Buf);
   
 public:
   EnqueueMapBufferBuilder &SetBlocking(bool Blocking = true);
   EnqueueMapBufferBuilder &SetMapFlags(cl_map_flags MapFlags);
-  EnqueueMapBufferBuilder &SetMapArea(size_t Offset, size_t Size);
+  EnqueueMapBufferBuilder &SetMapArea(size_t Offset,
+                                      size_t Size);
+  EnqueueMapBufferBuilder &SetMapBuffer(void **MapBuf);
   EnqueueMapBufferBuilder &SetWaitList(unsigned N, const cl_event *Evs);
-  EnqueueMapBufferBuilder &SetMapBuffer(void *MapBuf);
   
   EnqueueMapBuffer *Create(cl_int *ErrCode);
 
@@ -1023,12 +1076,65 @@ private:
   }
   
 private:
+  CommandQueue &Queue;
   Buffer *Source;
   bool Blocking;
   cl_map_flags MapFlags;
   size_t Offset;
   size_t Size;
+
   void *MapBuf;
+};
+
+class EnqueueMapImageBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueMapImageBuilder;
+  }
+
+public:
+  EnqueueMapImageBuilder(CommandQueue &Queue, cl_mem Img);
+  
+public:
+  EnqueueMapImageBuilder &SetBlocking(bool Blocking = true);
+  EnqueueMapImageBuilder &SetMapFlags(cl_map_flags MapFlags);
+  EnqueueMapImageBuilder &SetMapArea(const size_t *Origin,
+                                     const size_t *Region);
+  EnqueueMapImageBuilder &SetMapPitches(size_t *ImageRowPitch,
+                                        size_t *ImageSlicePitch);
+  EnqueueMapImageBuilder &SetMapBuffer(void **MapBuf);
+  EnqueueMapImageBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  
+  EnqueueMapImage *Create(cl_int *ErrCode);
+
+private:
+  EnqueueMapImageBuilder &NotifyError(cl_int ErrCode,
+                                       const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+  
+private:
+  CommandQueue &Queue;
+  Image *Source;
+  bool Blocking;
+  cl_map_flags MapFlags;
+  const size_t *Origin;
+  const size_t *Region;
+
+  void *MapBuf;
+  size_t MapPitches[2];
+
+  friend EnqueueMapImageBuilder &CheckDevImgSupport<>(
+      EnqueueMapImageBuilder &,
+      CommandQueue &,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueMapImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueUnmapMemObjectBuilder : public CommandBuilder {

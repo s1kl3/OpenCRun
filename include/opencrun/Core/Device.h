@@ -375,11 +375,10 @@ public:
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj) = 0;
 
-  virtual void *CreateMapBuffer(MemoryObj &MemObj, 
-                                size_t Offset,
-                                size_t Size,
-                                cl_map_flags MapFlags,
-                                cl_int *ErrCode) = 0;
+  virtual bool MappingDoesAllocation(MemoryObj::Type MemObjTy) = 0;
+  virtual void *CreateMapBuffer(MemoryObj &MemObj,
+                                MemoryObj::MappingInfo &MapInfo) = 0;
+  virtual void FreeMapBuffer(void *MapBuf) = 0;
   
   virtual bool Submit(Command &Cmd) = 0;
 

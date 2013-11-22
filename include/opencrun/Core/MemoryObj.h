@@ -8,6 +8,7 @@
 
 #include "llvm/Support/Mutex.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 #include <map>
 
@@ -17,6 +18,7 @@ namespace opencrun {
 
 class Context;
 class Device;
+class Image;
 
 class MemoryObj : public _cl_mem, public MTRefCountedBaseVPTR<MemoryObj> {
 public:
@@ -57,17 +59,20 @@ public:
   static bool classof(const _cl_mem *MemObj) { return true; }
 
 public:
-  typedef struct {
+  struct MappingInfo {
     size_t Offset;
     size_t Size;
-    unsigned long MapFlags;
-  } MappingInfo;
+    const size_t *Origin;
+    const size_t *Region;
+    cl_map_flags MapFlags;
+
+    bool CheckOverlap(const MappingInfo &MapInfo);
+  };
   
   typedef std::multimap<void *, MappingInfo> MappingsContainer;
   
 public:
   typedef MappingsContainer::iterator maps_iterator;
-  typedef MappingsContainer::const_iterator const_maps_iterator;
   
 protected:
   MemoryObj(Type MemTy,
@@ -101,10 +106,7 @@ public:
   }
   
 public:
-  bool AddNewMapping(void *MapBuf, 
-                     size_t Offset, 
-                     size_t Size, 
-                     unsigned long MapFlags);
+  bool AddNewMapping(void *MapBuf, const MappingInfo &MapInfo);
   
   bool RemoveMapping(void *MapBuf);
   
@@ -134,6 +136,26 @@ public:
     return MemObj->GetType() < MemoryObj::LastBuffer;
   }
 
+public:
+  typedef llvm::SmallPtrSet<Image *, 4> ImagesContainer;
+
+  typedef ImagesContainer::iterator image_iterator;
+
+public:
+  image_iterator image_begin() { return AttachedImages.begin(); }
+  image_iterator image_end() { return AttachedImages.end(); }
+
+public:
+  bool AddAttachedImage(Image *Img) {
+    if(!Img) return false;
+    return AttachedImages.insert(Img);
+  }
+
+  bool RemoveAttachedImage(Image *Img) {
+    if(!Img) return false;
+    return AttachedImages.erase(Img);
+  }
+
 protected:
   Buffer(Type MemTy,
          Context &Ctx,
@@ -142,6 +164,11 @@ protected:
          MemoryObj::AccessProtection AccessProt,
          MemoryObj::HostAccessProtection HostAccessProt) :
   MemoryObj(MemTy, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt) { }
+
+private:
+  // This container holds all 1D image buffers initialized using
+  // the buffer object.
+  ImagesContainer AttachedImages;
 };
 
 class Image : public MemoryObj {
@@ -231,7 +258,7 @@ protected:
         size_t HostSlicePitch,
         unsigned NumMipLevels,
         unsigned NumSamples,
-        llvm::IntrusiveRefCntPtr<Buffer> Buf,
+        Buffer *Buf,
         MemoryObj::HostPtrUsageMode HostPtrMode,
         MemoryObj::AccessProtection AccessProt,
         MemoryObj::HostAccessProtection HostAccessProt) :
@@ -246,7 +273,8 @@ protected:
   Depth(Depth),
   ArraySize(ArraySize),
   NumMipLevels(NumMipLevels),
-  NumSamples(NumSamples) { 
+  NumSamples(NumSamples),
+  Buf(Buf) { 
     if(GetType() == HostImage) {
       // In case of CL_MEM_USE_HOST_PTR the storage area for the
       // image object is inside host memory and its address is
@@ -261,6 +289,12 @@ protected:
       HostPitches[1] = HostSlicePitch;
       Pitches[0] = Width * ElementSize;
       Pitches[1] = Pitches[0] * Height;
+    }
+  }
+
+  ~Image() {
+    if(GetImageType() == Image1D_Buffer) {
+      GetBuffer()->RemoveAttachedImage(this); 
     }
   }
 
@@ -450,7 +484,7 @@ private:
             size_t SlicePitch,
             unsigned NumMipLevels,
             unsigned NumSamples,
-            llvm::IntrusiveRefCntPtr<Buffer> Buf,
+            Buffer *Buf,
             MemoryObj::HostPtrUsageMode HostPtrMode,
             MemoryObj::AccessProtection AccessProt,
             MemoryObj::HostAccessProtection HostAccessProt)
@@ -505,7 +539,7 @@ private:
                        size_t SlicePitch,
                        unsigned NumMipLevels,
                        unsigned NumSamples,
-                       llvm::IntrusiveRefCntPtr<Buffer> Buf,
+                       Buffer *Buf,
                        MemoryObj::HostPtrUsageMode HostPtrMode,
                        MemoryObj::AccessProtection AccessProt,
                        MemoryObj::HostAccessProtection HostAccessProt)
@@ -561,7 +595,7 @@ private:
               size_t SlicePitch,
               unsigned NumMipLevels,
               unsigned NumSamples,
-              llvm::IntrusiveRefCntPtr<Buffer> Buf,
+              Buffer *Buf,
               MemoryObj::HostPtrUsageMode HostPtrMode,
               MemoryObj::AccessProtection AccessProt,
               MemoryObj::HostAccessProtection HostAccessProt)

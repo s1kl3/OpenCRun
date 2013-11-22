@@ -44,11 +44,10 @@ public:
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj);
 
+  virtual bool MappingDoesAllocation(MemoryObj::Type MemObjTy);
   virtual void *CreateMapBuffer(MemoryObj &MemObj, 
-      size_t Offset, 
-      size_t Size, 
-      cl_map_flags MapFlags,
-      cl_int *ErrCode);
+                                MemoryObj::MappingInfo &MapInfo);
+  virtual void FreeMapBuffer(void *MapBuf);
 
   virtual bool Submit(Command &Cmd);
 
@@ -74,6 +73,7 @@ private:
   bool Submit(EnqueueCopyImageToBuffer &Cmd);
   bool Submit(EnqueueCopyBufferToImage &Cmd);
   bool Submit(EnqueueMapBuffer &Cmd);
+  bool Submit(EnqueueMapImage &Cmd);
   bool Submit(EnqueueUnmapMemObject &Cmd);
   bool Submit(EnqueueReadBufferRect &Cmd);
   bool Submit(EnqueueWriteBufferRect &Cmd);

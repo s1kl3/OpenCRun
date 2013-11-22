@@ -172,45 +172,40 @@ void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
   Global.Free(MemObj);
 }
 
+bool CPUDevice::MappingDoesAllocation(MemoryObj::Type MemObjTy) {
+  // Memory objects are directly accessible by the host, so mapping
+  // nevere requires memory allocation on the host side.
+  return false;
+}
+
 void *CPUDevice::CreateMapBuffer(MemoryObj &MemObj, 
-                                 size_t Offset,
-                                 size_t Size,
-                                 cl_map_flags MapFlags,
-                                 cl_int *ErrCode) {
+                                 MemoryObj::MappingInfo &MapInfo) {
   void *MapBuf;
-  
-  if(llvm::isa<HostBuffer>(&MemObj)) {		
-    // An host buffer is already allocated and it's the same storage area
-    // we have used for the memory object.
+ 
+  // A CPU device has only one physical address space so host-side
+  // code can access directly to memory object's storage area.
+  if(llvm::isa<Buffer>(MemObj)) {
     MapBuf = reinterpret_cast<void *>(
-                reinterpret_cast<uintptr_t>(Global[MemObj]) + Offset);
-    
-    if(!MemObj.AddNewMapping(MapBuf, 
-                             Offset, 
-                             Size, 
-                             static_cast<unsigned long>(MapFlags))) {
-      MapBuf = NULL;
-      *ErrCode = CL_INVALID_OPERATION;
-    }
+        reinterpret_cast<uintptr_t>(Global[MemObj]) + MapInfo.Offset);
+  } else if(Image *Img = llvm::dyn_cast<Image>(&MemObj)) {
+    MapBuf = reinterpret_cast<void *>(
+        reinterpret_cast<uintptr_t>(Global[MemObj]) +
+        Img->GetElementSize() * MapInfo.Origin[0] +
+        Img->GetRowPitch() * MapInfo.Origin[1] +
+        Img->GetSlicePitch() * MapInfo.Origin[2]);
   }
-  
-  else if(llvm::isa<DeviceBuffer>(&MemObj) || 
-          llvm::isa<HostAccessibleBuffer>(&MemObj)) {
-    MapBuf = malloc(MemObj.GetSize());
-    if(!MapBuf)
-      *ErrCode = CL_OUT_OF_HOST_MEMORY;
-    
-    else if(!MemObj.AddNewMapping(MapBuf,
-                                  Offset,
-                                  Size,
-                                  static_cast<unsigned long>(MapFlags))) {
-      free(MapBuf);
-      MapBuf = NULL;
-      *ErrCode = CL_INVALID_OPERATION;
-    }
-  }
-  
+
+  if(!MemObj.AddNewMapping(MapBuf, MapInfo))
+    MapBuf = NULL;
+
   return MapBuf;
+}
+
+void CPUDevice::FreeMapBuffer(void *MapBuf) {
+  // This method does nothing in particular for CPU target, but for
+  // those target having separated physical address spaces it would be
+  // used inside clEnqueueMapBuffer and clEnqueueMapImage to free
+  // host allocated memory in case of errors before returning to the caller.
 }
 
 bool CPUDevice::Submit(Command &Cmd) {
@@ -250,9 +245,12 @@ bool CPUDevice::Submit(Command &Cmd) {
       llvm::dyn_cast<EnqueueCopyBufferToImage>(&Cmd))
     Submitted = Submit(*CopyBufToImg);
 
-  else if(EnqueueMapBuffer *Map = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
-    Submitted = Submit(*Map);
+  else if(EnqueueMapBuffer *MapBuf = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
+    Submitted = Submit(*MapBuf);
   
+  else if(EnqueueMapImage *MapImg = llvm::dyn_cast<EnqueueMapImage>(&Cmd))
+    Submitted = Submit(*MapImg);
+
   else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
     Submitted = Submit(*Unmap);
 
@@ -570,6 +568,13 @@ bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new MapBufferCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueMapImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new MapImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
 }
 
 bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {

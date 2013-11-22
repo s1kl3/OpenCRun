@@ -346,7 +346,7 @@ clEnqueueReadImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueReadImageBuilder Bld(Queue, image, ptr);
+  opencrun::EnqueueReadImageBuilder Bld(*Queue, image, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_read)
                               .SetCopyArea(origin, 
                                            region, 
@@ -394,7 +394,7 @@ clEnqueueWriteImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueWriteImageBuilder Bld(Queue, image, ptr);
+  opencrun::EnqueueWriteImageBuilder Bld(*Queue, image, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_write)
                               .SetCopyArea(origin,
                                            region, 
@@ -453,7 +453,7 @@ clEnqueueCopyImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueCopyImageBuilder Bld(Queue, dst_image, src_image);
+  opencrun::EnqueueCopyImageBuilder Bld(*Queue, dst_image, src_image);
   opencrun::Command *Cmd = Bld.SetCopyArea(dst_origin, src_origin, region)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
@@ -495,7 +495,7 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueCopyImageToBufferBuilder Bld(Queue, dst_buffer, src_image);
+  opencrun::EnqueueCopyImageToBufferBuilder Bld(*Queue, dst_buffer, src_image);
   opencrun::Command *Cmd = Bld.SetCopyArea(dst_offset, src_origin, region)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
@@ -537,7 +537,7 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueCopyBufferToImageBuilder Bld(Queue, dst_image, src_buffer);
+  opencrun::EnqueueCopyBufferToImageBuilder Bld(*Queue, dst_image, src_buffer);
   opencrun::Command *Cmd = Bld.SetCopyArea(dst_origin, region, src_offset)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
@@ -575,42 +575,29 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
   
   opencrun::CommandQueue *Queue;
-  opencrun::MemoryObj *MemObj;
   
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
-  MemObj = llvm::cast<opencrun::MemoryObj>(buffer);
   
-  cl_int ErrCode;
-  
-  void *MapBuf = 
-    Queue->GetDevice().CreateMapBuffer(*MemObj,
-                                       offset,
-                                       cb,
-                                       map_flags,
-                                       &ErrCode);
-  if(!MapBuf)
-    RETURN_WITH_ERROR(errcode_ret, ErrCode);
-  
-  opencrun::EnqueueMapBufferBuilder Bld(Queue->GetContext(), buffer);
+  void *MapBuf;
+
+  opencrun::EnqueueMapBufferBuilder Bld(*Queue, buffer);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_map)
                               .SetMapFlags(map_flags)
                               .SetMapArea(offset, cb)
+                              .SetMapBuffer(&MapBuf)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
-                              .SetMapBuffer(MapBuf)
                               .Create(errcode_ret);
 
   if(!Cmd) {
-    if(MemObj->GetType() != opencrun::MemoryObj::HostBuffer)
-      free(MapBuf);			
+    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
 
   opencrun::Event *Ev = Queue->Enqueue(*Cmd, errcode_ret);
 
   if(!Ev) {
-    if(MemObj->GetType() != opencrun::MemoryObj::HostBuffer)
-      free(MapBuf);			
+    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
   
@@ -635,8 +622,53 @@ clEnqueueMapImage(cl_command_queue command_queue,
                   const cl_event *event_wait_list,
                   cl_event *event,
                   cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+  if(!command_queue)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_COMMAND_QUEUE);
+
+  if(!clValidMapField(map_flags))
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+
+  if(!origin || !region)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+
+  opencrun::CommandQueue *Queue; 
+  
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  if(!Queue->GetDevice().HasImageSupport())
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_OPERATION);
+
+  void *MapBuf;
+
+  opencrun::EnqueueMapImageBuilder Bld(*Queue, image);
+  opencrun::Command *Cmd = Bld.SetBlocking(blocking_map)
+                              .SetMapFlags(map_flags)
+                              .SetMapPitches(image_row_pitch, 
+                                             image_slice_pitch)
+                              .SetMapArea(origin, region)
+                              .SetMapBuffer(&MapBuf)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(errcode_ret);
+
+  if(!Cmd) {
+    Queue->GetDevice().FreeMapBuffer(MapBuf);
+    return NULL;
+  }
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, errcode_ret);
+
+  if(!Ev) {
+    Queue->GetDevice().FreeMapBuffer(MapBuf);
+    return NULL;
+  }
+  
+  if(event)
+    *event = Ev;
+  else
+    Ev->Release();
+  
+  return MapBuf;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

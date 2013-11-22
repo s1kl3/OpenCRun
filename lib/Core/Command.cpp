@@ -214,6 +214,30 @@ EnqueueMapBuffer::EnqueueMapBuffer(Buffer &Source,
     MapBuf(MapBuf) { }
 
 //
+// EnqueueMapImage implementation.
+//
+
+EnqueueMapImage::EnqueueMapImage(Image &Source,
+                                 bool Blocking,
+                                 cl_map_flags MapFlags,
+                                 const size_t *Origin,
+                                 const size_t *Region,
+                                 void *MapBuf,
+                                 size_t *MapPitches,
+                                 EventsContainer &WaitList)
+  : Command(Command::MapImage, WaitList, Blocking),
+    Source(&Source),
+    MapFlags(MapFlags),
+    MapBuf(MapBuf) {
+  std::memcpy(this->Origin, Origin, 3 * sizeof(size_t));
+  // Convert the region width in bytes.
+  this->Region[0] = Region[0] * Source.GetElementSize();
+  this->Region[1] = Region[1];
+  this->Region[2] = Region[2];
+  std::memcpy(this->MapPitches, MapPitches, 2 * sizeof(size_t));
+}
+
+//
 // EnqueueUnmapMemObject implementation.
 //
 
@@ -686,10 +710,10 @@ EnqueueCopyBuffer *EnqueueCopyBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueReadImageBuilder::EnqueueReadImageBuilder(
-  CommandQueue *Queue,
+  CommandQueue &Queue,
   cl_mem Img,
   void *Target) : CommandBuilder(CommandBuilder::EnqueueReadImageBuilder,
-                                 Queue->GetContext()),
+                                 Queue.GetContext()),
                   Source(NULL),
                   Target(Target),
                   Blocking(false),
@@ -705,7 +729,7 @@ EnqueueReadImageBuilder::EnqueueReadImageBuilder(
           (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid read image operation");
 
-  else if(Queue->GetContext() != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
     
   if(!Target)
@@ -810,10 +834,10 @@ EnqueueReadImage *EnqueueReadImageBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
-  CommandQueue *Queue,
+  CommandQueue &Queue,
   cl_mem Img,
   const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteImageBuilder,
-                                       Queue->GetContext()),
+                                       Queue.GetContext()),
                   Target(NULL),
                   Source(Source),
                   Blocking(false),
@@ -934,10 +958,10 @@ EnqueueWriteImage *EnqueueWriteImageBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
-  CommandQueue *Queue,
+  CommandQueue &Queue,
   cl_mem TargetImg,
   cl_mem SourceImg) : CommandBuilder(CommandBuilder::EnqueueCopyImageBuilder,
-                                     Queue->GetContext()),
+                                     Queue.GetContext()),
                       Target(NULL),
                       Source(NULL),
                       TargetOffset(0),
@@ -949,7 +973,7 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
   else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(TargetImg))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not an image");
 
-  else if(Queue->GetContext() != Target->GetContext())
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
 
   if(!SourceImg)
@@ -958,7 +982,7 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
   else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(SourceImg))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an image");
   
-  else if(Queue->GetContext() != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
 
   else if((Source->GetChannelOrder() != Target->GetChannelOrder()) ||
@@ -1041,11 +1065,11 @@ EnqueueCopyImage *EnqueueCopyImageBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
-  CommandQueue *Queue,
+  CommandQueue &Queue,
   cl_mem TargetBuf,
   cl_mem SourceImg) 
   : CommandBuilder(CommandBuilder::EnqueueCopyImageToBufferBuilder,
-                   Queue->GetContext()),
+                   Queue.GetContext()),
     Target(NULL),
     Source(NULL),
     TargetOffset(0),
@@ -1057,7 +1081,7 @@ EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
 
-  else if(Queue->GetContext() != Target->GetContext())
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
 
   if(!SourceImg)
@@ -1070,7 +1094,7 @@ EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
           Source->GetBuffer() == Target)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source created from target buffer");
   
-  else if(Queue->GetContext() != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source image have different context");
 
   if(Source)
@@ -1144,11 +1168,11 @@ EnqueueCopyImageToBuffer *EnqueueCopyImageToBufferBuilder::Create(cl_int *ErrCod
 //
 
 EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
-  CommandQueue *Queue,
+  CommandQueue &Queue,
   cl_mem TargetImg,
   cl_mem SourceBuf) 
   : CommandBuilder(CommandBuilder::EnqueueCopyBufferToImageBuilder,
-                   Queue->GetContext()),
+                   Queue.GetContext()),
     Target(NULL),
     Source(NULL),
     TargetOffset(0),
@@ -1160,7 +1184,7 @@ EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an buffer");
   
-  else if(Queue->GetContext() != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context");
 
   if(!TargetImg)
@@ -1173,7 +1197,7 @@ EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
           Target->GetBuffer() == Source)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source created from target buffer");
 
-  else if(Queue->GetContext() != Target->GetContext())
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target image have different context");
 
   if(Target)
@@ -1247,9 +1271,10 @@ EnqueueCopyBufferToImage *EnqueueCopyBufferToImageBuilder::Create(cl_int *ErrCod
 //
 
 EnqueueMapBufferBuilder::EnqueueMapBufferBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf) : CommandBuilder(CommandBuilder::EnqueueMapBufferBuilder,
-                               Ctx),
+                               Queue.GetContext()),
+                Queue(Queue),
                 Source(NULL),
                 Blocking(false),
                 MapFlags(0),
@@ -1262,7 +1287,7 @@ EnqueueMapBufferBuilder::EnqueueMapBufferBuilder(
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "map source is not a buffer");	
     
-  if(Ctx != Source->GetContext())
+  else if(Ctx != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
 }
 
@@ -1277,6 +1302,9 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetBlocking(bool Blocking) {
 }
 
 EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapFlags(cl_map_flags MapFlags) {
+  if(!Source)
+    return *this;
+
   if(MapFlags & CL_MAP_READ) {
     if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
       return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
@@ -1314,6 +1342,9 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset,
   if(!Source)
     return *this;
 
+  if(!MapBuf)
+    return *this;
+
   if(Offset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "out of bounds buffer mapping");
 
@@ -1321,6 +1352,28 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset,
 
   this->Offset = Offset;
   this->Size = Size;
+
+  return *this;
+}
+
+EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapBuffer(void **MapBuf) {
+  if(!Source)
+    return *this;
+
+  MemoryObj::MappingInfo MapInfo;
+
+  MapInfo.Offset = Offset;
+  MapInfo.Size = Size;
+  MapInfo.Origin = NULL;
+  MapInfo.Region = NULL;
+  MapInfo.MapFlags = MapFlags;
+
+  void *MapPtr = Queue.GetDevice().CreateMapBuffer(*Source, MapInfo);
+  if(!MapPtr)
+    return NotifyError(CL_INVALID_OPERATION, "cannot get host pointer to mapped data");
+    
+  this->MapBuf = MapPtr;
+  *MapBuf = MapPtr;
 
   return *this;
 }
@@ -1344,15 +1397,6 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetWaitList(unsigned N, const 
   return llvm::cast<EnqueueMapBufferBuilder>(Super);
 }
 
-EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapBuffer(void *MapBuf) {
-  if(!MapBuf)
-    return *this;
-    
-  this->MapBuf = MapBuf;
-  
-  return *this;
-}
-
 EnqueueMapBuffer *EnqueueMapBufferBuilder::Create(cl_int *ErrCode) {
   if(this->ErrCode != CL_SUCCESS)
     RETURN_WITH_ERROR(ErrCode);
@@ -1361,6 +1405,212 @@ EnqueueMapBuffer *EnqueueMapBufferBuilder::Create(cl_int *ErrCode) {
     *ErrCode = CL_SUCCESS;
 
   return new EnqueueMapBuffer(*Source, Blocking, MapFlags, Offset, Size, MapBuf, WaitList);
+}
+
+//
+// EnqueueMapImageBuilder implementation.
+//
+
+EnqueueMapImageBuilder::EnqueueMapImageBuilder(
+  CommandQueue &Queue,
+  cl_mem Img) : CommandBuilder(CommandBuilder::EnqueueMapImageBuilder,
+                               Queue.GetContext()),
+                Queue(Queue),
+                Source(NULL),
+                Blocking(false),
+                MapFlags(0),
+                Origin(NULL),
+                Region(NULL),
+                MapBuf(NULL) {
+  if(!Img)
+    NotifyError(CL_INVALID_MEM_OBJECT, "map source is null");
+
+  else if(!(Source = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(Img))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "map source is not an image");	
+    
+  else if(Queue.GetContext() != Source->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
+
+  if(Source)
+    CheckDevImgSupport<>(*this, Queue, Source);
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetBlocking(bool Blocking) {
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  this->Blocking = Blocking;
+
+  return *this;
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetMapFlags(cl_map_flags MapFlags) {
+  if(!Source)
+    return *this;
+
+  if(MapFlags & CL_MAP_READ) {
+    if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+    if(Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");		
+  }
+  
+  if(MapFlags & CL_MAP_WRITE) {
+    if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION)
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+    if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+  }
+  
+  if(MapFlags & CL_MAP_WRITE_INVALIDATE_REGION) {
+    if((MapFlags & CL_MAP_READ) || (MapFlags & CL_MAP_WRITE))
+      return NotifyError(CL_INVALID_VALUE, "invalid flag combination");
+
+    if(Source->GetHostAccessProtection() == MemoryObj::HostReadOnly ||
+       Source->GetHostAccessProtection() == MemoryObj::HostNoAccess)
+      return NotifyError(CL_INVALID_OPERATION, "invalid map operation");
+  }
+
+  this->MapFlags = MapFlags;
+
+  return *this;
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetMapArea(
+    const size_t *Origin,
+    const size_t *Region) {
+  if(!Source)
+    return *this;
+
+  if(!Origin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  this->Origin = Origin;
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
+  if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  if(!IsValidImgRegion<>(*this, Source, Origin, Region))
+    return *this;
+
+  // Region is valid.
+  this->Region = Region;
+  
+  return *this;
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetMapPitches(size_t *ImageRowPitch,
+                                                              size_t *ImageSlicePitch) {
+  if(!Source || !Region)
+    return *this;
+
+  if(!ImageRowPitch)
+    return NotifyError(CL_INVALID_VALUE, "image row pitch is null");
+
+  switch(Source->GetImageType()) {
+  case Image::Image1D_Array:
+  case Image::Image2D_Array:
+  case Image::Image3D:
+    if(!ImageSlicePitch)
+      return NotifyError(CL_INVALID_VALUE, "image slice pitch is null");
+    break;
+  default:
+    break;
+  }
+
+  if(Queue.GetDevice().MappingDoesAllocation(Source->GetType())) {
+    // A new host buffer will be allocated and it will contain
+    // mapped data in the specified region only.
+    MapPitches[0] = Region[0] * Source->GetElementSize();
+    MapPitches[1] = MapPitches[0] * Region[1];
+  } else {
+    // In this case image object storage area is used as if it
+    // was the result of a mapping operation, so we have to deal
+    // with extra data outside the specified regions.
+    MapPitches[0] = Source->GetRowPitch();
+    MapPitches[1] = Source->GetSlicePitch(); 
+  }
+
+  *ImageRowPitch = MapPitches[0];
+  *ImageSlicePitch = MapPitches[1];
+
+  return *this;
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetMapBuffer(void **MapBuf) {
+  if(!Source || !Origin || !Region)
+    return *this;
+
+  MemoryObj::MappingInfo MapInfo;
+
+  // Mapping informations for 1d image buffers are identical to
+  // those used for buffer objects.
+  if(Source->GetImageType() == Image::Image1D_Buffer) {
+    MapInfo.Offset = Origin[0] * Source->GetElementSize();
+    MapInfo.Size = Region[0] * Source->GetElementSize();
+    MapInfo.Origin = NULL;
+    MapInfo.Region = NULL;
+  } else {
+    MapInfo.Offset = 0;
+    MapInfo.Size = 0;
+    MapInfo.Origin = Origin;
+    MapInfo.Region = Region;
+  }
+
+  MapInfo.MapFlags = MapFlags;
+
+  void *MapPtr = Queue.GetDevice().CreateMapBuffer(*Source, MapInfo);
+  if(!MapPtr)
+    return NotifyError(CL_INVALID_OPERATION, "cannot get host pointer to mapped data");
+    
+  this->MapBuf = MapPtr;
+  *MapBuf = MapPtr;
+
+  return *this;
+}
+
+EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  if(Blocking && IsWaitListInconsistent())
+    return NotifyError(CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST,
+                       "cannot block on an inconsistent wait list");
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueMapImageBuilder>(Super);
+}
+
+EnqueueMapImage *EnqueueMapImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueMapImage(*Source, 
+                             Blocking,
+                             MapFlags,
+                             Origin,
+                             Region,
+                             MapBuf,
+                             MapPitches,
+                             WaitList);
 }
 
 //
@@ -2251,39 +2501,42 @@ EnqueueNativeKernel *EnqueueNativeKernelBuilder::Create(cl_int *ErrCode) {
 template<class ImgCmdBuilderType>
 ImgCmdBuilderType &opencrun::CheckDevImgSupport(
     ImgCmdBuilderType &Bld,
-    CommandQueue *Queue,
+    CommandQueue &Queue,
     Image *Img) {
+  if(!Img)
+    return Bld; 
+
   // Check if the image dimensions are supported by the device attached
   // to the command queue.
   switch(Img->GetImageType()) {
   case Image::Image1D_Array:
-    if(Img->GetArraySize() > Queue->GetDevice().GetImageMaxArraySize())
+    if(Img->GetArraySize() > Queue.GetDevice().GetImageMaxArraySize())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
           "image size unsupported by target device associated with queue");  
   case Image::Image1D:
-    if(Img->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth())
+    if(Img->GetWidth() > Queue.GetDevice().GetImage2DMaxWidth())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
           "image size unsupported by target device associated with queue");  
     break;
   case Image::Image1D_Buffer:
-    if(Img->GetWidth() > Queue->GetDevice().GetImageMaxBufferSize())
+    if(Img->GetWidth() > Queue.GetDevice().GetImageMaxBufferSize())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
           "image size unsupported by target device associated with queue");  
     break;
   case Image::Image2D_Array:
-    if(Img->GetArraySize() > Queue->GetDevice().GetImageMaxArraySize())
+    if(Img->GetArraySize() > Queue.GetDevice().GetImageMaxArraySize())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
           "image size unsupported by target device associated with queue");  
   case Image::Image2D:
-    if((Img->GetWidth() > Queue->GetDevice().GetImage2DMaxWidth()) ||
-        (Img->GetHeight() > Queue->GetDevice().GetImage2DMaxHeight()))
+    if((Img->GetWidth() > Queue.GetDevice().GetImage2DMaxWidth()) ||
+        (Img->GetHeight() > Queue.GetDevice().GetImage2DMaxHeight()))
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
           "image size unsupported by target device associated with queue");  
     break;
   case Image::Image3D:
-    if((Img->GetWidth() > Queue->GetDevice().GetImage3DMaxWidth()) ||
-        (Img->GetHeight() > Queue->GetDevice().GetImage3DMaxHeight()) ||
-        (Img->GetDepth() > Queue->GetDevice().GetImage3DMaxDepth()))
+    if((Img->GetWidth() > Queue.GetDevice().GetImage3DMaxWidth()) ||
+        (Img->GetHeight() > Queue.GetDevice().GetImage3DMaxHeight()) ||
+        (Img->GetDepth() > Queue.GetDevice().GetImage3DMaxDepth()))
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE,
           "image size unsupported by device associated with queue");  
     break;
@@ -2295,7 +2548,7 @@ ImgCmdBuilderType &opencrun::CheckDevImgSupport(
   // Check if the specified source image format is supported by the device
   // attached to the command queue.
   llvm::ArrayRef<cl_image_format> DevFmts = 
-    Queue->GetDevice().GetSupportedImageFormats();
+    Queue.GetDevice().GetSupportedImageFormats();
 
   cl_image_format ImgFmt = Img->GetImageFormat();
   bool FmtSupported = false;
@@ -2321,6 +2574,9 @@ bool opencrun::IsValidImgRegion(
     Image *Img,
     const size_t *Origin,
     const size_t *Region) {
+  if(!Img || !Origin || !Region)
+    return false; 
+
   switch(Img->GetImageType()) {
   case Image::Image1D:
   case Image::Image1D_Buffer:

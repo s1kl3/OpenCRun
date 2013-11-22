@@ -15,53 +15,116 @@ MemoryObj::~MemoryObj() {
   Ctx->DestroyMemoryObj(*this);
 }
 
-bool MemoryObj::AddNewMapping(void *MapBuf,
-                              size_t Offset,
-                              size_t Size,
-                              unsigned long MapFlags) {
+bool MemoryObj::MappingInfo::CheckOverlap(const MappingInfo &MapInfo) {
+  if(Origin && Region) {
+    // Image mapping.
+    const size_t MapInfo_Min[] = { MapInfo.Origin[0],
+                                   MapInfo.Origin[1],
+                                   MapInfo.Origin[2] };
+
+    const size_t MapInfo_Max[] = { MapInfo.Origin[0] + MapInfo.Region[0],
+                                   MapInfo.Origin[1] + MapInfo.Region[1],
+                                   MapInfo.Origin[2] + MapInfo.Region[2] };
+
+    const size_t Min[] = { Origin[0], Origin[1], Origin[2] };
+
+    const size_t Max[] = { Origin[0] + Region[0],
+                           Origin[1] + Region[1],
+                           Origin[2] + Region[2] };
+
+    bool Overlap = true;
+    for(unsigned I = 0; I < 3 && !Overlap; ++I) {
+      Overlap = Overlap && (MapInfo_Min[I] < Max[I])
+        && (MapInfo_Max[I] > Min[I]);
+    }
+
+    if(Overlap)
+      return true;
+
+  } else {
+    // Buffer or 1D Image buffer mapping.
+    if((MapInfo.Offset <= (Offset + Size))
+        && ((MapInfo.Offset + MapInfo.Size) >=  Offset))
+      return true;
+  }
+
+  return false;
+}
+
+bool MemoryObj::AddNewMapping(void *MapBuf, const MemoryObj::MappingInfo &MapInfo) {
   if(!MapBuf)
     return false;
     
-  if(Size == 0)
+  if(MapInfo.Size == 0 && MapInfo.Origin == NULL && MapInfo.Region == NULL && 
+      (MapInfo.Region[0] == 0 || MapInfo.Region[1] == 0 || MapInfo.Region[2] == 0))
     return false;
     
-  if(MapFlags == 0)
+  if(MapInfo.MapFlags == 0)
     return false;
   
-  MappingInfo Infos;
-
-  Infos.Offset = Offset;
-  Infos.Size = Size;
-  Infos.MapFlags = MapFlags;
-  
   llvm::sys::ScopedLock Lock(ThisLock);
-  
-  // This will handle also the (CL_MAP_READ | CL_MAP_WRITE) case.
-  if(MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
-    if(Maps.count(MapBuf))
-      return false;
 
-    // We have to check that the mapped region doesn't overlap
-    // with any other mapped region of the same memory object.
-    for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I) {
-      if((Offset <= (I->second.Offset + I->second.Size))
-        && ((Offset + Size) >=  I->second.Offset))
+  if(llvm::isa<Buffer>(this)) {
+
+    if(MapInfo.MapFlags & CL_MAP_READ)
+      Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
+
+    else if(MapInfo.MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
+      if(Maps.count(MapBuf))
         return false;
+
+      for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
+        if(I->second.CheckOverlap(MapInfo)) return false;
     }
-  
-    Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
+
+  } else if(Image *Img = llvm::dyn_cast<Image>(this)) {
+
+    if(MapInfo.MapFlags & CL_MAP_READ) {
+      if(Img->GetImageType() == Image::Image1D_Buffer) {
+        Buffer *Buf = Img->GetBuffer();
+
+        // Mapping is added to the associated buffer, checking
+        // the image 1D buffer mapping doesn't overlap with
+        // any other mapping involving the buffer.
+        return Buf->AddNewMapping(MapBuf, MapInfo);
+      }
+      else 
+        Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
+    } else if(MapInfo.MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
+      if(Img->GetImageType() == Image::Image1D_Buffer) {
+        Buffer *Buf = Img->GetBuffer();
+
+        // Mapping is added to the associated buffer, checking
+        // the image 1D buffer mapping doesn't overlap with
+        // any other mapping involving the buffer.
+        return Buf->AddNewMapping(MapBuf, MapInfo);
+      }
+      else {
+        if(Maps.count(MapBuf))
+          return false;
+
+        for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
+          if(I->second.CheckOverlap(MapInfo)) return false;
+
+        Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
+      }
+    }
+
   }
-  
-  // This will handle read-only mappings.
-  else if(MapFlags & CL_MAP_READ)
-    // There can be multiple read mappings of overlapped regions.
-    Maps.insert(std::pair<void *, MappingInfo>(MapBuf, Infos));
   
   return true;
 }
 
 bool MemoryObj::RemoveMapping(void *MapBuf) {
   llvm::sys::ScopedLock Lock(ThisLock);
+
+  if(Image *Img = llvm::dyn_cast<Image>(this)) {
+    if(Img->GetImageType() == Image::Image1D_Buffer) {
+      Buffer *Buf = Img->GetBuffer();
+
+      return Buf->RemoveMapping(MapBuf);
+    }
+  }
   
   // We remove the first found element with the given key value. In case of
   // read mappings with the same host address, this will remove the first

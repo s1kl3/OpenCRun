@@ -88,6 +88,13 @@ bool Multiprocessor::Submit(MapBufferCPUCommand *Cmd) {
   return Thr.Submit(static_cast<CPUCommand *>(Cmd));
 }
 
+bool Multiprocessor::Submit(MapImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
 bool Multiprocessor::Submit(UnmapMemObjectCPUCommand *Cmd) {
   // TODO: implement a smarter selection policy.
   CPUThread &Thr = **Threads.begin();

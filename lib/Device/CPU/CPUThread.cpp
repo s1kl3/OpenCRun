@@ -353,10 +353,14 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<CopyBufferToImageCPUCommand>(Cmd))
     return Submit(CopyBufToImg);
 
-  else if(MapBufferCPUCommand *Map =
+  else if(MapBufferCPUCommand *MapBuf =
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
-    return Submit(Map);
+    return Submit(MapBuf);
   
+  else if(MapImageCPUCommand *MapImg =
+            llvm::dyn_cast<MapImageCPUCommand>(Cmd))
+    return Submit(MapImg);
+
   else if(UnmapMemObjectCPUCommand *Unmap =
             llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
     return Submit(Unmap);
@@ -463,6 +467,10 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
             llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
   
+  else if(MapImageCPUCommand *OnFly =
+            llvm::dyn_cast<MapImageCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+
   else if(UnmapMemObjectCPUCommand *OnFly =
             llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
@@ -576,33 +584,20 @@ int CPUThread::Execute(CopyBufferToImageCPUCommand &Cmd) {
 }
 
 int CPUThread::Execute(MapBufferCPUCommand &Cmd) {
-  EnqueueMapBuffer &CmdMap = Cmd.GetQueueCommandAs<EnqueueMapBuffer>();
-  Buffer &Buf = CmdMap.GetSource();
-  
-  // When device and host buffer are distinct we need to copy the specified region to
-  // the host buffer only for CL_MAP_READ and CL_MAP_WRITE mappings, because we have
-  // to guarantee that the host buffer contains the latest bits from the region being
-  // mapped; this is not necessary for CL_MAP_WRITE_INVALIDATE_REGION mappings.
-  if((llvm::isa<DeviceBuffer>(&Buf) || llvm::isa<HostAccessibleBuffer>(&Buf)) &&
-      (CmdMap.IsMapRead() || CmdMap.IsMapWrite()))
-    std::memcpy(Cmd.GetTarget(), Cmd.GetSource(), Cmd.GetSize());
+  // The CPU device doesn't require any operation; the memory object iself is
+  // always located in the same physical address space of device memory and
+  // so it can be accessed directly.
+   return CPUCommand::NoError;
+}
 
+int CPUThread::Execute(MapImageCPUCommand &Cmd) {
+  // The same considerations as in the previous method.
   return CPUCommand::NoError;
 }
 
 int CPUThread::Execute(UnmapMemObjectCPUCommand &Cmd) {
   EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
   MemoryObj &MemObj = CmdUnmap.GetMemObj();
-  
-  if(llvm::isa<DeviceBuffer>(&MemObj) || llvm::isa<HostAccessibleBuffer>(&MemObj)) {
-    // Copy data back to the memory object if it was mapped with
-    // CL_MAP_WRITE_INVALIDATE_REGION
-    MemoryObj::MappingInfo *Info = MemObj.GetMappingInfo(Cmd.GetMappedPtr());
-    if(Info && (Info->MapFlags & CL_MAP_WRITE_INVALIDATE_REGION))
-      memcpy(Cmd.GetMemObjAddr(), Cmd.GetMappedPtr(), Info->Size);
-  
-    free(Cmd.GetMappedPtr());
-  }
   
   MemObj.RemoveMapping(Cmd.GetMappedPtr());
   

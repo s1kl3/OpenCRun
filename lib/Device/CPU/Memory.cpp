@@ -36,10 +36,14 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
   return Addr;
 }
 
-// For the CPU target the device global memory is in the host AS,
-// hence we return the address of the provided host buffer.
-// In this way the OpenCL kernel will directly operate on the host 
-// buffer which will be always coherent and we use a half of memory.
+// For the CPU target, the device memory and host memory share the
+// same physical AS, so the model is simplified, if compared to a
+// generic device with separated ASs:
+
+// 1b) In this case no new memory allocation is requiered and the
+// provided host_ptr is returned; the buffer object will be stored
+// at the location pointed by host_ptr, which is supposed to be
+// already allocated in host code.
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
   llvm::sys::ScopedLock Lock(ThisLock);
     
@@ -50,9 +54,9 @@ void *GlobalMemory::Alloc(HostBuffer &Buf) {
   return Addr;
 }
 
-// In case of a CPU target, the device memory is in the same AS 
-// of the host memory, so we allocate the buffer object and its
-// address will be accessible by the host.
+// 2b) In this case new memory is allocated as the storage area for
+// the buffer object, and it will be accessible to the host code 
+// too, since the ASs are the same.
 void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
 
@@ -64,6 +68,8 @@ void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
   return Addr;
 }
 
+// 3b) As in the previous case, since all device memory is physically 
+// undistinct from host memory.
 void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
 
@@ -73,6 +79,7 @@ void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
   return Addr;
 }
 
+// 1i) See (1b).
 void *GlobalMemory::Alloc(HostImage &Img) {
   llvm::sys::ScopedLock Lock(ThisLock);
   
@@ -89,11 +96,14 @@ void *GlobalMemory::Alloc(HostImage &Img) {
       return NULL;
     
     std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+
+    Buf->AddAttachedImage(&Img);
   } 
 
   return Addr;
 }
 
+// 2i) See (2i).
 void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Img));
 
@@ -106,6 +116,8 @@ void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
       return NULL;
     
     std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+
+    Buf->AddAttachedImage(&Img);
   }
   
   // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
@@ -136,6 +148,7 @@ void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
   return Addr;
 }
 
+// 3i) See (3b).
 void *GlobalMemory::Alloc(DeviceImage &Img) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Img));
   
@@ -148,6 +161,8 @@ void *GlobalMemory::Alloc(DeviceImage &Img) {
       return NULL;
     
     std::memcpy(Addr, Mappings[Buf], Buf->GetSize());
+
+    Buf->AddAttachedImage(&Img);
   }
 
   if(Img.HasInitializationData()) {
