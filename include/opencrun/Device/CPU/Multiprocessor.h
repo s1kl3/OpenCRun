@@ -42,6 +42,7 @@ public:
   bool Submit(WriteBufferRectCPUCommand *Cmd);
   bool Submit(CopyBufferRectCPUCommand *Cmd);
   bool Submit(FillBufferCPUCommand *Cmd);
+  bool Submit(FillImageCPUCommand *Cmd);
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd);
   bool Submit(NativeKernelCPUCommand *Cmd);
 

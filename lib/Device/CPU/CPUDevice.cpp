@@ -266,6 +266,9 @@ bool CPUDevice::Submit(Command &Cmd) {
   else if(EnqueueFillBuffer *Fill = llvm::dyn_cast<EnqueueFillBuffer>(&Cmd))
     Submitted = Submit(*Fill);
     
+  else if(EnqueueFillImage *Fill = llvm::dyn_cast<EnqueueFillImage>(&Cmd))
+    Submitted = Submit(*Fill);
+
   else if(EnqueueNDRangeKernel *NDRange =
             llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
     Submitted = Submit(*NDRange);
@@ -610,6 +613,13 @@ bool CPUDevice::Submit(EnqueueFillBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new FillBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+}
+
+bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new FillImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {

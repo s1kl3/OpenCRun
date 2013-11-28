@@ -343,6 +343,31 @@ EnqueueFillBuffer::~EnqueueFillBuffer() {
 }
     
 //
+// EnqueueFillImage implementation.
+//
+
+EnqueueFillImage ::EnqueueFillImage(Image &Target,
+                                    const void *Source,
+                                    const size_t *TargetOrigin,
+                                    const size_t *TargetRegion,
+                                    EventsContainer &WaitList)
+  : Command(Command::FillImage, WaitList),
+    Target(&Target),
+    Source(Source),
+    TargetOffset(0) { 
+  std::memcpy(this->TargetOrigin, TargetOrigin, 3 * sizeof(size_t));
+
+  // Convert the region width in bytes.
+  this->TargetRegion[0] = TargetRegion[0] * Target.GetElementSize();
+  this->TargetRegion[1] = TargetRegion[1];
+  this->TargetRegion[2] = TargetRegion[2];
+
+  TargetOffset = TargetOrigin[0] * Target.GetElementSize() +
+                 TargetOrigin[1] * Target.GetRowPitch() +
+                 TargetOrigin[2] * Target.GetSlicePitch();
+}                                     
+
+//
 // EnqueueNDRangeKernel implementation.
 //
 
@@ -838,11 +863,11 @@ EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
   cl_mem Img,
   const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteImageBuilder,
                                        Queue.GetContext()),
-                  Target(NULL),
-                  Source(Source),
-                  Blocking(false),
-                  Region(NULL),
-                  TargetOffset(0) {
+                        Target(NULL),
+                        Source(Source),
+                        Blocking(false),
+                        Region(NULL),
+                        TargetOffset(0) {
   if(!Img)
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
 
@@ -2254,6 +2279,9 @@ EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetPatternSize(
 EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetFillRegion(
   size_t Offset,
   size_t Size) {
+  if(!SourceSize)
+    return *this;
+
   if((Offset % SourceSize) != 0)
     return NotifyError(CL_INVALID_VALUE, "fill offset is not a multiple of pattern size");
     
@@ -2294,6 +2322,88 @@ EnqueueFillBuffer *EnqueueFillBufferBuilder::Create(cl_int *ErrCode) {
     *ErrCode = CL_SUCCESS;
 
   return new EnqueueFillBuffer(*Target, Source, SourceSize, TargetOffset, TargetSize, WaitList);
+}
+
+//
+// EnqueueFillImageBuilder implementation.
+//
+
+EnqueueFillImageBuilder::EnqueueFillImageBuilder(
+  CommandQueue &Queue,
+  cl_mem Img,
+  const void *FillColor) : CommandBuilder(CommandBuilder::EnqueueFillImageBuilder,
+                                          Queue.GetContext()),
+                            Target(NULL),
+                            Source(FillColor),
+                            TargetOrigin(NULL),
+                            TargetRegion(NULL) {
+  if(!Img)
+    NotifyError(CL_INVALID_MEM_OBJECT, "fill target is null");
+
+  else if(!(Target = llvm::dyn_cast<Image>(llvm::cast<MemoryObj>(Img))))
+    NotifyError(CL_INVALID_MEM_OBJECT, "fill target is not an image");
+  
+  else if(Queue.GetContext() != Target->GetContext())
+    NotifyError(CL_INVALID_CONTEXT, "command queue and image have different context");
+    
+  if(!Source)
+    NotifyError(CL_INVALID_VALUE, "pointer to fill color is null");  
+
+  if(Target)
+    CheckDevImgSupport<>(*this, Queue, Target);
+}
+
+EnqueueFillImageBuilder &EnqueueFillImageBuilder::SetFillRegion(
+    const size_t *TargetOrigin,
+    const size_t *TargetRegion) {
+  if(!Target)
+    return *this;
+
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  this->TargetOrigin = TargetOrigin;
+
+  if(!TargetRegion)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
+  if(TargetRegion[0] == 0 || TargetRegion[1] == 0 || TargetRegion [2] == 0)
+    return NotifyError(CL_INVALID_VALUE, "invalid region");
+
+  if(!IsValidImgRegion<>(*this, Target, TargetOrigin, TargetRegion))
+    return *this;
+
+  // Region is valid.
+  this->TargetRegion = TargetRegion;
+  
+  return *this;
+}
+
+EnqueueFillImageBuilder &EnqueueFillImageBuilder::SetWaitList(
+  unsigned N,
+  const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+  
+  return llvm::cast<EnqueueFillImageBuilder>(Super);
+}
+
+EnqueueFillImage *EnqueueFillImageBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return new EnqueueFillImage(*Target, Source, TargetOrigin, TargetRegion, WaitList);
 }
 
 //
@@ -2560,7 +2670,7 @@ ImgCmdBuilderType &opencrun::CheckDevImgSupport(
     }
 
   if(!FmtSupported)
-    Bld.NotifyError(CL_INVALID_VALUE, 
+    Bld.NotifyError(CL_IMAGE_FORMAT_NOT_SUPPORTED, 
         "image format unsupported by device associated with queue");
 
   return Bld;

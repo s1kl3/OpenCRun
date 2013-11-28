@@ -55,7 +55,8 @@ public:
     ReadBufferRect = CL_COMMAND_READ_BUFFER_RECT,
     WriteBufferRect = CL_COMMAND_WRITE_BUFFER_RECT,
     CopyBufferRect = CL_COMMAND_COPY_BUFFER_RECT,
-    FillBuffer = CL_COMMAND_FILL_BUFFER
+    FillBuffer = CL_COMMAND_FILL_BUFFER,
+    FillImage = CL_COMMAND_FILL_IMAGE
   };
 
 public:
@@ -606,6 +607,7 @@ private:
                     size_t TargetOffset,
                     size_t TargetSize,
                     EventsContainer &WaitList);
+
 public:
   ~EnqueueFillBuffer();
                     
@@ -624,6 +626,38 @@ private:
   size_t TargetSize;
   
   friend class EnqueueFillBufferBuilder;
+};
+
+class EnqueueFillImage : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::FillImage;
+  }
+  
+private:
+  EnqueueFillImage(Image &Target,
+                   const void *Source,
+                   const size_t *TargetOrigin,
+                   const size_t *TargetRegion,
+                   EventsContainer &WaitList);
+
+public:
+  Image &GetTarget() { return *Target; }
+  const void *GetSource() { return Source; }
+  size_t *GetTargetOrigin() { return TargetOrigin; }
+  size_t *GetTargetRegion() { return TargetRegion; }
+  size_t GetTargetOffset() { return TargetOffset; }
+  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  
+private:
+  llvm::IntrusiveRefCntPtr<Image> Target;
+  const void *Source;
+  size_t TargetOffset;
+  size_t TargetOrigin[3];
+  size_t TargetRegion[3];
+  
+  friend class EnqueueFillImageBuilder;
 };
 
 class EnqueueNDRangeKernel : public Command {
@@ -707,7 +741,8 @@ public:
     EnqueueReadBufferRectBuilder,
     EnqueueWriteBufferRectBuilder,
     EnqueueCopyBufferRectBuilder,
-    EnqueueFillBufferBuilder
+    EnqueueFillBufferBuilder,
+    EnqueueFillImageBuilder
   };
 
 protected:
@@ -1317,6 +1352,47 @@ private:
   size_t SourceSize;
   size_t TargetOffset;
   size_t TargetSize;
+};
+
+class EnqueueFillImageBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueFillImageBuilder;
+  }
+  
+public:
+  EnqueueFillImageBuilder(CommandQueue &Queue, cl_mem Img, const void *FillColor);
+  
+public:
+  EnqueueFillImageBuilder &SetFillRegion(const size_t *TargetOrigin,
+                                         const size_t *TargetRegion);
+  EnqueueFillImageBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  
+  EnqueueFillImage *Create(cl_int *ErrCode);
+  
+private:
+  EnqueueFillImageBuilder &NotifyError(cl_int ErrCode,
+                                       const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }  
+  
+private:
+  Image *Target;
+  const void *Source;
+  const size_t *TargetOrigin;
+  const size_t *TargetRegion;
+
+  friend EnqueueFillImageBuilder &CheckDevImgSupport<>(
+      EnqueueFillImageBuilder &,
+      CommandQueue &,
+      Image *);
+
+  friend bool IsValidImgRegion<>(
+      EnqueueFillImageBuilder &,
+      Image *,
+      const size_t *,
+      const size_t *);
 };
 
 class EnqueueNDRangeKernelBuilder : public CommandBuilder {

@@ -424,8 +424,33 @@ clEnqueueFillImage(cl_command_queue command_queue,
                    cl_uint num_events_in_wait_list,
                    const cl_event *event_wait_list,
                    cl_event *event) CL_API_SUFFIX__VERSION_1_2 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  if(!Queue->GetDevice().HasImageSupport())
+    return CL_INVALID_OPERATION;
+
+  cl_int ErrCode;
+
+  opencrun::EnqueueFillImageBuilder Bld(*Queue, image, fill_color);
+  opencrun::Command *Cmd = Bld.SetFillRegion(origin, region)
+                              .SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);  
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

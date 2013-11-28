@@ -31,6 +31,7 @@ public:
     WriteBufferRect,
     CopyBufferRect,
     FillBuffer,
+    FillImage,
     NativeKernel,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
@@ -836,6 +837,53 @@ public:
 
   size_t GetSourceSize() {
     return GetQueueCommandAs<EnqueueFillBuffer>().GetSourceSize();
+  }
+  
+private:
+  void *Dst;
+};
+
+class FillImageCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::FillImage;
+  }
+
+public:
+  FillImageCPUCommand(EnqueueFillImage &Cmd,
+                      void *Dst)
+    : CPUExecCommand(CPUCommand::FillImage, Cmd),
+      Dst(Dst) { }
+      
+  void *GetTarget() {
+    uintptr_t Base = reinterpret_cast<uintptr_t>(Dst);
+    EnqueueFillImage &Cmd = GetQueueCommandAs<EnqueueFillImage>();
+    
+    return reinterpret_cast<void *>(Base + Cmd.GetTargetOffset());  
+  }
+  
+  const void *GetSource() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetSource();
+  }
+
+  size_t *GetTargetRegion() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetTargetRegion();
+  }
+
+  size_t GetTargetRowPitch() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetTargetRowPitch();
+  }
+
+  size_t GetTargetSlicePitch() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetTargetSlicePitch();
+  }
+
+  size_t GetTargetElementSize() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().GetElementSize();
+  }
+
+  cl_image_format GetTargetImageFormat() {
+    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().GetImageFormat();
   }
   
 private:

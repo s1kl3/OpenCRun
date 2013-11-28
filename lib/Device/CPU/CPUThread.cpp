@@ -377,9 +377,13 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
     return Submit(CopyRect);
   
-  else if(FillBufferCPUCommand *Fill =
+  else if(FillBufferCPUCommand *FillBuf =
             llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
-    return Submit(Fill);
+    return Submit(FillBuf);
+  
+  else if(FillImageCPUCommand *FillImg =
+            llvm::dyn_cast<FillImageCPUCommand>(Cmd))
+    return Submit(FillImg);
   
   else if(NDRangeKernelBlockCPUCommand *NDBlock =
             llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
@@ -489,6 +493,10 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   
   else if(FillBufferCPUCommand *OnFly =
             llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
+    ExitStatus = Execute(*OnFly);
+  
+  else if(FillImageCPUCommand *OnFly =
+            llvm::dyn_cast<FillImageCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
   
   else if(NDRangeKernelBlockCPUCommand *OnFly =
@@ -673,6 +681,159 @@ int CPUThread::Execute(FillBufferCPUCommand &Cmd) {
   return CPUCommand::NoError;
 }
 
+int CPUThread::Execute(FillImageCPUCommand &Cmd) {
+  // Maximum fill data size is 4 channels with 4 bytes
+  // per channel.
+  cl_uchar fill_data[16];
+
+  cl_image_format ImgFmt = Cmd.GetTargetImageFormat();
+  const size_t *Region = Cmd.GetTargetRegion(); 
+
+  // Region's first element is stored in bytes inside
+  // EnqueueFillImage class.
+  size_t RowEls = Region[0] / Cmd.GetTargetElementSize();
+
+  std::memset(fill_data, 0, 16 * sizeof(cl_uchar));
+
+  float r, g, b;
+
+  switch(ImgFmt.image_channel_order) {
+  case CL_R:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    break;
+  case CL_A:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 3, ImgFmt);
+    break;
+  case CL_Rx:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    break;
+  case CL_RG:
+  case CL_RGx:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
+    break;
+  case CL_RA:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 1, 3, ImgFmt);
+    break;
+  case CL_RGB:
+  case CL_RGBx:
+    r = std::min(1.0f, std::max(0.0f, ((const float*)Cmd.GetSource())[0]));
+    g = std::min(1.0f, std::max(0.0f, ((const float*)Cmd.GetSource())[1]));
+    b = std::min(1.0f, std::max(0.0f, ((const float*)Cmd.GetSource())[2]));
+
+    switch(ImgFmt.image_channel_data_type) {
+    case CL_UNORM_SHORT_565:
+      *((cl_ushort *)fill_data) =
+        ((cl_uint)(r * 31.0f) << 11) | ((cl_uint)(g * 63.0f) << 5) | (cl_uint)(b * 31.0f);
+      break;
+    case CL_UNORM_SHORT_555:
+      *((cl_ushort *)fill_data) =
+        ((cl_uint)(r * 31.0f) << 10) | ((cl_uint)(g * 31.0f) << 5) | (cl_uint)(b * 31.0f);
+      break;
+    case CL_UNORM_INT_101010:
+      *((cl_uint *)fill_data) =
+        ((cl_uint)(r * 1023.0f) << 20) | ((cl_uint)(g * 1023.0f) << 10) | (cl_uint)(b * 1023.0f);
+      break;
+    }
+    break;
+  case CL_RGBA:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 2, 2, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 3, 3, ImgFmt);
+    break;
+  case CL_ARGB:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 3, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 1, 0, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 2, 1, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 3, 2, ImgFmt);
+    break;
+  case CL_BGRA:
+    WriteChannel(fill_data, Cmd.GetSource(), 0, 2, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 2, 0, ImgFmt);
+    WriteChannel(fill_data, Cmd.GetSource(), 3, 3, ImgFmt);
+    break;
+  case CL_INTENSITY:
+  case CL_LUMINANCE:
+    // Only normalized data types are possible for these two
+    // image channel layouts, so data source is composed by
+    // 4 floating point values.
+    cl_float Y = ((const float*)Cmd.GetSource())[0] * 0.299f +
+                 ((const float*)Cmd.GetSource())[1] * 0.587f +
+                 ((const float*)Cmd.GetSource())[2] * 0.114f;
+
+    switch(ImgFmt.image_channel_data_type) {
+    case CL_UNORM_INT8:
+      *((cl_uchar *)fill_data) = (cl_uchar)(Y * 255.0f);
+      break;
+    case CL_UNORM_INT16:
+      *((cl_ushort *)fill_data) = (cl_ushort)(Y * 65535.0f);
+      break;
+    case CL_SNORM_INT8:
+      *((cl_char *)fill_data) = (cl_char)(Y * 127.0f);
+      break;
+    case CL_SNORM_INT16:
+      *((cl_short *)fill_data) = (cl_short)(Y * 32767.0f);
+      break;
+    case CL_HALF_FLOAT:
+      *((cl_half *)fill_data) = FloatToHalf(Y);
+      break;
+    case CL_FLOAT:
+      *((cl_float *)fill_data) = Y;
+      break;
+    }
+
+    break;
+  }
+
+  switch(Cmd.GetTargetElementSize()) {
+  case 1:
+    MemRectFill<cl_uchar>(Cmd.GetTarget(),
+                          Cmd.GetSource(),
+                          Region,
+                          Cmd.GetTargetRowPitch(),
+                          Cmd.GetTargetSlicePitch(),
+                          RowEls);
+    break;
+  case 2:
+     MemRectFill<cl_ushort>(Cmd.GetTarget(),
+                            Cmd.GetSource(),
+                            Region,
+                            Cmd.GetTargetRowPitch(),
+                            Cmd.GetTargetSlicePitch(),
+                            RowEls);
+     break;
+  case 4:
+     MemRectFill<cl_uint>(Cmd.GetTarget(),
+                          Cmd.GetSource(),
+                          Region,
+                          Cmd.GetTargetRowPitch(),
+                          Cmd.GetTargetSlicePitch(),
+                          RowEls);
+     break;
+  case 8:
+     MemRectFill<cl_ulong>(Cmd.GetTarget(),
+                           Cmd.GetSource(),
+                           Region,
+                           Cmd.GetTargetRowPitch(),
+                           Cmd.GetTargetSlicePitch(),
+                           RowEls);
+     break;
+  case 16:
+     MemRectFill<cl_uint4>(Cmd.GetTarget(),
+                           Cmd.GetSource(),
+                           Region,
+                           Cmd.GetTargetRowPitch(),
+                           Cmd.GetTargetSlicePitch(),
+                           RowEls);
+     break;
+  }
+
+  return CPUCommand::NoError;
+}
+
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
   // Reserve space for local buffers.
   // TODO: reserve space for local automatic buffers.
@@ -713,14 +874,6 @@ int CPUThread::Execute(NativeKernelCPUCommand &Cmd) {
   return CPUCommand::NoError;
 }
 
-// Used by: EnqueueReadBufferRect
-//          EnqueueWriteBufferRect
-//          EnqueueCopyBufferRect
-//          EnqueueReadImage
-//          EnqueueWriteImage
-//          EnqueueCopyImage
-//          EnqueueCopyImageToBuffer
-//          EnqueueCopyBufferToImage
 void CPUThread::MemRectCpy(void *Target, 
                            const void *Source,
                            const size_t *Region,
@@ -737,6 +890,158 @@ void CPUThread::MemRectCpy(void *Target,
                     reinterpret_cast<uintptr_t>(Source) + SourceRowPitch * Y + SourceSlicePitch * Z
                   ),
                   Region[0]);                               
+}
+
+void CPUThread::WriteChannel(void *DataOut,
+                             const void *DataIn,
+                             size_t ToCh,
+                             size_t FromCh,
+                             const cl_image_format &ImgFmt) {
+  switch(ImgFmt.image_channel_data_type) {
+  case CL_SNORM_INT8:
+    ((cl_char *)DataOut)[ToCh] =
+      (cl_char)(std::min(1.0f, std::max(0.0f, ((const cl_float *)DataIn)[FromCh])) * 127.0f);
+    break;
+  case CL_SNORM_INT16:
+    ((cl_short *)DataOut)[ToCh] =
+      (cl_short)(std::min(1.0f, std::max(0.0f, ((const cl_float *)DataIn)[FromCh])) * 32767.0f);
+    break;    
+  case CL_UNORM_INT8:
+    ((cl_uchar *)DataOut)[ToCh] =
+      (cl_uchar)(std::min(1.0f, std::max(0.0f, ((const cl_float *)DataIn)[FromCh])) * 255.0f);
+    break;
+  case CL_UNORM_INT16:
+    ((cl_ushort *)DataOut)[ToCh] =
+      (cl_ushort)(std::min(1.0f, std::max(0.0f, ((const cl_float *)DataIn)[FromCh])) * 65535.0f);
+    break;
+  case CL_SIGNED_INT8:
+    ((cl_char *)DataOut)[ToCh] = (cl_char)(((const cl_int *)DataIn)[FromCh]);
+    break;
+  case CL_SIGNED_INT16:
+    ((cl_short *)DataOut)[ToCh] = (cl_short)(((const cl_int *)DataIn)[FromCh]);
+    break;
+  case CL_SIGNED_INT32:
+    ((cl_int *)DataOut)[ToCh] = ((const cl_int *)DataIn)[FromCh];
+    break;
+  case CL_UNSIGNED_INT8:
+    ((cl_uchar *)DataOut)[ToCh] = (cl_uchar)(((const cl_uint *)DataIn)[FromCh]);
+    break;
+  case CL_UNSIGNED_INT16:
+    ((cl_ushort*)DataOut)[ToCh] = (cl_ushort)(((const cl_uint *)DataIn)[FromCh]);
+    break;
+  case CL_UNSIGNED_INT32:
+    ((cl_uint *)DataOut)[ToCh] = ((const cl_uint *)DataIn)[FromCh];
+    break;
+  case CL_HALF_FLOAT:
+    ((cl_half *)DataOut)[ToCh] = FloatToHalf(((const cl_float *)DataIn)[FromCh]); 
+    break;
+  case CL_FLOAT:
+    ((cl_float *)DataOut)[ToCh] = ((const cl_float *)DataIn)[FromCh];
+    break;
+  }
+}
+
+cl_half CPUThread::FloatToHalf(cl_float f) {
+  // Single-precision float as a 32 bit unsigned integer.
+  cl_uint fp32 = *((cl_float *)&f);
+
+  // Half-precision float as a 16 bit unsigned integer.
+  cl_ushort fp16 = 0;
+
+  // Round or not.
+  bool round = false;
+
+  // Single-precision float components (Sign, Exponent, Significand)
+  // as 32 bit unsigned integers.
+  cl_uint fp32_s = fp32 & 0x80000000U;
+  cl_uint fp32_e = fp32 & 0x7f800000U;
+  cl_uint fp32_m = fp32 & 0x007fffffU;
+
+  // Half-precision float components (Sign, Exponent, Significand)
+  // as 16 bit unsigned integers.
+  cl_ushort fp16_s = fp32_s >> 16;
+  cl_ushort fp16_e = 0;
+  cl_ushort fp16_m = fp32_m >> 13;
+
+  // Re-bias the exponent for the excess-15 binary representation.
+  cl_int exp = (fp32_e >> 23) - 127 + 15;
+
+  if(exp < -9) { // {-inf .. -10} : Excessive underflow.
+    // Return +/- zero keeping only the original
+    // sign.
+    fp16_m = 0;  
+  } else if(exp < 1) { // {-9 .. 0} : Underflow.
+    // Denormalization.
+    cl_uint m = fp32_m | 0x00800000U; 
+    fp16_m = m >> (14 - exp);
+    // If the MSB lost by denormalization was 1 we round up
+    // the result.
+    if((m >> (13 - exp)) & 1)
+      round = true;
+  } if(exp >= 31) { // {31 .. +inf} : Inf, NaN or overflow.
+    // Nan -> QNaN
+    // +/-Inf -> +/- Inf
+    fp16_e = 0x001fU << 10;
+    fp16_m = fp32_m ? 0x0200U : 0; 
+  } else { // {1 .. 30} : Normal.
+    fp16_e = (cl_ushort)(exp << 10);
+    // If the MSB lost by shifting was 1 we round up.
+    if(fp32_m & 0x00001000U)
+      round = true;
+  }
+
+  fp16 = (cl_half)(fp16_s | fp16_e | fp16_m);
+
+  if(round) fp16++; // May overflow into exponent.
+
+  return fp16;
+}
+
+cl_float CPUThread::HalfToFloat(cl_half h) {
+  // Half-precision float as a 16 bit unsigned integer.
+  cl_ushort fp16 = *((cl_ushort *)&h);
+
+  // Single-precision float as a 32 bit unsigned integer.
+  cl_uint fp32 = 0;
+
+  // Half-precision float components (Sign, Exponent, Significand)
+  // as 16 bit unsigned integers.
+  cl_ushort fp16_s = fp16 & 0x8000U;
+  cl_ushort fp16_e = fp16 & 0x7c00U;
+  cl_ushort fp16_m = fp16 & 0x03ffU;
+
+  // Single-precision float components (Sign, Exponent, Significand)
+  // as 32 bit unsigned integers.
+  cl_uint fp32_s = fp16_s << 16;
+  cl_uint fp32_e = 0;
+  cl_uint fp32_m = fp16_m << 13;
+
+  // Unsigned value for f16_e.
+  cl_ushort exp = fp16_e >> 10;
+
+  if(exp == 31) // Inf, NaN
+    fp32_e = 255 << 23;
+  else if(exp == 0) {
+    if(fp16_m != 0) { // Denormal.
+      cl_int e = -1;
+      cl_uint m = fp16_m;
+
+      do {
+        ++e;
+        m <<= 1;
+      } while((m & 0x400U) == 0);
+
+      fp32_m = (m & 0x3ffU) << 13;
+      fp32_e = (127 - 15 - e) << 23;
+    }
+  } else // Normal.
+    // Apply new bias and shift to correct position.
+    fp32_e = ((cl_uint)exp - 15 + 127) << 23;
+
+  // +/- 0 are handled here.
+  fp32 = (cl_float)(fp32_s | fp32_e | fp32_m);
+
+  return fp32;
 }
 
 //
