@@ -349,6 +349,10 @@ ImageBuilder::ImageBuilder(Context &Ctx) :
   Buf(NULL) { }
   
 ImageBuilder &ImageBuilder::SetFormat(const cl_image_format *ImgFmt) {
+  if(!ImgFmt)
+    return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
+                       "image format descriptor is null");
+
   size_t NumChannels = 0;
   size_t DataSize = 0;
   
@@ -493,9 +497,9 @@ ImageBuilder &ImageBuilder::SetFormat(const cl_image_format *ImgFmt) {
 }
 
 ImageBuilder &ImageBuilder::SetDesc(const cl_image_desc *ImgDesc) {
-  // In case of an error in SetFormat we cannot proceed.
-  if(this->ErrCode != CL_SUCCESS)
-    return *this;
+  if(!ImgDesc)
+    return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                       "image descriptor is null");
 
   if(ImgDesc->num_mip_levels)
     return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
@@ -504,6 +508,10 @@ ImageBuilder &ImageBuilder::SetDesc(const cl_image_desc *ImgDesc) {
   if(ImgDesc->num_samples)
     return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
         "non zero samples");
+
+  if(TargetDevs.size() == 0)
+    return NotifyError(CL_IMAGE_FORMAT_NOT_SUPPORTED,
+                       "specified image format unsupported");
 
   // Determine the minimum maximum image dimensions.
   size_t Min_Image2DMaxWidth = TargetDevs[0]->GetImage2DMaxWidth(),

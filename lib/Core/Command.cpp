@@ -93,19 +93,26 @@ EnqueueCopyBuffer::EnqueueCopyBuffer(Buffer &Target,
 EnqueueReadImage::EnqueueReadImage(void *Target,
                                    Image &Source,
                                    bool Blocking,
+                                   const size_t *SourceOrigin,
                                    const size_t *Region,
-                                   size_t SourceOffset, 
                                    size_t *TargetPitches,
                                    EventsContainer &WaitList)
   : Command(Command::ReadImage, WaitList),
     Target(Target),
     Source(&Source),
-    SourceOffset(SourceOffset) {
+    SourceOffset(0) {
+  std::memcpy(this->SourceOrigin, SourceOrigin, 3 * sizeof(size_t));
+  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+
   // Convert the region width in bytes.
   this->Region[0] = Region[0] * Source.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
-  std::memcpy(this->TargetPitches, TargetPitches, 2 * sizeof(size_t));
+
+  // Calculate offset inside the image object.
+  SourceOffset = SourceOrigin[0] * Source.GetElementSize() +
+                 SourceOrigin[1] * Source.GetRowPitch() +
+                 SourceOrigin[2] * Source.GetSlicePitch();
 }
 
 //
@@ -115,19 +122,26 @@ EnqueueReadImage::EnqueueReadImage(void *Target,
 EnqueueWriteImage::EnqueueWriteImage(Image &Target, 
                                      const void *Source, 
                                      bool Blocking, 
+                                     const size_t *TargetOrigin,
                                      const size_t *Region, 
-                                     size_t TargetOffset, 
                                      size_t *SourcePitches, 
                                      EventsContainer &WaitList)
   : Command(Command::WriteImage, WaitList),
     Target(&Target),
     Source(Source),
-    TargetOffset(TargetOffset) { 
+    TargetOffset(0) { 
+  std::memcpy(this->TargetOrigin, TargetOrigin, 3 * sizeof(size_t));
+  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+
   // Convert the region width in bytes.
   this->Region[0] = Region[0] * Target.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
-  std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
+  
+  // Calculate offset inside the image object.
+  TargetOffset = TargetOrigin[0] * Target.GetElementSize() +
+                 TargetOrigin[1] * Target.GetRowPitch() +
+                 TargetOrigin[2] * Target.GetSlicePitch();
 }
 
 
@@ -137,20 +151,33 @@ EnqueueWriteImage::EnqueueWriteImage(Image &Target,
 
 EnqueueCopyImage::EnqueueCopyImage(Image &Target,
                                    Image &Source,
-                                   size_t TargetOffset,
-                                   size_t SourceOffset,
+                                   const size_t *TargetOrigin,
+                                   const size_t *SourceOrigin,
                                    const size_t *Region,
                                    EventsContainer &WaitList)
   : Command(Command::CopyImage, WaitList),
     Target(&Target),
     Source(&Source),
-    TargetOffset(TargetOffset),
-    SourceOffset(SourceOffset) {
+    TargetOffset(0),
+    SourceOffset(0) {
+  std::memcpy(this->TargetOrigin, TargetOrigin, 3 * sizeof(size_t));
+  std::memcpy(this->SourceOrigin, SourceOrigin, 3 * sizeof(size_t));
+
   // Convert the region width in bytes. Target and source images have
   // the same element size because they have the same image format.
   this->Region[0] = Region[0] * Target.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
+  
+  // Calculate offset inside the target image object.
+  TargetOffset = TargetOrigin[0] * Target.GetElementSize() +
+                 TargetOrigin[1] * Target.GetRowPitch() +
+                 TargetOrigin[2] * Target.GetSlicePitch();
+  
+  // Calculate offset inside the source image object.
+  SourceOffset = SourceOrigin[0] * Source.GetElementSize() +
+                 SourceOrigin[1] * Source.GetRowPitch() +
+                 SourceOrigin[2] * Source.GetSlicePitch();
 }
 
 //
@@ -160,18 +187,25 @@ EnqueueCopyImageToBuffer::EnqueueCopyImageToBuffer(
     Buffer &Target,
     Image &Source,
     size_t TargetOffset,
-    size_t SourceOffset,
+    const size_t *SourceOrigin,
     const size_t *Region,
     EventsContainer &WaitList)
   : Command(Command::CopyImageToBuffer, WaitList),
     Target(&Target),
     Source(&Source),
     TargetOffset(TargetOffset),
-    SourceOffset(SourceOffset) {
+    SourceOffset(0) {
+  std::memcpy(this->SourceOrigin, SourceOrigin, 3 * sizeof(size_t));
+
   // Convert the source region width in bytes.
   this->Region[0] = Region[0] * Source.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
+  
+  // Calculate offset inside the source image object.
+  SourceOffset = SourceOrigin[0] * Source.GetElementSize() +
+                 SourceOrigin[1] * Source.GetRowPitch() +
+                 SourceOrigin[2] * Source.GetSlicePitch();
 }
 
 //
@@ -180,19 +214,26 @@ EnqueueCopyImageToBuffer::EnqueueCopyImageToBuffer(
 EnqueueCopyBufferToImage::EnqueueCopyBufferToImage(
     Image &Target,
     Buffer &Source,
-    size_t TargetOffset,
+    const size_t *TargetOrigin,
     const size_t *Region,
     size_t SourceOffset,
     EventsContainer &WaitList)
   : Command(Command::CopyBufferToImage, WaitList),
     Target(&Target),
     Source(&Source),
-    TargetOffset(TargetOffset),
+    TargetOffset(0),
     SourceOffset(SourceOffset) {
+  std::memcpy(this->TargetOrigin, TargetOrigin, 3 * sizeof(size_t));
+  
   // Convert the target region width in bytes.
   this->Region[0] = Region[0] * Target.GetElementSize();
   this->Region[1] = Region[1];
   this->Region[2] = Region[2];
+  
+  // Calculate offset inside the source image object.
+  TargetOffset = TargetOrigin[0] * Target.GetElementSize() +
+                 TargetOrigin[1] * Target.GetRowPitch() +
+                 TargetOrigin[2] * Target.GetSlicePitch();
 }
 
 //
@@ -742,8 +783,8 @@ EnqueueReadImageBuilder::EnqueueReadImageBuilder(
                   Source(NULL),
                   Target(Target),
                   Blocking(false),
-                  Region(NULL),
-                  SourceOffset(0) {
+                  SourceOrigin(NULL),
+                  Region(NULL) {
   if(!Img)
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is null");
 
@@ -776,42 +817,44 @@ EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetBlocking(
 }
 
 EnqueueReadImageBuilder &EnqueueReadImageBuilder::SetCopyArea(
-    const size_t *Origin,
+    const size_t *SourceOrigin,
     const size_t *Region,
-    size_t RowPitch,
-    size_t SlicePitch) {
+    size_t TargetRowPitch,
+    size_t TargetSlicePitch) {
   if(!Source)
     return *this;
+
+  if(!SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
 
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  if(!IsValidImgRegion<>(*this, Source, Origin, Region))
+  if(!IsValidImgRegion<>(*this, Source, SourceOrigin, Region))
     return *this;
   
   // Region is valid.
   this->Region = Region;
-
-  // Calculate offset inside the image object.
-  SourceOffset = Origin[0] * Source->GetElementSize() +
-                 Origin[1] * Source->GetRowPitch() +
-                 Origin[2] * Source->GetSlicePitch();
+  this->SourceOrigin = SourceOrigin;
 
   // Check row and slice picthes.
-  if(RowPitch == 0) 
+  if(TargetRowPitch == 0) 
     TargetPitches[0] = Region[0] * Source->GetElementSize();
   else {
-    if(RowPitch < Region[0] * Source->GetElementSize())
+    if(TargetRowPitch < Region[0] * Source->GetElementSize())
       return NotifyError(CL_INVALID_VALUE, "invalid row pitch");
-    TargetPitches[0] = RowPitch;
+    TargetPitches[0] = TargetRowPitch;
   }
 
-  if(SlicePitch == 0) 
+  if(TargetSlicePitch == 0) 
     TargetPitches[1] = TargetPitches[0] * Region[1];
   else {
-    if(SlicePitch < TargetPitches[0] * Region[1])
+    if(TargetSlicePitch < TargetPitches[0] * Region[1])
       return NotifyError(CL_INVALID_VALUE, "invalid slice pitch");
-    TargetPitches[1] = SlicePitch;
+    TargetPitches[1] = TargetSlicePitch;
   }
 
   return *this;
@@ -848,8 +891,8 @@ EnqueueReadImage *EnqueueReadImageBuilder::Create(cl_int *ErrCode) {
   return new EnqueueReadImage(Target,
                               *Source,
                               Blocking,
+                              SourceOrigin,
                               Region,
-                              SourceOffset,
                               TargetPitches,
                               WaitList);
 }
@@ -866,8 +909,8 @@ EnqueueWriteImageBuilder::EnqueueWriteImageBuilder(
                         Target(NULL),
                         Source(Source),
                         Blocking(false),
-                        Region(NULL),
-                        TargetOffset(0) {
+                        TargetOrigin(NULL),
+                        Region(NULL) {
   if(!Img)
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is null");
 
@@ -900,42 +943,44 @@ EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetBlocking(
 }
 
 EnqueueWriteImageBuilder &EnqueueWriteImageBuilder::SetCopyArea(
-    const size_t *Origin,
+    const size_t *TargetOrigin,
     const size_t *Region,
-    size_t InputRowPitch,
-    size_t InputSlicePitch) {
+    size_t SourceRowPitch,
+    size_t SourceSlicePitch) {
   if(!Target)
     return *this;
+
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
 
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
-  if(!IsValidImgRegion<>(*this, Target, Origin, Region))
+  if(!IsValidImgRegion<>(*this, Target, TargetOrigin, Region))
     return *this;
 
   // Region is valid.
   this->Region = Region;
-
-  // Calculate offset inside the image object.
-  TargetOffset = Origin[0] * Target->GetElementSize() +
-                 Origin[1] * Target->GetRowPitch() +
-                 Origin[2] * Target->GetSlicePitch();
+  this->TargetOrigin = TargetOrigin;
 
   // Check row and slice picthes.
-  if(InputRowPitch == 0) 
+  if(SourceRowPitch == 0) 
     SourcePitches[0] = Region[0] * Target->GetElementSize();
   else {
-    if(InputRowPitch < Region[0] * Target->GetElementSize())
-      return NotifyError(CL_INVALID_VALUE, "invalid input row pitch");
-    SourcePitches[0] = InputRowPitch;
+    if(SourceRowPitch < Region[0] * Target->GetElementSize())
+      return NotifyError(CL_INVALID_VALUE, "invalid row pitch");
+    SourcePitches[0] = SourceRowPitch;
   }
 
-  if(InputSlicePitch == 0) 
+  if(SourceSlicePitch == 0) 
     SourcePitches[1] = SourcePitches[0] * Region[1];
   else {
-    if(InputSlicePitch < SourcePitches[0] * Region[1])
-      return NotifyError(CL_INVALID_VALUE, "invalid input slice pitch");
-    SourcePitches[1] = InputSlicePitch;
+    if(SourceSlicePitch < SourcePitches[0] * Region[1])
+      return NotifyError(CL_INVALID_VALUE, "invalid slice pitch");
+    SourcePitches[1] = SourceSlicePitch;
   }
 
   return *this;
@@ -972,8 +1017,8 @@ EnqueueWriteImage *EnqueueWriteImageBuilder::Create(cl_int *ErrCode) {
   return new EnqueueWriteImage(*Target,
                                Source, 
                                Blocking,
+                               TargetOrigin,
                                Region,
-                               TargetOffset,
                                SourcePitches,
                                WaitList);
 }
@@ -989,8 +1034,8 @@ EnqueueCopyImageBuilder::EnqueueCopyImageBuilder(
                                      Queue.GetContext()),
                       Target(NULL),
                       Source(NULL),
-                      TargetOffset(0),
-                      SourceOffset(0),
+                      TargetOrigin(NULL),
+                      SourceOrigin(NULL),
                       Region(NULL) {
   if(!TargetImg)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
@@ -1028,6 +1073,12 @@ EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
   if(!Target || !Source)
     return *this;
 
+  if(!TargetOrigin || !SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
@@ -1039,16 +1090,8 @@ EnqueueCopyImageBuilder &EnqueueCopyImageBuilder::SetCopyArea(
 
   // Region is valid for both image objects.
   this->Region = Region;
-  
-  // Calculate offset inside the target image object.
-  TargetOffset = TargetOrigin[0] * Target->GetElementSize() +
-                 TargetOrigin[1] * Target->GetRowPitch() +
-                 TargetOrigin[2] * Target->GetSlicePitch();
-  
-  // Calculate offset inside the source image object.
-  SourceOffset = SourceOrigin[0] * Source->GetElementSize() +
-                 SourceOrigin[1] * Source->GetRowPitch() +
-                 SourceOrigin[2] * Source->GetSlicePitch();
+  this->TargetOrigin = TargetOrigin;
+  this->SourceOrigin = SourceOrigin;
 
   return *this;
 }
@@ -1079,8 +1122,8 @@ EnqueueCopyImage *EnqueueCopyImageBuilder::Create(cl_int *ErrCode) {
 
   return new EnqueueCopyImage(*Target,
                               *Source,
-                              TargetOffset,
-                              SourceOffset,
+                              TargetOrigin,
+                              SourceOrigin,
                               Region,
                               WaitList);
 }
@@ -1098,7 +1141,7 @@ EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
     Target(NULL),
     Source(NULL),
     TargetOffset(0),
-    SourceOffset(0),
+    SourceOrigin(NULL),
     Region(NULL) {
   if(!TargetBuf)
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is null");
@@ -1133,6 +1176,12 @@ EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
   if(!Target || !Source)
     return *this;
 
+  if(!SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
@@ -1141,6 +1190,7 @@ EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
 
   // Region is valid.
   this->Region = Region;
+  this->SourceOrigin = SourceOrigin;
 
   if(TargetOffset + 
      Region[0] * Region[1] * Region[2] * Source->GetElementSize() > Target->GetSize())
@@ -1148,11 +1198,6 @@ EnqueueCopyImageToBufferBuilder &EnqueueCopyImageToBufferBuilder::SetCopyArea(
 
   this->TargetOffset = TargetOffset;
   
-  // Calculate offset inside the source image object.
-  SourceOffset = SourceOrigin[0] * Source->GetElementSize() +
-                 SourceOrigin[1] * Source->GetRowPitch() +
-                 SourceOrigin[2] * Source->GetSlicePitch();
-
   return *this;
 }
 
@@ -1183,7 +1228,7 @@ EnqueueCopyImageToBuffer *EnqueueCopyImageToBufferBuilder::Create(cl_int *ErrCod
   return new EnqueueCopyImageToBuffer(*Target,
                                       *Source,
                                       TargetOffset,
-                                      SourceOffset,
+                                      SourceOrigin,
                                       Region,
                                       WaitList);
 }
@@ -1200,7 +1245,7 @@ EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
                    Queue.GetContext()),
     Target(NULL),
     Source(NULL),
-    TargetOffset(0),
+    TargetOrigin(NULL),
     Region(NULL),
     SourceOffset(0) {
   if(!SourceBuf)
@@ -1236,6 +1281,12 @@ EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
   if(!Target || !Source)
     return *this;
 
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "origin is null");
+
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE, "invalid region");
 
@@ -1244,6 +1295,7 @@ EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
 
   // Region is valid.
   this->Region = Region;
+  this->TargetOrigin = TargetOrigin;
 
   if(SourceOffset + 
      Region[0] * Region[1] * Region[2] * Target->GetElementSize() > Source->GetSize())
@@ -1251,11 +1303,6 @@ EnqueueCopyBufferToImageBuilder &EnqueueCopyBufferToImageBuilder::SetCopyArea(
 
   this->SourceOffset = SourceOffset;
   
-  // Calculate offset inside the source image object.
-  TargetOffset = TargetOrigin[0] * Target->GetElementSize() +
-                 TargetOrigin[1] * Target->GetRowPitch() +
-                 TargetOrigin[2] * Target->GetSlicePitch();
-
   return *this;
 }
 
@@ -1285,7 +1332,7 @@ EnqueueCopyBufferToImage *EnqueueCopyBufferToImageBuilder::Create(cl_int *ErrCod
 
   return new EnqueueCopyBufferToImage(*Target,
                                       *Source,
-                                      TargetOffset,
+                                      TargetOrigin,
                                       Region,
                                       SourceOffset,
                                       WaitList);
@@ -1723,6 +1770,9 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetBlocking(
 
 EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetRegion(
   const size_t *Region) {
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE,
                        "invalid region");
@@ -1736,6 +1786,12 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
+  if(!Region)
+    return *this;
+
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "target origin is null");
+
   if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
@@ -1767,6 +1823,12 @@ EnqueueReadBufferRectBuilder &EnqueueReadBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
+  if(!Source || !Region)
+    return *this;
+
+  if(!SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "source origin is null");
+
   if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
@@ -1885,6 +1947,9 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetBlocking(
 
 EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetRegion(
   const size_t *Region) {
+  if(!Region)
+    return NotifyError(CL_INVALID_VALUE, "region is null");
+
   if(Region[0] == 0 || Region[1] == 0 || Region [2] == 0)
     return NotifyError(CL_INVALID_VALUE,
                        "invalid region");
@@ -1898,6 +1963,12 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
+  if(!Target || !Region)
+    return *this;
+
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "target origin is null");
+
   if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
@@ -1934,6 +2005,12 @@ EnqueueWriteBufferRectBuilder &EnqueueWriteBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
+  if(!Region)
+    return *this;
+
+  if(!SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "source origin is null");
+
   if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
@@ -2050,6 +2127,12 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetTargetOffset(
   const size_t *TargetOrigin,
   size_t TargetRowPitch,
   size_t TargetSlicePitch) {
+  if(!Target || !Region)
+    return *this;
+
+  if(!TargetOrigin)
+    return NotifyError(CL_INVALID_VALUE, "target origin is null");
+
   if(TargetRowPitch == 0) TargetPitches[0] = Region[0];
   else {
     if(TargetRowPitch < Region[0])
@@ -2088,6 +2171,11 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetSourceOffset(
   const size_t *SourceOrigin,
   size_t SourceRowPitch,
   size_t SourceSlicePitch) {
+  if(!Source || !Region)
+    return *this;
+
+  if(!SourceOrigin)
+    return NotifyError(CL_INVALID_VALUE, "source origin is null");
   if(SourceRowPitch == 0) SourcePitches[0] = Region[0];
   else {
     if(SourceRowPitch < Region[0])
@@ -2125,6 +2213,9 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::SetSourceOffset(
 // The algorithm for overlap checking is taken from OpenCL v.1.2 specifications
 // Appendix E.
 EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::CheckCopyOverlap() {
+  if(!Target || !Source || !Region || !TargetOrigin || !SourceOrigin)
+    return *this;
+
   if(Target == Source) {
     // Since target and source buffers are the same object they must have the
     // same row and slice pitches.
@@ -2279,7 +2370,7 @@ EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetPatternSize(
 EnqueueFillBufferBuilder &EnqueueFillBufferBuilder::SetFillRegion(
   size_t Offset,
   size_t Size) {
-  if(!SourceSize)
+  if(!Target || !SourceSize)
     return *this;
 
   if((Offset % SourceSize) != 0)

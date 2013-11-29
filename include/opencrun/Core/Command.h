@@ -201,14 +201,15 @@ private:
   EnqueueReadImage(void *Target,
                    Image &Source,
                    bool Blocking,
+                   const size_t *SourceOrigin,
                    const size_t *Region,
-                   size_t SourceOffset,
                    size_t *TargetPitches,
                    EventsContainer &WaitList);
 
 public:
   void *GetTarget() { return Target; }
   Image &GetSource() { return *Source; }
+  const size_t *GetSourceOrigin() { return SourceOrigin; }
   const size_t *GetRegion() { return Region; }
   size_t GetSourceOffset() { return SourceOffset; }
   size_t GetTargetRowPitch() { return TargetPitches[0]; }
@@ -220,6 +221,7 @@ private:
   void *Target;
   llvm::IntrusiveRefCntPtr<Image> Source;
   size_t SourceOffset;
+  size_t SourceOrigin[3];
   size_t Region[3];
   size_t TargetPitches[2];
 
@@ -236,14 +238,15 @@ private:
   EnqueueWriteImage(Image &Target,
                     const void *Source,
                     bool Blocking,
+                    const size_t *TargetOrigin,
                     const size_t *Region, 
-                    size_t TargetOffset, 
                     size_t *SourcePitches, 
                     EventsContainer &WaitList);
 
 public:
   Image &GetTarget() { return *Target; }
   const void *GetSource() { return Source; }
+  const size_t *GetTargetOrigin() { return TargetOrigin; }
   const size_t *GetRegion() { return Region; }
   size_t GetTargetOffset() { return TargetOffset; }
   size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
@@ -255,6 +258,7 @@ private:
   llvm::IntrusiveRefCntPtr<Image> Target;
   const void *Source;
   size_t TargetOffset;
+  size_t TargetOrigin[3];
   size_t Region[3];
   size_t SourcePitches[2];
 
@@ -270,8 +274,8 @@ public:
 private:
   EnqueueCopyImage(Image &Target,
                    Image &Source,
-                   size_t TargetOffset,
-                   size_t SourceOffset,
+                   const size_t *TargetOrigin,
+                   const size_t *SourceOrigin,
                    const size_t *Region,
                    EventsContainer &WaitList);
 
@@ -280,17 +284,21 @@ public:
   Image &GetSource() { return *Source; }
   size_t GetTargetOffset() { return TargetOffset; }
   size_t GetSourceOffset() { return SourceOffset; }
+  const size_t *GetTargetOrigin() { return TargetOrigin; }
+  const size_t *GetSourceOrigin() { return SourceOrigin; }
+  const size_t *GetRegion() { return Region; }
   size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
   size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
   size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
   size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
-  const size_t *GetRegion() { return Region; }
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
   llvm::IntrusiveRefCntPtr<Image> Source;
   size_t TargetOffset;
   size_t SourceOffset;
+  size_t TargetOrigin[3];
+  size_t SourceOrigin[3];
   size_t Region[3];
 
   friend class EnqueueCopyImageBuilder;
@@ -306,7 +314,7 @@ private:
   EnqueueCopyImageToBuffer(Buffer &Target,
                            Image &Source,
                            size_t TargetOffset,
-                           size_t SourceOffset,
+                           const size_t *SourceOrigin,
                            const size_t *Region,
                            EventsContainer &WaitList);
 
@@ -315,15 +323,17 @@ public:
   Image &GetSource() { return *Source; }
   size_t GetTargetOffset() { return TargetOffset; }
   size_t GetSourceOffset() { return SourceOffset; }
+  const size_t *GetSourceOrigin() { return SourceOrigin; }
+  const size_t *GetRegion() { return Region; }
   size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
   size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
-  const size_t *GetRegion() { return Region; }
 
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Target;
   llvm::IntrusiveRefCntPtr<Image> Source;
   size_t TargetOffset;
   size_t SourceOffset;
+  size_t SourceOrigin[3];
   size_t Region[3];
 
   friend class EnqueueCopyImageToBufferBuilder;
@@ -338,7 +348,7 @@ public:
 private:
   EnqueueCopyBufferToImage(Image &Target,
                            Buffer &Source,
-                           size_t TargetOffset,
+                           const size_t *TargetOrigin,
                            const size_t *Region,
                            size_t SourceOffset,
                            EventsContainer &WaitList);
@@ -346,17 +356,19 @@ private:
 public:
   Image &GetTarget() { return *Target; }
   Buffer &GetSource() { return *Source; }
+  const size_t *GetTargetOrigin() { return TargetOrigin; }
+  const size_t *GetRegion() { return Region; }
   size_t GetTargetOffset() { return TargetOffset; }
   size_t GetSourceOffset() { return SourceOffset; }
   size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
   size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
-  const size_t *GetRegion() { return Region; }
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
   llvm::IntrusiveRefCntPtr<Buffer> Source;
   size_t TargetOffset;
   size_t SourceOffset;
+  size_t TargetOrigin[3];
   size_t Region[3];
 
   friend class EnqueueCopyBufferToImageBuilder;
@@ -874,10 +886,10 @@ public:
 
 public:
   EnqueueReadImageBuilder &SetBlocking(bool Blocking = true);
-  EnqueueReadImageBuilder &SetCopyArea(const size_t *Origin,
+  EnqueueReadImageBuilder &SetCopyArea(const size_t *SourceOrigin,
                                        const size_t *Region,
-                                       size_t RowPitch,
-                                       size_t SlicePitch);
+                                       size_t TargetRowPitch,
+                                       size_t TargetSlicePitch);
   EnqueueReadImageBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueReadImage *Create(cl_int *ErrCode);
@@ -893,8 +905,8 @@ private:
   Image *Source;
   void *Target;
   bool Blocking;
+  const size_t *SourceOrigin;
   const size_t *Region;
-  size_t SourceOffset;
   size_t TargetPitches[2];
 
   friend EnqueueReadImageBuilder &CheckDevImgSupport<>(
@@ -920,10 +932,10 @@ public:
 
 public:
   EnqueueWriteImageBuilder &SetBlocking(bool Blocking = true);
-  EnqueueWriteImageBuilder &SetCopyArea(const size_t *Origin, 
+  EnqueueWriteImageBuilder &SetCopyArea(const size_t *TargetOrigin, 
                                         const size_t *Region, 
-                                        size_t RowPitch, 
-                                        size_t SlicePitch);
+                                        size_t SourceRowPitch, 
+                                        size_t SourceSlicePitch);
   EnqueueWriteImageBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueWriteImage *Create(cl_int *ErrCode);
@@ -939,8 +951,8 @@ private:
   Image *Target;
   const void *Source;
   bool Blocking;
+  const size_t *TargetOrigin;
   const size_t *Region;
-  size_t TargetOffset;
   size_t SourcePitches[2];
 
   friend EnqueueWriteImageBuilder &CheckDevImgSupport<>(
@@ -982,8 +994,8 @@ private:
 private:
   Image *Target;
   Image *Source;
-  size_t TargetOffset;
-  size_t SourceOffset;
+  const size_t *TargetOrigin;
+  const size_t *SourceOrigin;
   const size_t *Region;
 
   friend EnqueueCopyImageBuilder &CheckDevImgSupport<>(
@@ -1026,7 +1038,7 @@ private:
   Buffer *Target;
   Image *Source;
   size_t TargetOffset;
-  size_t SourceOffset;
+  const size_t *SourceOrigin;
   const size_t *Region;
 
   friend EnqueueCopyImageToBufferBuilder &CheckDevImgSupport<>(
@@ -1068,7 +1080,7 @@ private:
 private:
   Image *Target;
   Buffer *Source;
-  size_t TargetOffset;
+  const size_t *TargetOrigin;
   const size_t *Region;
   size_t SourceOffset;
 

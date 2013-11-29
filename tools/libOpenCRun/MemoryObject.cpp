@@ -100,12 +100,6 @@ clCreateImage(cl_context context,
   if(!context)
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_CONTEXT);
 
-  if(!image_format)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
-  
-  if(!image_desc)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_IMAGE_DESCRIPTOR);
-
   opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
 
   bool IsInvalidOp = true;

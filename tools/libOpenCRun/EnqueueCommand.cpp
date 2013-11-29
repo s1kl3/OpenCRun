@@ -76,9 +76,6 @@ clEnqueueReadBufferRect(cl_command_queue command_queue,
                         cl_event *event) CL_API_SUFFIX__VERSION_1_1 {
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
-
-  if(!buffer_origin || !host_origin || !region)
-    return CL_INVALID_VALUE;
     
   opencrun::CommandQueue *Queue;
   
@@ -164,9 +161,6 @@ clEnqueueWriteBufferRect(cl_command_queue command_queue,
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
     
-  if(!buffer_origin || !host_origin || !region)
-    return CL_INVALID_VALUE;
-
   opencrun::CommandQueue *Queue;
   
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -290,9 +284,6 @@ clEnqueueCopyBufferRect(cl_command_queue command_queue,
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
   
-  if(!src_origin || !dst_origin || !region)
-    return CL_INVALID_VALUE;
-
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -333,9 +324,6 @@ clEnqueueReadImage(cl_command_queue command_queue,
                    cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
-    
-  if(!origin || !region)
-    return CL_INVALID_VALUE;
 
   opencrun::CommandQueue *Queue;
 
@@ -381,9 +369,6 @@ clEnqueueWriteImage(cl_command_queue command_queue,
                     cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
-
-  if(!origin || !region)
-    return CL_INVALID_VALUE;
 
   opencrun::CommandQueue *Queue;
 
@@ -466,9 +451,6 @@ clEnqueueCopyImage(cl_command_queue command_queue,
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
 
-  if(!src_origin || !dst_origin || !region)
-    return CL_INVALID_VALUE;
-
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -508,9 +490,6 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
 
-  if(!src_origin || !region)
-    return CL_INVALID_VALUE;
-
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
@@ -549,9 +528,6 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
                            cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
   if(!command_queue)
     return CL_INVALID_COMMAND_QUEUE;
-
-  if(!dst_origin || !region)
-    return CL_INVALID_VALUE;
 
   opencrun::CommandQueue *Queue;
 
@@ -651,9 +627,6 @@ clEnqueueMapImage(cl_command_queue command_queue,
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_COMMAND_QUEUE);
 
   if(!clValidMapField(map_flags))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-
-  if(!origin || !region)
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
 
   opencrun::CommandQueue *Queue; 
