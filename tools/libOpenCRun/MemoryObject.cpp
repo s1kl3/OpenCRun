@@ -355,8 +355,6 @@ clGetImageInfo(cl_mem image,
   default:
     return CL_INVALID_VALUE;
   }
-
-  return CL_SUCCESS;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

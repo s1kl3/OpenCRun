@@ -1,0 +1,6 @@
+
+PROPERTY(CL_SAMPLER_REFERENCE_COUNT, GetReferenceCount, cl_uint, unsigned)
+PROPERTY(CL_SAMPLER_CONTEXT, GetContext, cl_context, opencrun::Context &)
+PROPERTY(CL_SAMPLER_NORMALIZED_COORDS, GetNormalizedCoords, cl_bool, bool)
+PROPERTY(CL_SAMPLER_ADDRESSING_MODE, GetAddressingMode, cl_addressing_mode, opencrun::Sampler::AddressingMode)
+PROPERTY(CL_SAMPLER_FILTER_MODE, GetFilterMode, cl_filter_mode, opencrun::Sampler::FilterMode)
