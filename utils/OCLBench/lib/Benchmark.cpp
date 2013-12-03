@@ -200,7 +200,7 @@ cl::Program Benchmark::LoadProgramFromFile(llvm::StringRef File) {
       llvm::SmallString<32> Path = *I;
       llvm::sys::path::append(Path, File);
 
-      llvm::MemoryBuffer::getFile(Path, BufPtr);
+      llvm::MemoryBuffer::getFile(Path.str(), BufPtr);
     }
 
     // File not found.
