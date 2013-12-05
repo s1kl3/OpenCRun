@@ -31,6 +31,19 @@ typedef _event_t * event_t;
 #define CLK_LOCAL_MEM_FENCE  1 << 0
 #define CLK_GLOBAL_MEM_FENCE 1 << 1
 
+#define CLK_NORMALIZED_COORDS_FALSE 0x00
+#define CLK_NORMALIZED_COORDS_TRUE  0x08
+
+#define CLK_ADDRESS_NONE            0x00
+#define CLK_ADDRESS_MIRRORED_REPEAT 0x01
+#define CLK_ADDRESS_REPEAT          0x02
+#define CLK_ADDRESS_CLAMP_TO_EDGE   0x03
+#define CLK_ADDRESS_CLAMP           0x04
+
+#define CLK_FILTER_NEAREST          0x00
+#define CLK_FILTER_LINEAR           0x10
+
+
 namespace opencrun {
 namespace cpu {
 

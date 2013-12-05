@@ -16,6 +16,18 @@ let Group = "Memory flag constants" in {
   def : OCLConstant<"CLK_LOCAL_MEM_FENCE", "1">;
 }
 
+let Group = "Sampler flag constants" in {
+  def : OCLConstant<"CLK_NORMALIZED_COORDS_FALSE", "0x00">;
+  def : OCLConstant<"CLK_NORMALIZED_COORDS_TRUE", "0x08">;
+  def : OCLConstant<"CLK_ADDRESS_NONE", "0x00">;
+  def : OCLConstant<"CLK_ADDRESS_MIRRORED_REPEAT", "0x01">;
+  def : OCLConstant<"CLK_ADDRESS_REPEAT", "0x02">;
+  def : OCLConstant<"CLK_ADDRESS_CLAMP_TO_EDGE", "0x03">;
+  def : OCLConstant<"CLK_ADDRESS_CLAMP", "0x04">;
+  def : OCLConstant<"CLK_FILTER_NEAREST", "0x00">;
+  def : OCLConstant<"CLK_FILTER_LINEAR", "0x10">;
+}
+
 let Group = "Integer types constants" in {
   def : OCLConstant<"CHAR_BIT", "8">;
   def : OCLConstant<"CHAR_MAX", "SCHAR_MAX">;

@@ -892,6 +892,47 @@ private:
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {
 public:
+  class DeviceImage {
+  public:
+    DeviceImage(const Image &Img, void *ImgData)
+      : image_channel_order(Img.GetImageFormat().image_channel_order),
+        image_channel_data_type(Img.GetImageFormat().image_channel_data_type),
+        num_channels(Img.GetNumChannels()),
+        element_size(Img.GetElementSize()),
+        width(Img.GetWidth()),
+        height(Img.GetHeight()),
+        depth(Img.GetDepth()),
+        row_pitch(Img.GetRowPitch()),
+        slice_pitch(Img.GetSlicePitch()),
+        array_size(Img.GetArraySize()),
+        num_mip_levels(Img.GetNumMipLevels()),
+        num_samples(Img.GetNumSamples()),
+        data(ImgData) { }
+
+  private:
+    cl_channel_order image_channel_order;
+    cl_channel_type image_channel_data_type;
+    cl_uint num_channels;
+    cl_uint element_size;
+
+    cl_uint width;
+    cl_uint height;
+    cl_uint depth;
+
+    cl_uint row_pitch;
+    cl_uint slice_pitch;
+
+    cl_uint array_size;
+   
+    cl_uint num_mip_levels;
+    cl_uint num_samples;
+
+    void *data; // Pointer to actual image data in __global AS.
+  };
+
+  typedef cl_uint DeviceSampler;
+
+public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::NDRangeKernelBlock;
   }
@@ -900,6 +941,8 @@ public:
   typedef void (*Signature) (void **);
 
   typedef llvm::DenseMap<unsigned, void *> ArgsMappings;
+  typedef llvm::SmallVector<DeviceImage *, 4> DeviceImagesContainer;
+  typedef llvm::SmallVector<DeviceSampler *, 4> DeviceSamplersContainer;
 
 public:
   DimensionInfo::iterator index_begin() { return Start; }
@@ -931,8 +974,14 @@ public:
   }
 
 private:
+  cl_uint GetDeviceSampler(const Sampler &Smplr);
+
+private:
   Signature Entry;
   void **Args;
+
+  DeviceImagesContainer DevImgs;
+  DeviceSamplersContainer DevSmplrs;
 
   DimensionInfo::iterator Start;
   DimensionInfo::iterator End;

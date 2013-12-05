@@ -34,6 +34,7 @@
 #define OPENCRUN_UTIL_OPENCLMETADATAHANDLER_H
 
 #include "clang/Basic/AddressSpaces.h"
+#include "clang/Basic/OpenCL.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
@@ -126,6 +127,8 @@ public:
 public:
   llvm::Function *GetKernel(llvm::StringRef KernName) const;
   clang::LangAS::ID GetArgAddressSpace(llvm::Function &Kern, unsigned I);
+  clang::OpenCLImageAccess GetArgAccessQual(llvm::Function &Kern, unsigned I);
+  llvm::StringRef GetArgTypeName(llvm::Function &Kern, unsigned I);
 
   llvm::Function *GetBuiltin(llvm::StringRef Name);
 

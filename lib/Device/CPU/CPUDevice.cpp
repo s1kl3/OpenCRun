@@ -771,6 +771,14 @@ void CPUDevice::LocateMemoryObjArgAddresses(
         GlobalArgs[I] = Global[*Buf];
       else
         GlobalArgs[I] = NULL;
+    } else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(*I)) {
+      // Images are always allocated in __global AS.
+      unsigned I = Arg->GetPosition();
+
+      if(Image *Img = Arg->GetImage())
+        GlobalArgs[I] = Global[*Img];
+      else
+        GlobalArgs[I] = NULL;
     }
 }
 

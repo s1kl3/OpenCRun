@@ -197,8 +197,6 @@ public:
     ChOrder_Rx              = CL_Rx,
     ChOrder_RGx             = CL_RGx,
     ChOrder_RGBx            = CL_RGBx,
-    ChOrder_Depth           = CL_DEPTH,
-    ChOrder_Depth_Stencil   = CL_DEPTH_STENCIL,
     ChOrder_Invalid         = 0
   };
 
@@ -329,6 +327,22 @@ public:
   Buffer *GetBuffer() const { return Buf.getPtr(); }
 
   size_t GetElementSize() const { return ElementSize; }
+  size_t GetNumChannels() const {
+    switch(GetChannelOrder()) {
+      case ChOrder_R: case ChOrder_A:
+      case ChOrder_Intensity: case ChOrder_Luminance:
+        return 1;
+      case ChOrder_RG: case ChOrder_RA: case ChOrder_Rx:    
+        return 2;
+      case ChOrder_RGB: case ChOrder_RGx:
+        return 3;
+      case ChOrder_RGBA: case ChOrder_BGRA:
+      case ChOrder_ARGB: case ChOrder_RGBx:
+        return 4;
+      default:
+        return 0; 
+    }
+  }
 
 private:
   TargetDevices TargetDevs;
