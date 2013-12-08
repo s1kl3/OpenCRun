@@ -11,3 +11,17 @@ INTERNAL_CALL(get_global_offset, opencrun::cpu::GetGlobalOffset)
 
 // Synchronization Functions.
 INTERNAL_CALL(barrier, opencrun::cpu::Barrier)
+
+// Asynchronous Copy Functions.
+INTERNAL_CALL(async_work_group_copy_impl, opencrun::cpu::AsyncWorkGroupCopy)
+INTERNAL_CALL(async_work_group_strided_copy_impl, opencrun::cpu::AsyncWorkGroupStridedCopy)
+INTERNAL_CALL(wait_group_events, opencrun::cpu::WaitGroupEvents)
+
+// Explicit Memory Fence Functions.
+INTERNAL_CALL(mem_fence, opencrun::cpu::MemFence)
+INTERNAL_CALL(read_mem_fence, opencrun::cpu::ReadMemFence)
+INTERNAL_CALL(write_mem_fence, opencrun::cpu::WriteMemFence)
+
+// Global Lock Functions.
+INTERNAL_CALL(acquire_global_lock, opencrun::cpu::AcquireGlobalLock)
+INTERNAL_CALL(release_global_lock, opencrun::cpu::ReleaseGlobalLock)

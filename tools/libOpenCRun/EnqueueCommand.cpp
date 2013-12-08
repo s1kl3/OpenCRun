@@ -315,8 +315,21 @@ clEnqueueTask(cl_command_queue command_queue,
               cl_uint num_events_in_wait_list,
               const cl_event *event_wait_list,
               cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+  cl_uint work_dim = 1;
+  const size_t *global_work_offset = NULL;
+  const size_t global_work_size[] = { 1 };
+  const size_t local_work_size[] = { 1 };
+
+  return clEnqueueNDRangeKernel(command_queue,
+                                kernel,
+                                work_dim,
+                                global_work_offset,
+                                global_work_size,
+                                local_work_size,
+                                num_events_in_wait_list,
+                                event_wait_list,
+                                event
+                                );
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

@@ -69,7 +69,7 @@ PROPERTY(CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,
          cl_uint,
          unsigned)
 PROPERTY(CL_DEVICE_MAX_CLOCK_FREQUENCY, GetMaxClockFrequency, cl_uint, unsigned)
-PROPERTY(CL_DEVICE_ADDRESS_BITS, GetAddressBits, cl_ulong, long)
+PROPERTY(CL_DEVICE_ADDRESS_BITS, GetAddressBits, cl_uint, unsigned)
 
 PROPERTY(CL_DEVICE_MAX_MEM_ALLOC_SIZE, GetMaxMemoryAllocSize, cl_ulong, size_t)
 

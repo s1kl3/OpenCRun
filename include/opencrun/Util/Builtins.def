@@ -11,3 +11,18 @@ BUILTIN("get_global_offset", "zUi")
 
 // Synchronization builtins.
 BUILTIN("barrier", "vULi")
+
+// Asynchronous copy builtins.
+BUILTIN("async_work_group_copy_impl", "ePUcPUczez")
+BUILTIN("async_work_group_strided_copy_impl", "ePUcPUczzezUi")
+BUILTIN("wait_group_events", "viPe")
+
+// Explicit memory fence builtins.
+BUILTIN("mem_fence", "vULi")
+BUILTIN("read_mem_fence", "vULi")
+BUILTIN("write_mem_fence", "vULi")
+
+// Global lock builtins.
+BUILTIN("acquire_global_lock", "")
+BUILTIN("release_global_lock", "")
+

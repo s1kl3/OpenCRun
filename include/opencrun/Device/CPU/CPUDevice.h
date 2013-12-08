@@ -50,7 +50,6 @@ public:
 private:
   void InitDeviceInfo(sys::HardwareNode &Node);
   void InitJIT();
-  void InitInternalCalls();
   void InitMultiprocessors(sys::HardwareNode &Node);
 
   void DestroyJIT();

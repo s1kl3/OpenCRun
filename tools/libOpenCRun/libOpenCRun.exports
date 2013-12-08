@@ -2,6 +2,9 @@ clGetPlatformIDs
 clGetPlatformInfo
 clGetDeviceIDs
 clGetDeviceInfo
+clCreateSubDevices
+clRetainDevice
+clReleaseDevice
 clCreateContext
 clCreateContextFromType
 clRetainContext

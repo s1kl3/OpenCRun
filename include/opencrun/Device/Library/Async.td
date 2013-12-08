@@ -6,7 +6,11 @@ let Group = "ASYNC" in {
 
 class AsyncBuiltin_vP1gz<string name> : OCLGenericBuiltinSimple<
   name,
-  [ocl_void, OCLPointerType<ocl_gentype, ocl_as_global, [ocl_mod_const]>],
+  [
+    ocl_void, 
+    OCLPointerType<ocl_gentype, ocl_as_global, [ocl_mod_const]>,
+    ocl_size_t
+  ],
   []
 >;
 
@@ -47,7 +51,7 @@ class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLGenericBuiltin<name, 
     ocl_event_t
   ],
   [isSameAs<Pointee<1>, Pointee<2>>],
-  "eP2gP1gze">,
+  "eP2gP1gzze">,
   OCLBuiltinVariant<[
     ocl_event_t,
     OCLPointerType<ocl_gentype, ocl_as_global, []>,
@@ -57,7 +61,7 @@ class AsyncBuiltin_eP2gP1gzze_eP1gP2gzze<string name> : OCLGenericBuiltin<name, 
     ocl_event_t
   ],
   [isSameAs<Pointee<1>, Pointee<2>>],
-  "eP1gP2gze">
+  "eP1gP2gzze">
 ]>;
 
 }

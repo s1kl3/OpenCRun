@@ -33,6 +33,7 @@ include "opencrun/Device/Library/Builtin.td"
 //===----------------------------------------------------------------------===//
 
 include "opencrun/Device/Library/Async.td"
+include "opencrun/Device/Library/Atomic.td"
 include "opencrun/Device/Library/Common.td"
 include "opencrun/Device/Library/Convert.td"
 include "opencrun/Device/Library/Geometric.td"

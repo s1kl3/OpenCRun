@@ -30,6 +30,7 @@ public:
 
     return AddrSpaces[K];
   }
+
 private:
   void BuildPredicate(llvm::Record &R) {
     OCLPredicate *P = 0;

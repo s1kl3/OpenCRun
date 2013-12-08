@@ -216,8 +216,24 @@ private:
         llvm::cast<OCLAddressSpace>(&OCLPredicatesTable::get(*ASRecord));
 
       const OCLType &Base = get(*R.getValueAsDef("BaseType"));
-      // TODO: modifiers
-      Type = new OCLPointerType(Base, AS->getAddressSpace());
+	  
+	  std::vector<llvm::Record *> Modifiers =
+		R.getValueAsListOfDefs("Modifiers");
+	  unsigned mods = 0;
+	  for (unsigned i = 0, e = Modifiers.size(); i != e; ++i) {
+		const std::string &ModName = Modifiers[i]->getName();
+        mods |= 
+          llvm::StringSwitch<unsigned>(ModName)
+            .Case("ocl_mod_const", OCLPointerType::M_Const)
+            .Case("ocl_mod_restrict", OCLPointerType::M_Restrict)
+            .Case("ocl_mod_volatile", OCLPointerType::M_Volatile)
+            .Default(OCLPointerType::M_Unknown);
+
+        if (mods == OCLPointerType::M_Unknown)
+          llvm::PrintFatalError("Illegal modifier!");
+	  }
+	  
+      Type = new OCLPointerType(Base, AS->getAddressSpace(), mods);
     }
     else if (R.isSubClassOf("OCLGroupType")) {
       std::vector<llvm::Record *> Members = R.getValueAsListOfDefs("Members");

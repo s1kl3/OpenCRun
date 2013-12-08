@@ -36,13 +36,15 @@ def ocl_as_constant : OCLAddressSpace<"constant">;
 class OCLModifier;
 
 def ocl_mod_const : OCLModifier;
+def ocl_mod_restrict : OCLModifier;
+def ocl_mod_volatile : OCLModifier;
 
 class OCLPointerType<OCLType base, OCLAddressSpace as, 
                      list<OCLModifier> mod = []> 
  : OCLBasicType, Requires<[as]> {
   OCLType BaseType = base;
   OCLAddressSpace AddressSpace = as;
-  list<OCLModifier> Modifier = mod;
+  list<OCLModifier> Modifiers = mod;
 }
 
 class OCLScalarType<int bitwidth> : OCLBasicType {

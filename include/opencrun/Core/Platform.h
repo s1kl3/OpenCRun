@@ -14,7 +14,7 @@ namespace opencrun {
 class PlatformInfo {
 public:
   llvm::StringRef GetProfile() const { return "FULL_PROFILE"; }
-  llvm::StringRef GetVersion() const { return "OpenCL 1.1"; }
+  llvm::StringRef GetVersion() const { return "OpenCL 1.2"; }
   llvm::StringRef GetName() const { return "OpenCRun"; }
   llvm::StringRef GetVendor() const { return "UC 2.0"; }
   llvm::StringRef GetExtensions() const { return ""; }

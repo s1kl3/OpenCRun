@@ -32,19 +32,64 @@ public:
 public:
   void SetUnsignedPrefix() { Unsigned = true; }
   void SetLongPrefix() { Long = true; }
+  void SetShortPrefix() { Short = true; }
+  void SetPointerPrefix() { Pointer = true; }
 
+  void SetChar() { Char = true; }
   void SetInteger() { Integer = true; }
   void SetSizeT() { SizeT = true; }
   void SetVoid() { Void = true; }
+  void SetEventT() { EventT = true; }
 
   void SetTypeDone() {
     llvm::Type *Ty;
 
-    if(Integer && Unsigned && !Long)
-      Ty = GetUIntTy();
-    else if(Integer && Unsigned && Long)
-      Ty = GetULongTy();
-    else if(SizeT)
+    if(Char && Unsigned) {
+      if(Pointer)
+        Ty = GetPointerTy(GetUCharTy());
+      else if(!Pointer)
+        Ty = GetUCharTy();
+    } else if(Char && !Unsigned) {
+      if(Pointer)
+        Ty = GetPointerTy(GetCharTy());
+      else if(!Pointer)
+        Ty = GetCharTy();
+    } else if(Integer && Unsigned && Short) {
+      if(Pointer)
+        Ty = GetPointerTy(GetUShortTy());
+      else if(!Pointer)
+        Ty = GetUShortTy();
+    } else if(Integer && !Unsigned && Short) {
+      if(Pointer)
+        Ty = GetPointerTy(GetShortTy());
+      else if(!Pointer)
+        Ty = GetShortTy();
+    } else if(Integer && Unsigned && !Long && !Short) {
+      if(Pointer)
+        Ty = GetPointerTy(GetUIntTy());
+      else if(!Pointer)
+        Ty = GetUIntTy();
+    } else if(Integer && !Unsigned && !Long && !Short) {
+      if(Pointer)
+        Ty = GetPointerTy(GetIntTy());
+      else if(!Pointer)
+        Ty = GetIntTy();
+    } else if(Integer && Unsigned && Long) {
+      if(Pointer)
+        Ty = GetPointerTy(GetULongTy());
+      else if(!Pointer)
+        Ty = GetULongTy();
+    } else if(Integer && !Unsigned && Long) {
+      if(Pointer)
+        Ty = GetPointerTy(GetLongTy());
+      else if(!Pointer)
+        Ty = GetLongTy();
+    } else if(EventT) {
+      if(Pointer)
+        Ty = GetPointerTy(GetEventTTy());
+      else if(!Pointer)
+        Ty = GetEventTTy();
+    } else if(SizeT)          
       Ty = GetSizeTTy();
     else if(Void)
       Ty = GetVoidTy();
@@ -74,10 +119,10 @@ public:
     return Fun;
   }
 
-private:
+private: 
   void ResetState() {
-    Unsigned = Long = false;
-    Integer = SizeT = Void = false;
+    Unsigned = Long = Short = Pointer = false;
+    Char = Integer = SizeT = Void = EventT = false;
   }
 
   void InitTargetInfo() {
@@ -93,11 +138,35 @@ private:
     delete Diag;
   }
 
-  llvm::Type *GetUIntTy() {
+  llvm::Type *GetUCharTy() {
+    return llvm::Type::getInt8Ty(Mod.getContext());
+  }
+
+  llvm::Type *GetCharTy() {
+    return llvm::Type::getInt8Ty(Mod.getContext());
+  }
+  
+  llvm::Type *GetUShortTy() {
     return llvm::Type::getInt16Ty(Mod.getContext());
   }
 
+  llvm::Type *GetShortTy() {
+    return llvm::Type::getInt16Ty(Mod.getContext());
+  }
+
+  llvm::Type *GetUIntTy() {
+    return llvm::Type::getInt32Ty(Mod.getContext());
+  }
+
+  llvm::Type *GetIntTy() {
+    return llvm::Type::getInt32Ty(Mod.getContext());
+  }
+
   llvm::Type *GetULongTy() {
+    return llvm::Type::getInt64Ty(Mod.getContext());
+  }
+
+  llvm::Type *GetLongTy() {
     return llvm::Type::getInt64Ty(Mod.getContext());
   }
 
@@ -109,15 +178,23 @@ private:
     return llvm::Type::getVoidTy(Mod.getContext());
   }
 
+  llvm::Type *GetEventTTy() {
+    return llvm::PointerType::get(llvm::StructType::get(Mod.getContext()), 0);
+  }
+
+  llvm::Type *GetPointerTy(llvm::Type *ElementType) {
+    return llvm::PointerType::get(ElementType, 0);
+  }
+
 private:
   const llvm::StringRef Name;
   llvm::Module &Mod;
 
   // Prefixes.
-  bool Unsigned, Long;
+  bool Unsigned, Long, Short, Pointer;
 
   // Types.
-  bool Integer, SizeT, Void;
+  bool Char, Integer, SizeT, Void, EventT;
 
   TypesContainer Types;
 
@@ -259,6 +336,11 @@ OpenCLMetadataHandler::BuildBuiltin(const llvm::StringRef Name,
   while(I != E) {
     // Scan prefix.
 
+    if(*I == 'P') {
+      I++;
+      Bld.SetPointerPrefix();
+    }
+
     if(*I == 'U') {
       I++;
       Bld.SetUnsignedPrefix();
@@ -269,9 +351,18 @@ OpenCLMetadataHandler::BuildBuiltin(const llvm::StringRef Name,
       Bld.SetLongPrefix();
     }
 
+    if(*I == 'S') {
+      I++;
+      Bld.SetShortPrefix();
+    }
+
     // Scan type.
 
     switch(*I++) {
+    case 'c':
+      Bld.SetChar();
+      break;
+
     case 'i':
       Bld.SetInteger();
       break;
@@ -282,6 +373,10 @@ OpenCLMetadataHandler::BuildBuiltin(const llvm::StringRef Name,
 
     case 'v':
       Bld.SetVoid();
+      break;
+
+    case 'e':
+      Bld.SetEventT();
       break;
 
     default:
