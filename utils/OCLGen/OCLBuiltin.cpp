@@ -31,12 +31,12 @@ OCLTypeConstraint::~OCLTypeConstraint() {
 }
 
 bool OCLSameTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   return FirstParam.get(Ops) == SecondParam.get(Ops);
 }
 
 bool OCLSameDimTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   const OCLBasicType *P1 = FirstParam.get(Ops);
   const OCLBasicType *P2 = SecondParam.get(Ops);
 
@@ -50,7 +50,7 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
 }
 
 bool OCLSameBaseTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   const OCLBasicType *P1 = FirstParam.get(Ops);
   const OCLBasicType *P2 = SecondParam.get(Ops);
 
@@ -70,7 +70,7 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
 }
 
 bool OCLSameBaseSizeTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   const OCLBasicType *P1 = FirstParam.get(Ops);
   const OCLBasicType *P2 = SecondParam.get(Ops);
 
@@ -97,7 +97,7 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
 }
 
 bool OCLSameBaseKindTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   const OCLBasicType *P1 = FirstParam.get(Ops);
   const OCLBasicType *P2 = SecondParam.get(Ops);
 
@@ -124,7 +124,7 @@ apply(const std::vector<const OCLBasicType *> &Ops) const {
 }
 
 bool OCLSameBitSizeTypeConstraint::
-apply(const std::vector<const OCLBasicType *> &Ops) const {
+apply(const BuiltinSign &Ops) const {
   const OCLBasicType *P1 = FirstParam.get(Ops);
   const OCLBasicType *P2 = SecondParam.get(Ops);
 

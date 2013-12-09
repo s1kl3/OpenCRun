@@ -163,7 +163,7 @@ class OCLInclude<string filename> : OCLRequirement {
 }
 
 class OCLCodeBlock<code block> : OCLRequirement {
-  code Block = block;
+  code CodeBlock = block;
 }
 
 class OCLBuiltinImpl<OCLBuiltin builtin, OCLStrategy s, string varname = ""> {

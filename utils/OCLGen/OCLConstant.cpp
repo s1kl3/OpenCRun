@@ -56,7 +56,7 @@ const OCLConstant &OCLConstantsTable::get(llvm::Record &R) {
 
 static bool CompareLess(const OCLConstant *C1, const OCLConstant *C2) {
   return (C1->getGroup() < C2->getGroup()) || 
-         (C1->getGroup() == C2->getGroup() && C1->getName() == C2->getName());
+         (C1->getGroup() == C2->getGroup() && C1->getName() < C2->getName());
 }
 
 void opencrun::LoadOCLConstants(const llvm::RecordKeeper &R, 
