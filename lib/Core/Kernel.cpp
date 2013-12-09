@@ -41,7 +41,7 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
   if(IsBuffer(*ArgTy))
     return SetBufferArg(I, Size, Arg);
 
-  else if(IsImage(*ArgTy))
+  else if(IsImage(I))
     return SetImageArg(I, Size, Arg);
 
   else if(IsSampler(I))
@@ -214,22 +214,15 @@ bool Kernel::IsBuffer(llvm::Type &Ty) {
   return false;
 }
 
-bool Kernel::IsImage(llvm::Type &Ty) {
-  if(llvm::PointerType *PointerTy = llvm::dyn_cast<llvm::PointerType>(&Ty)) {
-    llvm::Type *PointeeTy = PointerTy->getElementType();
-
-    if(llvm::StructType *StructTy = llvm::dyn_cast<llvm::StructType>(PointeeTy))
-      return llvm::StringSwitch<bool>(StructTy->getName())
-              .Case("opencl.image1d_t", true)
-              .Case("opencl.image1d_array_t", true)
-              .Case("opencl.image1d_buffer_t", true)
-              .Case("opencl.image2d_t", true)
-              .Case("opencl.image2d_array_t", true)
-              .Case("opencl.image3d_t", true)
-              .Default(false);
-  }
-
-  return false;
+bool Kernel::IsImage(unsigned I) {
+  return llvm::StringSwitch<bool>(GetArgTypeName(I))
+          .Case("image1d_t", true)
+          .Case("image1d_array_t", true)
+          .Case("image1d_buffer_t", true)
+          .Case("image2d_t", true)
+          .Case("image2d_array_t", true)
+          .Case("image3d_t", true)
+          .Default(false);
 }
 
 bool Kernel::IsSampler(unsigned I) {

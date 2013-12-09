@@ -265,8 +265,8 @@ private:
   }
 
   bool IsSampler(unsigned I);
+  bool IsImage(unsigned I);
   bool IsBuffer(llvm::Type &Ty);
-  bool IsImage(llvm::Type &Ty);
   bool IsByValue(llvm::Type &Ty);
 
   Device *RequireEstimates(Device *Dev = NULL);
