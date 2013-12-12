@@ -150,6 +150,18 @@ OCLBuiltin::~OCLBuiltin() {
   llvm::DeleteContainerSeconds(Variants);
 }
 
+bool OCLRoundingMode::isDefaultFor(const OCLBasicType &Ty) const {
+  const OCLBasicType *Base = &Ty;
+  if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(&Ty))
+    Base = &V->getBaseType();
+
+  if (RMD_Integer & DefaultFor)
+    return llvm::isa<OCLIntegerType>(Base);
+  if (RMD_Real & DefaultFor)
+    return llvm::isa<OCLRealType>(Base);
+  return false;
+}
+
 static bool CompareLess(const OCLBuiltin *B1, const OCLBuiltin *B2) {
   return B1->getGroup() < B2->getGroup() ||
          (B1->getGroup() == B2->getGroup() && B1->getName() < B2->getName());
@@ -184,6 +196,7 @@ public:
   typedef std::map<llvm::Record *, const OCLBuiltin *> OCLBuiltinsMap;
   typedef std::map<llvm::Record *, const OCLTypeConstraint *> OCLConstraintsMap;
   typedef std::map<llvm::Record *, const OCLParam *> OCLParamsMap;
+  typedef std::map<llvm::Record *, const OCLRoundingMode *> OCLRoundingModesMap;
 
   typedef std::map<llvm::Record *, const OCLBuiltinImpl *> OCLBuiltinImplsMap;
   typedef std::map<llvm::Record *, const OCLRequirement *> OCLRequirementsMap;
@@ -196,6 +209,7 @@ public:
     llvm::DeleteContainerSeconds(Builtins);
     llvm::DeleteContainerSeconds(Constraints);
     llvm::DeleteContainerSeconds(Params);
+    llvm::DeleteContainerSeconds(RoundingModes);
 
     llvm::DeleteContainerSeconds(BuiltinImpls);
     llvm::DeleteContainerSeconds(Strategies);
@@ -223,7 +237,14 @@ public:
       BuildParam(R);
     
     return *Params[&R];
-  }  
+  }
+
+  const OCLRoundingMode &getRoundingMode(llvm::Record &R) {
+    if (!RoundingModes.count(&R))
+      BuildRoundingMode(R);
+
+    return *RoundingModes[&R];
+  }
 
   const OCLBuiltinImpl &getBuiltinImpl(llvm::Record &R) {
     if (!BuiltinImpls.count(&R))
@@ -297,10 +318,10 @@ private:
     else if (R.isSubClassOf("OCLReinterpretBuiltin"))
       Builtin = new OCLReinterpretBuiltin(Group, Name, Variants);
     else if (R.isSubClassOf("OCLConvertBuiltin")) {
-      llvm::StringRef Rounding = R.getValueAsString("Rounding");
+      const OCLRoundingMode &RM = getRoundingMode(*R.getValueAsDef("RoundingMode"));
       bool Saturation = R.getValueAsBit("Saturation");
       Builtin = new OCLConvertBuiltin(Group, Name, Saturation, 
-                                      Rounding, Variants);
+                                      RM, Variants);
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
 
@@ -381,6 +402,23 @@ private:
       llvm::PrintFatalError("Invalid Param: " + R.getName());
 
     Params[&R] = Param;
+  }
+
+  void BuildRoundingMode(llvm::Record &R) {
+    OCLRoundingMode *RM = 0;
+
+    assert(R.isSubClassOf("OCLRoundingMode") && "Not a rounding mode!");
+
+    llvm::StringRef Name = R.getValueAsString("Name");
+    unsigned DefaultFor = OCLRoundingMode::RMD_None;
+    if (R.getValueAsBit("DefaultForInteger"))
+      DefaultFor |= OCLRoundingMode::RMD_Integer;
+    if (R.getValueAsBit("DefaultForReal"))
+      DefaultFor |= OCLRoundingMode::RMD_Real;
+
+    RM = new OCLRoundingMode(Name, DefaultFor);
+
+    RoundingModes[&R] = RM;
   }
 
   void BuildBuiltinImpl(llvm::Record &R) {
@@ -494,6 +532,7 @@ private:
   OCLBuiltinsMap Builtins;
   OCLConstraintsMap Constraints;
   OCLParamsMap Params;
+  OCLRoundingModesMap RoundingModes;
 
   OCLBuiltinImplsMap BuiltinImpls;
   OCLRequirementsMap Requirements;

@@ -88,7 +88,7 @@ getExternalName(const BuiltinSign *S, bool NoRound) const {
 
     if (const OCLConvertBuiltin *CV = llvm::dyn_cast<OCLConvertBuiltin>(CB)) {
       if (CV->hasSaturation()) OS << "_sat";
-      if (!NoRound) OS << "_" << CV->getRoundingMode();
+      if (!NoRound) OS << "_" << CV->getRoundingMode().getName();
     }
 
     return OS.str();
