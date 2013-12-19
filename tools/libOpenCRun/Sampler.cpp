@@ -55,13 +55,13 @@ clCreateSampler(cl_context context,
   opencrun::Sampler *Smplr;
 
   Smplr = Bld.SetNormalizedCoords(normalized_coords)
-             .SetAddressNone(addressing_mode & CL_ADDRESS_NONE)
-             .SetAddressClampToEdge(addressing_mode & CL_ADDRESS_CLAMP_TO_EDGE)
-             .SetAddressClamp(addressing_mode & CL_ADDRESS_CLAMP)
-             .SetAddressRepeat(addressing_mode & CL_ADDRESS_REPEAT)
-             .SetAddressMirroredRepeat(addressing_mode & CL_ADDRESS_MIRRORED_REPEAT)
-             .SetFilterNearest(filter_mode & CL_FILTER_NEAREST)
-             .SetFilterLinear(filter_mode & CL_FILTER_LINEAR)
+             .SetAddressNone(addressing_mode == CL_ADDRESS_NONE)
+             .SetAddressClampToEdge(addressing_mode == CL_ADDRESS_CLAMP_TO_EDGE)
+             .SetAddressClamp(addressing_mode == CL_ADDRESS_CLAMP)
+             .SetAddressRepeat(addressing_mode == CL_ADDRESS_REPEAT)
+             .SetAddressMirroredRepeat(addressing_mode == CL_ADDRESS_MIRRORED_REPEAT)
+             .SetFilterNearest(filter_mode == CL_FILTER_NEAREST)
+             .SetFilterLinear(filter_mode == CL_FILTER_LINEAR)
              .Create(errcode_ret);
 
   if(Smplr)
