@@ -20,10 +20,8 @@ const char *opencrun::AddressSpaceQualifier(AddressSpaceKind AS) {
   return 0;
 }
 
-PredicateSet opencrun::ComputePredicates(const OCLBuiltin &B,
-                                         const BuiltinSign &Sign, 
-                                         bool IgnoreAS) {
-  PredicateSet Preds(B.getPredicates().begin(), B.getPredicates().end());
+PredicateSet opencrun::ComputePredicates(const BuiltinSign &Sign, bool IgnoreAS) {
+  PredicateSet Preds(Sign.getPredicates().begin(), Sign.getPredicates().end());
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 

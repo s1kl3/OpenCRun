@@ -14,7 +14,33 @@ namespace opencrun {
 //===----------------------------------------------------------------------===//
 class OCLBuiltinVariant;
 
-typedef std::vector<const OCLBasicType *> BuiltinSign;
+class BuiltinSign {
+public:
+  BuiltinSign() {}
+  BuiltinSign(const PredicateSet &Preds) : Preds(Preds) { }
+
+public:
+  size_t size() const { return Tys.size(); }
+  void reserve(size_t n) { Tys.reserve(n); } 
+
+public:
+  const OCLBasicType *operator[](size_t n) const { 
+    return Tys[n]; 
+  }
+
+public:
+  void push_back(const OCLBasicType *Ty) { Tys.push_back(Ty); }
+  void pop_back() { Tys.pop_back(); }
+
+public:
+  const PredicateSet &getPredicates() const { return Preds; }
+  void setPredicates(const PredicateSet &preds) { Preds = preds; }
+
+private:
+  std::vector<const OCLBasicType *> Tys;
+  PredicateSet Preds;
+};
+
 typedef std::list<BuiltinSign> BuiltinSignList;
 
 void ExpandSigns(const OCLBuiltinVariant &B, BuiltinSignList &R);
@@ -88,7 +114,8 @@ public:
     CK_SameBase,
     CK_SameBaseKind,
     CK_SameBaseSize,
-    CK_SameBitSize
+    CK_SameBitSize,
+    CK_CompatibleWithImageDim
   };
 
 protected:
@@ -133,6 +160,7 @@ public:
     switch (C->getKind()) {
     case CK_Same: case CK_SameDim: case CK_SameBase: 
     case CK_SameBaseKind: case CK_SameBaseSize: case CK_SameBitSize:
+    case CK_CompatibleWithImageDim:
       return true;
     default: return false;
     }
@@ -231,6 +259,19 @@ public:
   bool apply(const BuiltinSign &Ops) const;
 };
 
+class OCLCompatibleWithImageDim : public OCLBinaryTypeConstraint {
+public:
+  static bool classof(const OCLTypeConstraint *C) {
+    return C->getKind() == CK_CompatibleWithImageDim;
+  }
+
+public:
+  OCLCompatibleWithImageDim(const OCLParam &P1, const OCLParam &P2)
+    : OCLBinaryTypeConstraint(CK_CompatibleWithImageDim, P1, P2) {}
+
+  bool apply(const BuiltinSign &Ops) const;
+};
+
 //===----------------------------------------------------------------------===//
 // OCLBuiltin
 //===----------------------------------------------------------------------===//
@@ -243,19 +284,23 @@ public:
 public:
   OCLBuiltinVariant(OperandsContainer &Ops, 
                     ConstraintsContainer &Constrs,
-                    llvm::StringRef VarName)
-   : Operands(Ops), Constraints(Constrs), VariantName(VarName) { }
+                    llvm::StringRef VarName,
+                    const PredicateSet &Preds)
+   : Operands(Ops), Constraints(Constrs), VariantName(VarName), Predicates(Preds) { }
 
 public:
   const OCLType &getOperand(unsigned i) const { return *Operands[i]; }
   size_t size() const { return Operands.size(); }
   const ConstraintsContainer &getConstraints() const { return Constraints; }
   std::string getVariantName() const { return VariantName; }
+  const PredicateSet &getPredicates() const { return Predicates; }
+  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
 private:
   OperandsContainer Operands;
   ConstraintsContainer Constraints;
   std::string VariantName;
+  PredicateSet Predicates;
 };
 
 class OCLBuiltin {
@@ -285,15 +330,12 @@ public:
   var_iterator begin() const { return Variants.begin(); }
   var_iterator end() const { return Variants.end(); }
   var_iterator find(llvm::StringRef V) const { return Variants.find(V); }
-  const PredicateSet &getPredicates() const { return Predicates; }
-  void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
 private:
   BuiltinKind Kind;
   std::string Group;
   std::string Name;
   VariantsMap Variants;
-  PredicateSet Predicates;
 };
 
 class OCLGenericBuiltin : public OCLBuiltin {
