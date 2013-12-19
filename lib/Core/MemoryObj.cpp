@@ -361,6 +361,7 @@ ImageBuilder &ImageBuilder::SetFormat(const cl_image_format *ImgFmt) {
   switch(ImgFmt->image_channel_order) {
   case CL_R:
   case CL_A:
+  case CL_Rx:
     NumChannels = 1;
     break;
   
@@ -381,23 +382,21 @@ ImageBuilder &ImageBuilder::SetFormat(const cl_image_format *ImgFmt) {
     }
     break;
   
-  case CL_Rx:
   case CL_RG:
   case CL_RA:
+  case CL_RGx:
     NumChannels = 2;
     break;
   
-  case CL_RGx:
-    NumChannels = 3;
     break;
     
   case CL_RGB:
   case CL_RGBx:
-    NumChannels = (ImgFmt->image_channel_order == CL_RGB) ? 3 : 4;
+    NumChannels = 3;
     switch(ImgFmt->image_channel_data_type) {
     case CL_UNORM_SHORT_555:
-		case CL_UNORM_SHORT_565:
-		case CL_UNORM_INT_101010:
+	case CL_UNORM_SHORT_565:
+	case CL_UNORM_INT_101010:
       break;
     default:
 			return NotifyError(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR,
