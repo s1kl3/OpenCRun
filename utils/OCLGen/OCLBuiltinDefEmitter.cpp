@@ -86,13 +86,22 @@ void EmitOCLCastBuiltinPrototype(llvm::raw_ostream &OS,
     const BuiltinSign &S = *I;
 
     if (Ranges.front().second == I) {
+      Preds.Finalize();
+      OS << "\n";
+
       Ranges.pop_front();
+
+      if (const OCLConvertBuiltin *CB = llvm::dyn_cast<OCLConvertBuiltin>(&B))
+        if (CB->getRoundingMode().isDefaultFor(*S[0]))
+          OS << "#define " << BD.getExternalName(&S, true) << " "
+             << BD.getInternalName(&S) << "\n";
+
       OS << "#define " << BD.getExternalName(&S) << " "
          << BD.getInternalName(&S) << "\n\n";
     }
  
     Preds.Push(ComputePredicates(B, S, true));
-   
+
     if (Ranges.front().first > 1)
       OS << "__opencrun_overload\n";
 

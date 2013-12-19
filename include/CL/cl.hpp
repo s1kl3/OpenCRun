@@ -4842,7 +4842,7 @@ public:
                 object_,
                 (cl_uint)
                 devices.size(),
-                deviceIDs,
+                numDevices ? deviceIDs : NULL,
                 options,
                 notifyFptr,
                 data),

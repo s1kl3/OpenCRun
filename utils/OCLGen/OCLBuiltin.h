@@ -320,6 +320,27 @@ protected:
    : OCLBuiltin(K, Group, Name, Variants) {}
 };
 
+class OCLRoundingMode {
+public:
+  enum RoundingModeDefault {
+    RMD_None = 0,
+    RMD_Integer = 1 << 0,
+    RMD_Real = 1 << 1
+  };
+
+public:
+  OCLRoundingMode(llvm::StringRef name, unsigned rmd)
+   : Name(name), DefaultFor(rmd) {}
+
+public:
+  std::string getName() const { return Name; }
+  bool isDefaultFor(const OCLBasicType &Ty) const;
+
+private:
+  std::string Name;
+  unsigned DefaultFor;
+};
+
 class OCLConvertBuiltin : public OCLCastBuiltin {
 public:
   static bool classof(const OCLBuiltin *B) {
@@ -328,15 +349,15 @@ public:
 
 public:
   OCLConvertBuiltin(llvm::StringRef Group, llvm::StringRef Name, bool sat,
-                    llvm::StringRef rm, const VariantsMap &Variants)
+                    const OCLRoundingMode &rm, const VariantsMap &Variants)
    : OCLCastBuiltin(BK_Convert, Group, Name, Variants), RoundingMode(rm), 
      Saturation(sat) {}
 
-  const std::string &getRoundingMode() const { return RoundingMode; }
+  const OCLRoundingMode &getRoundingMode() const { return RoundingMode; }
   bool hasSaturation() const { return Saturation; }
 
 private:
-  std::string RoundingMode;
+  const OCLRoundingMode &RoundingMode;
   bool Saturation;
 };
 

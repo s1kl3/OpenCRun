@@ -43,14 +43,16 @@ class Not<OCLTypeConstraint c> : OCLTypeConstraint {
 
 //----------------------------------------------------------------------------//
 
-class OCLRoundingMode<string name> {
+class OCLRoundingMode<string name, bits<2> defaultFor = 0b00> {
   string Name = name;
+  bit DefaultForInteger = defaultFor{0};
+  bit DefaultForReal = defaultFor{1};
 }
 
-def ocl_rm_rtz : OCLRoundingMode<"rtz">;
+def ocl_rm_rtz : OCLRoundingMode<"rtz", 0b01>;
+def ocl_rm_rte : OCLRoundingMode<"rte", 0b10>;
 def ocl_rm_rtp : OCLRoundingMode<"rtp">;
 def ocl_rm_rtn : OCLRoundingMode<"rtn">;
-def ocl_rm_rte : OCLRoundingMode<"rte">;
 
 class OCLBuiltinVariant<list<OCLType> ops, list<OCLTypeConstraint> constrs,
                         string name> {
@@ -69,10 +71,10 @@ class OCLBuiltin<string name, list<OCLBuiltinVariant> var> {
 class OCLGenericBuiltin<string name, list<OCLBuiltinVariant> var>
  : OCLBuiltin<name, var>;
 
-class OCLConvertBuiltin<OCLRoundingMode round, bit sat, 
+class OCLConvertBuiltin<OCLRoundingMode rm, bit sat, 
                         list<OCLBuiltinVariant> var>
  : OCLBuiltin<"convert", var> {
-  string Rounding = round.Name;
+  OCLRoundingMode RoundingMode = rm;
   bit Saturation = sat;
 }
 
