@@ -10,8 +10,16 @@ class OCLOpaqueType<string name> : OCLBasicType {
 
 def ocl_void : OCLOpaqueType<"void">;
 def ocl_size_t : OCLOpaqueType<"size_t">;
+def ocl_uintptr_t : OCLOpaqueType<"uintptr_t">;
 def ocl_mem_fence_flags : OCLOpaqueType<"cl_mem_fence_flags">;
 def ocl_event_t : OCLOpaqueType<"event_t">;
+def ocl_sampler_t : OCLOpaqueType<"sampler_t">;
+def ocl_image1d_t : OCLOpaqueType<"image1d_t">;
+def ocl_image1d_buffer_t : OCLOpaqueType<"image1d_buffer_t">;
+def ocl_image1d_array_t : OCLOpaqueType<"image1d_array_t">;
+def ocl_image2d_t : OCLOpaqueType<"image2d_t">;
+def ocl_image2d_array_t : OCLOpaqueType<"image2d_array_t">;
+def ocl_image3d_t : OCLOpaqueType<"image3d_t">;
 
 class OCLOpaqueTypeDef<OCLOpaqueType ty, string define> {
   OCLOpaqueType Type = ty;
@@ -386,4 +394,52 @@ def ocl_gentype_uinteger_vmisc : OCLGroupType<[
 
 def ocl_sgentype_vldst : OCLGroupType<[
   ocl_sgentype_integer, ocl_sgentype_real
+]>;
+
+// Image builtins custom types
+
+def ocl_image_array : OCLGroupType<[
+  ocl_image1d_array_t, ocl_image2d_array_t
+]>;
+
+def ocl_image_1d : OCLGroupType<[
+  ocl_image1d_t, ocl_image1d_buffer_t, ocl_image1d_array_t
+]>;
+
+def ocl_image_2d : OCLGroupType<[
+  ocl_image2d_t, ocl_image2d_array_t
+]>;
+
+def ocl_image_1d_2d : OCLGroupType<[
+  ocl_image1d_t, ocl_image1d_buffer_t, ocl_image1d_array_t,
+  ocl_image2d_t, ocl_image2d_array_t
+]>;
+
+def ocl_image_2d_3d : OCLGroupType<[
+  ocl_image2d_t, ocl_image2d_array_t,
+  ocl_image3d_t
+]>;
+
+def ocl_image : OCLGroupType<[
+  ocl_image_1d,
+  ocl_image_2d,
+  ocl_image3d_t
+]>;
+
+def ocl_image_no_buff : OCLGroupType<[
+  ocl_image1d_t, ocl_image1d_array_t,
+  ocl_image_2d,
+  ocl_image3d_t
+]>;
+
+def ocl_coord_int : OCLGroupType<[
+  ocl_int, ocl_int_2, ocl_int_4
+]>;
+
+def ocl_coord_float : OCLGroupType<[
+  ocl_float, ocl_float_2, ocl_float_4
+]>;
+
+def ocl_coord : OCLGroupType<[
+  ocl_coord_int, ocl_coord_float
 ]>;
