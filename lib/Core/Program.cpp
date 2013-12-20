@@ -239,7 +239,7 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
   Info.RegisterBuildInProgress();
 
   // Invoke the compiler.
-  llvm::Module *BitCode;
+  llvm::Module *BitCode = NULL;
   bool Success = Dev.TranslateToBitCode(Opts, *Diag, *Src, BitCode);
 
   if(Success)
