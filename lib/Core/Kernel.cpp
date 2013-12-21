@@ -181,7 +181,7 @@ cl_int Kernel::SetSamplerArg(unsigned I, size_t Size, const void *Arg) {
   }
 
   ThisLock.acquire();
-  Arguments[I] = new SamplerKernelArg(I, Arg);
+  Arguments[I] = new SamplerKernelArg(I, Smplr);
   ThisLock.release();
 
   return CL_SUCCESS;

@@ -407,7 +407,7 @@ float4 map_channels_read(const device_image_t *image, const float4 color) {
     color_out = (float4)(color.x);
     break;
   case CLK_LUMINANCE:
-    color_out = (float4)(color.x, color.x, color.x, 0);
+    color_out = (float4)(color.x, color.x, color.x, 1.0f);
     break;
   default:
     color_out = color;

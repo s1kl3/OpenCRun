@@ -106,8 +106,9 @@ public:
   }
 
 public:
-  SamplerKernelArg(unsigned Position, const void *Arg) :
-    KernelArg(KernelArg::SamplerArg, Position) { }
+  SamplerKernelArg(unsigned Position, Sampler *Smplr) :
+    KernelArg(KernelArg::SamplerArg, Position),
+    Smplr(Smplr) { }
 
 public:
   Sampler *GetSampler() { return Smplr; }
