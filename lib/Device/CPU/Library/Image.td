@@ -282,10 +282,10 @@ float4 apply_filter_linear(const device_image_t *dev_image,
 
 def map_channels_read : OCLCodeBlock<[{
 __opencrun_overload
-int4 map_channels_read(const device_image_t *image, const int4 color) {
+int4 map_channels_read(const device_image_t *dev_image, const int4 color) {
   int4 color_out;
   
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R:
   case CLK_Rx:
     color_out = (int4)(color.x, 0, 0, 1);
@@ -317,7 +317,7 @@ int4 map_channels_read(const device_image_t *image, const int4 color) {
     color_out = (int4)(color.x);
     break;
   case CLK_LUMINANCE:
-    color_out = (int4)(color.x, color.x, color.x, 0);
+    color_out = (int4)(color.x, color.x, color.x, 1);
     break;
   default:
     color_out = color;
@@ -327,10 +327,10 @@ int4 map_channels_read(const device_image_t *image, const int4 color) {
 }
 
 __opencrun_overload
-uint4 map_channels_read(const device_image_t *image, const uint4 color) {
+uint4 map_channels_read(const device_image_t *dev_image, const uint4 color) {
   uint4 color_out;
   
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R:
   case CLK_Rx:
     color_out = (uint4)(color.x, 0, 0, 1);
@@ -362,7 +362,7 @@ uint4 map_channels_read(const device_image_t *image, const uint4 color) {
     color_out = (uint4)(color.x);
     break;
   case CLK_LUMINANCE:
-    color_out = (uint4)(color.x, color.x, color.x, 0);
+    color_out = (uint4)(color.x, color.x, color.x, 1);
     break;
   default:
     color_out = color;
@@ -372,10 +372,10 @@ uint4 map_channels_read(const device_image_t *image, const uint4 color) {
 }
 
 __opencrun_overload
-float4 map_channels_read(const device_image_t *image, const float4 color) {
+float4 map_channels_read(const device_image_t *dev_image, const float4 color) {
   float4 color_out;
 
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R:
   case CLK_Rx:
     color_out = (float4)(color.x, 0.0f, 0.0f, 1.0f);
@@ -419,10 +419,10 @@ float4 map_channels_read(const device_image_t *image, const float4 color) {
 
 def map_channels_write : OCLCodeBlock<[{
 __opencrun_overload
-int4 map_channels_write(const device_image_t *image, const int4 color) {
+int4 map_channels_write(const device_image_t *dev_image, const int4 color) {
   int4 color_out;
 
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R: case CLK_Rx:
     color_out.x = color.x;
     break;
@@ -471,10 +471,10 @@ int4 map_channels_write(const device_image_t *image, const int4 color) {
 }
 
 __opencrun_overload
-uint4 map_channels_write(const device_image_t *image, const uint4 color) {
+uint4 map_channels_write(const device_image_t *dev_image, const uint4 color) {
   uint4 color_out;
 
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R: case CLK_Rx:
     color_out.x = color.x;
     break;
@@ -523,10 +523,10 @@ uint4 map_channels_write(const device_image_t *image, const uint4 color) {
 }
 
 __opencrun_overload
-float4 map_channels_write(const device_image_t *image, const float4 color) {
+float4 map_channels_write(const device_image_t *dev_image, const float4 color) {
   float4 color_out;
 
-  switch(image->image_channel_order) {
+  switch(dev_image->image_channel_order) {
   case CLK_R: case CLK_Rx:
     color_out.x = color.x;
     break;
@@ -802,16 +802,16 @@ float4 read_pixelf(const device_image_t *dev_image, const int4 coord) {
   case CLK_UNORM_INT16:
     switch(dev_image->num_channels) {
     case 1:
-      color = (float4)(((const short *)src)[0], 0.0f, 0.0f, 0.0f) / 65535.0f;
+      color = (float4)(((const ushort *)src)[0], 0.0f, 0.0f, 0.0f) / 65535.0f;
       break;
     case 2:
-      color = (float4)(((const short *)src)[0], ((const short *)src)[1], 0.0f , 0.0f) / 65535.0f;
+      color = (float4)(((const ushort *)src)[0], ((const ushort *)src)[1], 0.0f , 0.0f) / 65535.0f;
       break;
     case 3:
-      color = (float4)(((const short *)src)[0], ((const short *)src)[1], ((const short *)src)[2], 0.0f) / 65535.0f;
+      color = (float4)(((const ushort *)src)[0], ((const ushort *)src)[1], ((const ushort *)src)[2], 0.0f) / 65535.0f;
       break;
     case 4:
-      color = (float4)(((const short *)src)[0], ((const short *)src)[1], ((const short *)src)[2], ((const short *)src)[3]) / 65535.0f;
+      color = (float4)(((const ushort *)src)[0], ((const ushort *)src)[1], ((const ushort *)src)[2], ((const ushort *)src)[3]) / 65535.0f;
       break;
     }
     break;

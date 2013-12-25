@@ -97,7 +97,7 @@ EnqueueReadImage::EnqueueReadImage(void *Target,
                                    const size_t *Region,
                                    size_t *TargetPitches,
                                    EventsContainer &WaitList)
-  : Command(Command::ReadImage, WaitList),
+  : Command(Command::ReadImage, WaitList, Blocking),
     Target(Target),
     Source(&Source),
     SourceOffset(0) {
@@ -126,7 +126,7 @@ EnqueueWriteImage::EnqueueWriteImage(Image &Target,
                                      const size_t *Region, 
                                      size_t *SourcePitches, 
                                      EventsContainer &WaitList)
-  : Command(Command::WriteImage, WaitList),
+  : Command(Command::WriteImage, WaitList, Blocking),
     Target(&Target),
     Source(Source),
     TargetOffset(0) { 
