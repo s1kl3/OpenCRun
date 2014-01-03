@@ -56,13 +56,13 @@ CommandQueue *Context::GetQueueForDevice(Device &Dev,
 }
 
 HostBuffer *Context::CreateHostBuffer(size_t Size,
-                                      void *Storage,
+                                      void *HostPtr,
                                       MemoryObj::AccessProtection AccessProt,
                                       MemoryObj::HostAccessProtection HostAccessProt,
                                       cl_int *ErrCode) {
   HostBuffer *Buf = new HostBuffer(*this, 
                                    Size, 
-                                   Storage, 
+                                   HostPtr, 
                                    MemoryObj::UseHostPtr, 
                                    AccessProt, 
                                    HostAccessProt);

@@ -74,18 +74,18 @@ public:
                                   cl_int *ErrCode = NULL);
 
   HostBuffer *CreateHostBuffer(size_t Size,
-                               void *Storage,
+                               void *HostPtr,
                                MemoryObj::AccessProtection AccessProt,
                                MemoryObj::HostAccessProtection HostAccessProt,
                                cl_int *ErrCode = NULL);
   HostAccessibleBuffer *CreateHostAccessibleBuffer(
                           size_t Size,
-                          void *Src,
+                          void *HostPtr,
                           MemoryObj::AccessProtection AccessProt,
                           MemoryObj::HostAccessProtection HostAccessProt,
                           cl_int *ErrCode = NULL);
   DeviceBuffer *CreateDeviceBuffer(size_t Size,
-                                   void *Src,
+                                   void *HostPtr,
                                    MemoryObj::AccessProtection AccessProt,
                                    MemoryObj::HostAccessProtection HostAccessProt,
                                    cl_int *ErrCode = NULL);
@@ -95,7 +95,7 @@ public:
                               cl_int *ErrCode = NULL);
 
   HostImage *CreateHostImage(size_t Size,
-                             void *Storage,
+                             void *HostPtr,
                              Image::TargetDevices &TargetDevs,
                              Image::ChannelOrder ChOrder,
                              Image::ChannelType ChDataType,
@@ -115,7 +115,7 @@ public:
                              cl_int *ErrCode = NULL);
   HostAccessibleImage *CreateHostAccessibleImage(
                           size_t Size,
-                          void *Src,
+                          void *HostPtr,
                           Image::TargetDevices &TargetDevs,
                           Image::ChannelOrder ChOrder,
                           Image::ChannelType ChDataType,
@@ -134,7 +134,7 @@ public:
                           MemoryObj::HostAccessProtection HostAccessProt,
                           cl_int *ErrCode = NULL);
   DeviceImage *CreateDeviceImage(size_t Size,
-                                 void *Src,
+                                 void *HostPtr,
                                  Image::TargetDevices &TargetDevs,
                                  Image::ChannelOrder ChOrder,
                                  Image::ChannelType ChDataType,

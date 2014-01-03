@@ -47,7 +47,7 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
   llvm::sys::ScopedLock Lock(ThisLock);
     
-  void *Addr = Buf.GetStorageData();
+  void *Addr = Buf.GetHostPtr();
   
   if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
   
@@ -62,8 +62,8 @@ void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
 
   // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
   // togheter.
-  if(Buf.HasInitializationData())
-    std::memcpy(Addr, Buf.GetInitializationData(), Buf.GetSize());
+  if(Buf.HasHostPtr())
+    std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
 
   return Addr;
 }
@@ -73,8 +73,8 @@ void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
 void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
   void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
 
-  if(Buf.HasInitializationData())
-    std::memcpy(Addr, Buf.GetInitializationData(), Buf.GetSize());
+  if(Buf.HasHostPtr())
+    std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
 
   return Addr;
 }
@@ -83,7 +83,7 @@ void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
 void *GlobalMemory::Alloc(HostImage &Img) {
   llvm::sys::ScopedLock Lock(ThisLock);
   
-  void *Addr = Img.GetStorageData();
+  void *Addr = Img.GetHostPtr();
   
   if(Addr) Mappings[llvm::cast<MemoryObj>(&Img)] = Addr;
 
@@ -122,7 +122,7 @@ void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
   
   // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
   // togheter.
-  if(Img.HasInitializationData()) {
+  if(Img.HasHostPtr()) {
     size_t FreeBytes = Img.GetSize();
     size_t RowSize = Img.GetWidth() * Img.GetElementSize();
     for(size_t I = 0; I < Img.GetArraySize(); ++I)
@@ -136,7 +136,7 @@ void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
                 Img.GetHeight() * Img.GetElementSize() * Z
                 ),
               reinterpret_cast<const void *>(
-                reinterpret_cast<uintptr_t>(Img.GetInitializationData()) + 
+                reinterpret_cast<uintptr_t>(Img.GetHostPtr()) + 
                 Img.GetSlicePitch() * I +
                 Img.GetRowPitch() * Y + 
                 Img.GetSlicePitch() * Z
@@ -165,7 +165,7 @@ void *GlobalMemory::Alloc(DeviceImage &Img) {
     Buf->AddAttachedImage(&Img);
   }
 
-  if(Img.HasInitializationData()) {
+  if(Img.HasHostPtr()) {
     size_t FreeBytes = Img.GetSize();
     size_t RowSize = Img.GetWidth() * Img.GetElementSize();
     for(size_t I = 0; I < Img.GetArraySize(); ++I)
@@ -179,7 +179,7 @@ void *GlobalMemory::Alloc(DeviceImage &Img) {
                   Img.GetHeight() * Img.GetElementSize() * Z
                   ),
                 reinterpret_cast<const void *>(
-                  reinterpret_cast<uintptr_t>(Img.GetInitializationData()) + 
+                  reinterpret_cast<uintptr_t>(Img.GetHostPtr()) + 
                   Img.GetSlicePitch() * I +
                   Img.GetRowPitch() * Y + 
                   Img.GetSlicePitch() * Z

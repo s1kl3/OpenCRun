@@ -313,7 +313,7 @@ clGetMemObjectInfo(cl_mem memobj,
         = llvm::dyn_cast<opencrun::HostBuffer>(&MemObj))
       return clFillValue<void *, void *>(
                static_cast<void **>(param_value),
-               HostBuf->GetStorageData(),
+               HostBuf->GetHostPtr(),
                param_value_size,
                param_value_size_ret);
       

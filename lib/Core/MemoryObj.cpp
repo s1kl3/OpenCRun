@@ -165,9 +165,9 @@ MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
   return NULL;                 \
   }
 
-MemoryObjBuilder &MemoryObjBuilder::SetUseHostMemory(bool Enabled, void* Storage) {
+MemoryObjBuilder &MemoryObjBuilder::SetUseHostMemory(bool Enabled, void* HostPtr) {
   if(Enabled) {
-    if(!Storage)
+    if(!HostPtr)
       return NotifyError(CL_INVALID_HOST_PTR, "missing host storage pointer");
 
     if((HostPtrMode == MemoryObj::AllocHostPtr) || (HostPtrMode == MemoryObj::CopyHostPtr))
@@ -175,7 +175,7 @@ MemoryObjBuilder &MemoryObjBuilder::SetUseHostMemory(bool Enabled, void* Storage
                          "multiple memory object storage specifiers not allowed");
 
     HostPtrMode = MemoryObj::UseHostPtr;
-    HostPtr = Storage;
+    this->HostPtr = HostPtr;
   }
 
   return *this;
@@ -193,9 +193,9 @@ MemoryObjBuilder &MemoryObjBuilder::SetAllocHostMemory(bool Enabled) {
   return *this;
 }
 
-MemoryObjBuilder &MemoryObjBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
+MemoryObjBuilder &MemoryObjBuilder::SetCopyHostMemory(bool Enabled, void* HostPtr) {
   if(Enabled) {
-    if(!Src)
+    if(!HostPtr)
       return NotifyError(CL_INVALID_HOST_PTR,
                          "missed pointer to initialization data");
 
@@ -204,7 +204,7 @@ MemoryObjBuilder &MemoryObjBuilder::SetCopyHostMemory(bool Enabled, void* Src) {
                          "multiple memory object storage specifiers not allowed");
 
     HostPtrMode = MemoryObj::CopyHostPtr;
-    HostPtr = Src;
+    this->HostPtr = HostPtr;
   }
 
   return *this;
