@@ -1414,9 +1414,6 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset,
   if(!Source)
     return *this;
 
-  if(!MapBuf)
-    return *this;
-
   if(Offset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "out of bounds buffer mapping");
 
