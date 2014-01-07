@@ -167,20 +167,36 @@ public:
     return AttachedImages.erase(Img);
   }
 
+public:
+  bool IsSubBuffer() const { return Parent; }
+  size_t GetOffset() const { return Offset; }
+  Buffer *GetParent() const { return Parent; }
+
 protected:
   Buffer(Type MemTy,
          Context &Ctx,
+         Buffer *Parent,
+         size_t Offset,
          size_t Size,
          void *HostPtr,
          MemoryObj::HostPtrUsageMode HostPtrMode,
          MemoryObj::AccessProtection AccessProt,
          MemoryObj::HostAccessProtection HostAccessProt) :
-  MemoryObj(MemTy, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
+  MemoryObj(MemTy, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt),
+  Parent(Parent),
+  Offset(0) { }
 
 private:
   // This container holds all 1D image buffers initialized using
   // the buffer object.
   ImagesContainer AttachedImages;
+
+  // In case of a sub-buffer object, this attribute points to the
+  // parent buffer.
+  Buffer *Parent;
+
+  // In case of a sub-buffer object, this attribute could be non-zero.
+  size_t Offset;
 };
 
 class Image : public MemoryObj {
@@ -390,12 +406,14 @@ public:
   
 private:
   HostBuffer(Context &Ctx,
+             Buffer *Parent,
+             size_t Offset,
              size_t Size,
              void *HostPtr,
              MemoryObj::HostPtrUsageMode HostPtrMode,
              MemoryObj::AccessProtection AccessProt,
              MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::HostBuffer, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
+    : Buffer(MemoryObj::HostBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostBuffer(const HostBuffer &That); // Do not implement.
   void operator=(const HostBuffer &That); // Do not implement.
@@ -411,12 +429,14 @@ public:
   
 private:
   HostAccessibleBuffer(Context &Ctx,
+                       Buffer *Parent,
+                       size_t Offset,
                        size_t Size,
                        void *HostPtr,
                        MemoryObj::HostPtrUsageMode HostPtrMode,
                        MemoryObj::AccessProtection AccessProt,
                        MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
+    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostAccessibleBuffer(const HostAccessibleBuffer &That); // Do not implement.
   void operator=(const HostAccessibleBuffer &That); // Do not implement.
@@ -432,12 +452,14 @@ public:
   
 private:
   DeviceBuffer(Context &Ctx,
+               Buffer *Parent,
+               size_t Offset,
                size_t Size,
                void *HostPtr,
                MemoryObj::HostPtrUsageMode HostPtrMode,
                MemoryObj::AccessProtection AccessProt,
                MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::DeviceBuffer, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
+    : Buffer(MemoryObj::DeviceBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   DeviceBuffer(const DeviceBuffer &That); // Do not implement.
   void operator=(const DeviceBuffer &That); // Do not implement.
@@ -456,7 +478,7 @@ private:
                 size_t Size,
                 MemoryObj::AccessProtection AccessProt,
                 MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::VirtualBuffer, Ctx, Size, NULL, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
+    : Buffer(MemoryObj::VirtualBuffer, Ctx, NULL, 0, Size, NULL, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
 
   VirtualBuffer(const VirtualBuffer &That); // Do not implement.
   void operator=(const VirtualBuffer &That); // Do not implement.
@@ -668,6 +690,7 @@ public:
 
 public:
   BufferBuilder(Context &Ctx, size_t Size);
+  BufferBuilder(Buffer &Parent, size_t Offset, size_t Size);
 
 public:
   BufferBuilder &SetUseHostMemory(bool Enabled, void *HostPtr) {
@@ -724,6 +747,10 @@ private:
     MemoryObjBuilder::NotifyError(ErrCode, Msg);
     return *this;
   }
+
+private:
+  Buffer *Parent;
+  size_t Offset;
 };
 
 class ImageBuilder : public MemoryObjBuilder {

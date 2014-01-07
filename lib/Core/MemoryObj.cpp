@@ -300,10 +300,12 @@ MemoryObjBuilder &MemoryObjBuilder::NotifyError(cl_int ErrCode, const char *Msg)
 //
 
 BufferBuilder::BufferBuilder(Context &Ctx, size_t Size) :
-  MemoryObjBuilder(MemoryObjBuilder::BufferBuilder, Ctx) {
+  MemoryObjBuilder(MemoryObjBuilder::BufferBuilder, Ctx),
+  Parent(NULL),
+  Offset(0) {
   this->Size = Size;  
   if(!this->Size) {
-    NotifyError(CL_INVALID_BUFFER_SIZE, "buffer size must be greater than 0");
+    NotifyError(CL_INVALID_BUFFER_SIZE, "buffer size must be greater than zero");
     return;
   }
 
@@ -317,16 +319,58 @@ BufferBuilder::BufferBuilder(Context &Ctx, size_t Size) :
     }
 }
 
+BufferBuilder::BufferBuilder(Buffer &Parent, size_t Offset, size_t Size) :
+  MemoryObjBuilder(MemoryObjBuilder::BufferBuilder, Parent.GetContext()),
+  Parent(&Parent),
+  Offset(Offset) {
+  if(Parent.GetParent()) {
+    NotifyError(CL_INVALID_MEM_OBJECT, "parent buffer is a sub-buffer");
+    return;
+  }
+
+  this->Size = Size;
+  if(!this->Size) {
+    NotifyError(CL_INVALID_BUFFER_SIZE, "sub-buffer size must be greater than zero");
+    return;
+  }
+
+  if(this->Offset + this->Size > Parent.GetSize()) {
+    NotifyError(CL_INVALID_VALUE, "specified region is out of bounds in the parent buffer");
+    return;
+  }
+
+//  bool IsMisalignedOffset = false;
+//  Context &Ctx = Parent.GetContext();
+//  for(Context::device_iterator I = Ctx.device_begin(),
+//                               E = Ctx.device_end(); 
+//                               I != E;
+//                               ++I) {
+//    if((Offset % (*I)->GetMemoryBaseAddressAlignment()) != 0) {
+//      IsMisalignedOffset = true;
+//      break;
+//    }
+//  }
+//
+//  if(IsMisalignedOffset) {
+//    NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, "sub-buffer origin is misaligned");
+//    return;
+//  }
+}
+
 Buffer *BufferBuilder::Create(cl_int *ErrCode) {
   if(this->ErrCode != CL_SUCCESS)
     RETURN_WITH_ERROR(ErrCode);
 
+  // Sub-buffer object with non-zero Offset must account for it in HostPtr.
+  if(Offset)
+    HostPtr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(HostPtr) + Offset);
+
   if(HostPtrMode == MemoryObj::UseHostPtr)
-    return Ctx.CreateHostBuffer(Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
+    return Ctx.CreateHostBuffer(Parent, Offset, Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
   else if(HostPtrMode == MemoryObj::AllocHostPtr)
-    return Ctx.CreateHostAccessibleBuffer(Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
+    return Ctx.CreateHostAccessibleBuffer(Parent, Offset, Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
   else
-    return Ctx.CreateDeviceBuffer(Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
+    return Ctx.CreateDeviceBuffer(Parent, Offset, Size, HostPtr, AccessProt, HostAccessProt, ErrCode);
 }
 
 //

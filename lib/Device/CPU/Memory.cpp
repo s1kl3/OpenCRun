@@ -46,7 +46,10 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
 // already allocated in host code.
 void *GlobalMemory::Alloc(HostBuffer &Buf) {
   llvm::sys::ScopedLock Lock(ThisLock);
-    
+  
+  // If Buf is a sub-buffer object the GetHostPtr method returns
+  // host_ptr + origin, where host_ptr is the argument value specified
+  // when the parent memory object is created.
   void *Addr = Buf.GetHostPtr();
   
   if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
@@ -58,12 +61,25 @@ void *GlobalMemory::Alloc(HostBuffer &Buf) {
 // the buffer object, and it will be accessible to the host code 
 // too, since the ASs are the same.
 void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
-  void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+  void *Addr;
 
-  // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
-  // togheter.
-  if(Buf.HasHostPtr())
-    std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
+  if(Buf.IsSubBuffer()) {
+    llvm::sys::ScopedLock Lock(ThisLock);
+
+    Buffer *Parent = Buf.GetParent();
+    Addr = reinterpret_cast<void *>(
+            reinterpret_cast<uintptr_t>(Mappings[llvm::cast<MemoryObj>(Parent)]) + Buf.GetOffset()
+           );
+
+    if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
+  } else {
+    Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+
+    // CL_MEM_ALLOC_HOST_PTR and CL_MEM_COPY_HOST_PTR can be used
+    // togheter.
+    if(Buf.HasHostPtr())
+      std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
+  }
 
   return Addr;
 }
@@ -71,11 +87,23 @@ void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
 // 3b) As in the previous case, since all device memory is physically 
 // undistinct from host memory.
 void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
-  void *Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+  void *Addr;
 
-  if(Buf.HasHostPtr())
-    std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
+  if(Buf.IsSubBuffer()) {
+    llvm::sys::ScopedLock Lock(ThisLock);
 
+    Buffer *Parent = Buf.GetParent();
+    Addr = reinterpret_cast<void *>(
+            reinterpret_cast<uintptr_t>(Mappings[llvm::cast<MemoryObj>(Parent)]) + Buf.GetOffset()
+           );
+
+    if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
+  } else {
+    Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+
+    if(Buf.HasHostPtr())
+      std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
+  }
   return Addr;
 }
 
@@ -197,7 +225,17 @@ void GlobalMemory::Free(MemoryObj &MemObj) {
   MappingsContainer::iterator I = Mappings.find(&MemObj);
   if(!Mappings.count(&MemObj))
     return;
-  
+
+  // In case of a sub-buffer we simply remove the corresponding element from
+  // the container and return.
+  if(Buffer *Buf = llvm::dyn_cast<Buffer>(&MemObj))
+    if(Buf->IsSubBuffer()) {
+      Mappings.erase(I);
+      return;
+    }
+
+  // For other memory objects (except HostBuffer and HostImages types) we need 
+  // to account for available memory increase.
   if(MemObj.GetType() != MemoryObj::HostBuffer &&
      MemObj.GetType() != MemoryObj::HostImage)
     Available += MemObj.GetSize();

@@ -73,18 +73,24 @@ public:
                                   bool EnableProfile,
                                   cl_int *ErrCode = NULL);
 
-  HostBuffer *CreateHostBuffer(size_t Size,
+  HostBuffer *CreateHostBuffer(Buffer *Parent,
+                               size_t Offset, 
+                               size_t Size,
                                void *HostPtr,
                                MemoryObj::AccessProtection AccessProt,
                                MemoryObj::HostAccessProtection HostAccessProt,
                                cl_int *ErrCode = NULL);
   HostAccessibleBuffer *CreateHostAccessibleBuffer(
+                          Buffer *Parent,
+                          size_t Offset,
                           size_t Size,
                           void *HostPtr,
                           MemoryObj::AccessProtection AccessProt,
                           MemoryObj::HostAccessProtection HostAccessProt,
                           cl_int *ErrCode = NULL);
-  DeviceBuffer *CreateDeviceBuffer(size_t Size,
+  DeviceBuffer *CreateDeviceBuffer(Buffer *Parent,
+                                   size_t Offset,  
+                                   size_t Size,
                                    void *HostPtr,
                                    MemoryObj::AccessProtection AccessProt,
                                    MemoryObj::HostAccessProtection HostAccessProt,

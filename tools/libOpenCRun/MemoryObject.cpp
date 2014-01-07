@@ -87,7 +87,70 @@ clCreateSubBuffer(cl_mem buffer,
                   cl_buffer_create_type buffer_create_type,
                   const void *buffer_create_info,
                   cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_1 {
-  return 0;
+  if(!buffer)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_MEM_OBJECT);
+
+  opencrun::MemoryObj &Buf = *llvm::cast<opencrun::MemoryObj>(buffer);
+  if(!llvm::isa<opencrun::Buffer>(Buf))
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_MEM_OBJECT);
+
+  if(!clValidMemField(flags))
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+
+  if(flags & (CL_MEM_USE_HOST_PTR | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR))
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+  
+  flags |= Buf.GetHostPtrUsageMode();
+
+  if(!(flags & (CL_MEM_READ_WRITE | CL_MEM_WRITE_ONLY | CL_MEM_READ_ONLY)))
+    flags |= Buf.GetAccessProtection();
+  else {
+    if((Buf.GetAccessProtection() == CL_MEM_WRITE_ONLY && (flags & (CL_MEM_READ_WRITE | CL_MEM_READ_ONLY))) || 
+       (Buf.GetAccessProtection() == CL_MEM_READ_ONLY && (flags & (CL_MEM_READ_WRITE | CL_MEM_WRITE_ONLY))))
+      RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+  }
+
+  if(!(flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS)))
+    flags |= Buf.GetHostAccessProtection();
+  else {
+    if((Buf.GetHostAccessProtection() == CL_MEM_HOST_WRITE_ONLY && (flags & CL_MEM_HOST_READ_ONLY)) ||
+       (Buf.GetHostAccessProtection() == CL_MEM_HOST_READ_ONLY && (flags & CL_MEM_HOST_WRITE_ONLY)) ||
+       (Buf.GetHostAccessProtection() == CL_MEM_HOST_NO_ACCESS && (flags & (CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_WRITE_ONLY))))
+      RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+  }
+
+  opencrun::Buffer *SubBuf;
+
+  switch(buffer_create_type) {
+  case CL_BUFFER_CREATE_TYPE_REGION: {
+      if(buffer_create_info == NULL)
+        RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+
+      const cl_buffer_region *Region = (const cl_buffer_region *)buffer_create_info;
+      size_t Offset = Region->origin;
+      size_t Size = Region->size;
+      opencrun::BufferBuilder Bld(llvm::cast<opencrun::Buffer>(Buf), Offset, Size);
+
+      SubBuf = Bld.SetUseHostMemory(flags & CL_MEM_USE_HOST_PTR, Buf.GetHostPtr())
+                  .SetAllocHostMemory(flags & CL_MEM_ALLOC_HOST_PTR)
+                  .SetCopyHostMemory(flags & CL_MEM_COPY_HOST_PTR, Buf.GetHostPtr())
+                  .SetReadWrite(flags & CL_MEM_READ_WRITE)
+                  .SetWriteOnly(flags & CL_MEM_WRITE_ONLY)
+                  .SetReadOnly(flags & CL_MEM_READ_ONLY)
+                  .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
+                  .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
+                  .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
+                  .Create(errcode_ret);
+    }
+    break;
+  default:
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+  }
+
+  if(SubBuf)
+    SubBuf->Retain();
+
+  return SubBuf;
 }
 
 CL_API_ENTRY cl_mem CL_API_CALL
@@ -309,14 +372,14 @@ clGetMemObjectInfo(cl_mem memobj,
   #undef IMG_PROPERTY
   
   case CL_MEM_HOST_PTR:
-    if(opencrun::HostBuffer *HostBuf 
-        = llvm::dyn_cast<opencrun::HostBuffer>(&MemObj))
+    if(llvm::isa<opencrun::HostBuffer>(MemObj) ||
+       llvm::isa<opencrun::HostImage>(MemObj))
       return clFillValue<void *, void *>(
                static_cast<void **>(param_value),
-               HostBuf->GetHostPtr(),
+               MemObj.GetHostPtr(),
                param_value_size,
                param_value_size_ret);
-      
+
     return clFillValue<void *, void *>(
              static_cast<void **>(param_value),
              NULL,
