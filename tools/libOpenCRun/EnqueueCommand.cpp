@@ -8,8 +8,6 @@
 #include "opencrun/Core/Event.h"
 #include "opencrun/Core/MemoryObj.h"
 
-#include <algorithm>
-
 #define CL_MAP_FIELD_ALL   \
   (CL_MAP_READ |     \
    CL_MAP_WRITE |     \
@@ -41,7 +39,7 @@ clEnqueueReadBuffer(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueReadBufferBuilder Bld(Queue->GetContext(), buffer, ptr);
+  opencrun::EnqueueReadBufferBuilder Bld(*Queue, buffer, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_read)
                               .SetCopyArea(offset, cb)
                               .SetWaitList(num_events_in_wait_list,
@@ -83,7 +81,7 @@ clEnqueueReadBufferRect(cl_command_queue command_queue,
   
   cl_int ErrCode;
   
-  opencrun::EnqueueReadBufferRectBuilder Bld(Queue->GetContext(), buffer, ptr);
+  opencrun::EnqueueReadBufferRectBuilder Bld(*Queue, buffer, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_read)
                               .SetRegion(region)
                               .SetTargetOffset(host_origin, host_row_pitch, host_slice_pitch)
@@ -125,7 +123,7 @@ clEnqueueWriteBuffer(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueWriteBufferBuilder Bld(Queue->GetContext(), buffer, ptr);
+  opencrun::EnqueueWriteBufferBuilder Bld(*Queue, buffer, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_write)
                               .SetCopyArea(offset, cb)
                               .SetWaitList(num_events_in_wait_list,
@@ -167,7 +165,7 @@ clEnqueueWriteBufferRect(cl_command_queue command_queue,
   
   cl_int ErrCode;
   
-  opencrun::EnqueueWriteBufferRectBuilder Bld(Queue->GetContext(), buffer, ptr);
+  opencrun::EnqueueWriteBufferRectBuilder Bld(*Queue, buffer, ptr);
   opencrun::Command *Cmd = Bld.SetBlocking(blocking_write)
                               .SetRegion(region)
                               .SetTargetOffset(buffer_origin, buffer_row_pitch, buffer_slice_pitch)
@@ -206,7 +204,7 @@ clEnqueueFillBuffer(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueFillBufferBuilder Bld(Queue->GetContext(), buffer, pattern);
+  opencrun::EnqueueFillBufferBuilder Bld(*Queue, buffer, pattern);
   opencrun::Command *Cmd = Bld.SetPatternSize(pattern_size)
                               .SetFillRegion(offset, size)
                               .SetWaitList(num_events_in_wait_list,
@@ -240,17 +238,13 @@ clEnqueueCopyBuffer(cl_command_queue command_queue,
   if(!cb)
     return CL_INVALID_VALUE;
   
-  if(src_buffer == dst_buffer && 
-      std::max(src_offset, dst_offset) - std::min(src_offset, dst_offset) < cb)
-    return CL_MEM_COPY_OVERLAP;
-  
   opencrun::CommandQueue *Queue;
 
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
 
   cl_int ErrCode;
   
-  opencrun::EnqueueCopyBufferBuilder Bld(Queue->GetContext(), dst_buffer, src_buffer);
+  opencrun::EnqueueCopyBufferBuilder Bld(*Queue, dst_buffer, src_buffer);
   opencrun::Command *Cmd = Bld.SetCopyArea(dst_offset, src_offset, cb)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
@@ -290,7 +284,7 @@ clEnqueueCopyBufferRect(cl_command_queue command_queue,
 
   cl_int ErrCode;
   
-  opencrun::EnqueueCopyBufferRectBuilder Bld(Queue->GetContext(), dst_buffer, src_buffer);
+  opencrun::EnqueueCopyBufferRectBuilder Bld(*Queue, dst_buffer, src_buffer);
   opencrun::Command *Cmd = Bld.SetRegion(region)
                               .SetTargetOffset(dst_origin, dst_row_pitch, dst_slice_pitch)
                               .SetSourceOffset(src_origin, src_row_pitch, src_slice_pitch)

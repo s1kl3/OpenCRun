@@ -339,22 +339,25 @@ BufferBuilder::BufferBuilder(Buffer &Parent, size_t Offset, size_t Size) :
     return;
   }
 
-//  bool IsMisalignedOffset = false;
-//  Context &Ctx = Parent.GetContext();
-//  for(Context::device_iterator I = Ctx.device_begin(),
-//                               E = Ctx.device_end(); 
-//                               I != E;
-//                               ++I) {
-//    if((Offset % (*I)->GetMemoryBaseAddressAlignment()) != 0) {
-//      IsMisalignedOffset = true;
-//      break;
-//    }
-//  }
-//
-//  if(IsMisalignedOffset) {
-//    NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, "sub-buffer origin is misaligned");
-//    return;
-//  }
+  // If Offset is not aligned with all devices in the context associated with the 
+  // parent buffer, CL_MISALIGNED_SUB_BUFFER_OFFSET is returned as the error code.
+  bool IsMisalignedOffset = true;
+  Context &Ctx = Parent.GetContext();
+  for(Context::device_iterator I = Ctx.device_begin(),
+                               E = Ctx.device_end(); 
+                               I != E;
+                               ++I) {
+    if(((*I)->GetMemoryBaseAddressAlignment() != 0) && 
+       ((Offset % (*I)->GetMemoryBaseAddressAlignment()) == 0)) {
+      IsMisalignedOffset = false;
+      break;
+    }
+  }
+
+  if(IsMisalignedOffset) {
+    NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, "sub-buffer origin is misaligned");
+    return;
+  }
 }
 
 Buffer *BufferBuilder::Create(cl_int *ErrCode) {

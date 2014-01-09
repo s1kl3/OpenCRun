@@ -146,9 +146,13 @@ clCreateSubBuffer(cl_mem buffer,
   default:
     RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
   }
-
-  if(SubBuf)
+ 
+  // Parent's reference count is increased to avoid destruction in
+  // case one of its sub-buffer objects is still alive.
+  if(SubBuf) {
     SubBuf->Retain();
+    SubBuf->GetParent()->Retain();
+  }
 
   return SubBuf;
 }
@@ -385,7 +389,35 @@ clGetMemObjectInfo(cl_mem memobj,
              NULL,
              param_value_size,
              param_value_size_ret);
-  
+
+  case CL_MEM_ASSOCIATED_MEMOBJECT:
+    if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
+      return clFillValue<cl_mem, opencrun::MemoryObj *>(
+               static_cast<cl_mem *>(param_value),
+               Buf->GetParent(),
+               param_value_size,
+               param_value_size_ret);
+
+    return clFillValue<cl_mem, opencrun::MemoryObj *>(
+             static_cast<cl_mem *>(param_value),
+             NULL,
+             param_value_size,
+             param_value_size_ret);
+
+  case CL_MEM_OFFSET:
+    if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
+      return clFillValue<size_t, size_t>(
+               static_cast<size_t *>(param_value),
+               Buf->GetOffset(),
+               param_value_size,
+               param_value_size_ret);
+
+    return clFillValue<size_t, size_t>(
+             static_cast<size_t *>(param_value),
+             0,
+             param_value_size,
+             param_value_size_ret);
+ 
   default:
     return CL_INVALID_VALUE;
   }

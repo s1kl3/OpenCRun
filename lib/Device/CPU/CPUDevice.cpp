@@ -419,8 +419,12 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
 
   // TODO: set MaxParameterSize.
 
-  // TODO: set MemoryBaseAddressAlignment.
-  // TODO: set MinimumDataTypeAlignment.
+  // MemoryBaseAddressAlignment is the size (in bits) of the largest
+  // OpenCL built-in data type supported by the device, that is long16
+  // for CPUDevice.
+  MemoryBaseAddressAlignment = sizeof(cl_long16) * 8;
+
+  // TODO: set MinimumDataTypeAlignment (Deprecated in OpenCL 1.2).
 
   // TODO: set SinglePrecisionFPCapabilities.
 

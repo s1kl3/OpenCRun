@@ -91,6 +91,7 @@ protected:
 
 public:
   virtual ~MemoryObj();
+  virtual unsigned GetMemObjectType() const = 0;
 
 public:
   size_t GetSize() const { return Size; }
@@ -171,6 +172,9 @@ public:
   bool IsSubBuffer() const { return Parent; }
   size_t GetOffset() const { return Offset; }
   Buffer *GetParent() const { return Parent; }
+
+public:
+  virtual unsigned GetMemObjectType() const { return CL_MEM_OBJECT_BUFFER; }
 
 protected:
   Buffer(Type MemTy,
@@ -266,6 +270,9 @@ public:
 public:
   targetdev_iterator targetdev_begin() { return TargetDevs.begin(); }
   targetdev_iterator targetdev_end() { return TargetDevs.end(); }
+
+public:
+  virtual unsigned GetMemObjectType() const { return ImgTy; }
 
 protected:
   Image(Type MemTy,
