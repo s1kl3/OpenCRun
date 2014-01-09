@@ -1,5 +1,5 @@
 
-PROPERTY(CL_MEM_TYPE, GetMemObjectType, cl_mem_object_type, unsigned) 
+// CL_MEM_TYPE manually implemented.
 PROPERTY(CL_MEM_FLAGS, GetMemFlags, cl_mem_flags, unsigned long)
 PROPERTY(CL_MEM_SIZE, GetSize, size_t, size_t)
 // CL_MEM_HOST_PTR manually implemented.

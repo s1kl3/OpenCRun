@@ -374,7 +374,22 @@ clGetMemObjectInfo(cl_mem memobj,
   #include "MemoryObjectProperties.def"
   #undef PROPERTY
   #undef IMG_PROPERTY
-  
+
+  case CL_MEM_TYPE:
+    if(llvm::isa<opencrun::Buffer>(MemObj))
+      return clFillValue<cl_mem_object_type, cl_mem_object_type>(
+               static_cast<cl_mem_object_type *>(param_value),
+               CL_MEM_OBJECT_BUFFER,
+               param_value_size,
+               param_value_size_ret);
+
+    if(opencrun::Image *Img = llvm::dyn_cast<opencrun::Image>(&MemObj))
+      return clFillValue<cl_mem_object_type, opencrun::Image::ImgType>(
+               static_cast<cl_mem_object_type *>(param_value),
+               Img->GetImageType(),
+               param_value_size,
+               param_value_size_ret);
+
   case CL_MEM_HOST_PTR:
     if(llvm::isa<opencrun::HostBuffer>(MemObj) ||
        llvm::isa<opencrun::HostImage>(MemObj))

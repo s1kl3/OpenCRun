@@ -766,12 +766,18 @@ EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t TargetOff
     return NotifyError(CL_INVALID_VALUE, "data size exceeds source buffer capacity");
 
   // Target and Source are the same buffer or sub-buffer object and the source and
-  // destination regions overlap or Target and Source are different sub-buffers of
-  // the same associated buffer object and they overlap.
-  if((std::max(SourceOffset, TargetOffset) - std::min(SourceOffset, TargetOffset) < Size) &&
-     ((Target == Source) || (Target->GetParent() == Source->GetParent())))
+  // destination regions overlap  if((Target == Source) 
+  if((Target == Source) &&
+     (std::max(SourceOffset, TargetOffset) - std::min(SourceOffset, TargetOffset) < Size))
     return NotifyError(CL_MEM_COPY_OVERLAP, "source and destination regions overlap");
-  
+
+  // Target and Source are different sub-buffers of the same associated buffer object
+  // and they overlap.
+  if((Target != Source) && (Target->IsSubBuffer() && Source->IsSubBuffer()) &&
+     (Target->GetParent() == Source->GetParent()) &&
+     (std::max(SourceOffset, TargetOffset) - std::min(SourceOffset, TargetOffset) < Size))
+    return NotifyError(CL_MEM_COPY_OVERLAP, "source and destination regions overlap");
+
   this->TargetOffset = TargetOffset;
   this->SourceOffset = SourceOffset;
   this->Size = Size;
@@ -2304,7 +2310,9 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::CheckCopyOverlap() {
 
   // Target and Source are the same buffer objects or they are different sub-buffers
   // of the same associated buffer object.
-  if((Target == Source) || (Target->GetParent() == Source->GetParent())) {
+  if((Target == Source) ||
+     ((Target->IsSubBuffer() && Source->IsSubBuffer()) &&
+      (Target->GetParent() == Source->GetParent()))) {
     if((TargetPitches[0] != SourcePitches[0]) && 
        (TargetPitches[1] != SourcePitches[1]))
       return NotifyError(CL_INVALID_VALUE, "different pitches between target and source buffer.");
