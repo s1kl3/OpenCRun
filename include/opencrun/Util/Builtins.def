@@ -22,7 +22,3 @@ BUILTIN("mem_fence", "vULi")
 BUILTIN("read_mem_fence", "vULi")
 BUILTIN("write_mem_fence", "vULi")
 
-// Global lock builtins.
-BUILTIN("acquire_global_lock", "")
-BUILTIN("release_global_lock", "")
-
