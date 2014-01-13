@@ -97,6 +97,11 @@ class OCLReinterpretBuiltinSimple<list<OCLType> ops,
 
 class OCLDeclaration;
 
+class LibM<OCLParam param, string suffix = ""> : OCLDeclaration {
+  OCLParam Param = param;
+  string Suffix = suffix;
+}
+
 class OCLTypedef<string name, OCLParam param> : OCLDeclaration {
   string Name = name;
   OCLParam Param = param;
