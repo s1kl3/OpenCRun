@@ -349,7 +349,34 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   MaxWorkItemSizes.assign(3, 1024);
   MaxWorkGroupSize = 1024;
 
-  // Preferred* and Native* gathered by the compiler.
+  Version = "OpenCL 1.2 OpenCRun";
+  OpenCLCVersion = "OpenCL C 1.2";
+  Profile = "FULL_PROFILE";
+
+  // TODO: AddressBits should be detected at runtime and consequently
+  // Extensions should be set accordingly.
+#if defined(__x86_64__)
+  AddressBits = 64;
+  Extensions = "cl_khr_fp64"
+               "cl_khr_global_int32_base_atomics"
+               "cl_khr_global_int32_extended_atomics"
+               "cl_khr_local_int32_base_atomics"
+               "cl_khr_local_int32_extended_atomics"
+               "cl_khr_int64_base_atomics"
+               "cl_khr_int64_extended_atomics"
+               "cl_khr_3d_image_writes";
+#else
+  AddressBits = 32;
+  Extensions = "cl_khr_global_int32_base_atomics"
+               "cl_khr_global_int32_extended_atomics"
+               "cl_khr_local_int32_base_atomics"
+               "cl_khr_local_int32_extended_atomics"
+               "cl_khr_3d_image_writes";
+#endif
+
+  // TODO: CPU extensions (AVX, SSE, SSE2, SSE3, SSE4, ...) should
+  // be detected at runtime and preferred and native widths should
+  // be set accordingly.
 #if defined(__AVX__)
   PreferredCharVectorWidth = 16;
   PreferredShortVectorWidth = 8;
@@ -398,7 +425,6 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   NativeHalfVectorWidth = NativeShortVectorWidth;
 
   // TODO: set MaxClockFrequency.
-  // TODO: set AddressBits.
 
   MaxMemoryAllocSize = Node.GetMemorySize();
 
@@ -419,6 +445,8 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
 
   // TODO: set MaxParameterSize.
 
+  PrintfBufferSize = 65536;
+
   // MemoryBaseAddressAlignment is the size (in bits) of the largest
   // OpenCL built-in data type supported by the device, that is long16
   // for CPUDevice.
@@ -426,7 +454,20 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
 
   // TODO: set MinimumDataTypeAlignment (Deprecated in OpenCL 1.2).
 
-  // TODO: set SinglePrecisionFPCapabilities.
+  SinglePrecisionFPCapabilities = Device::FPDenormalization | 
+                                  Device::FPInfNaN |
+                                  Device::FPRoundToNearest |
+                                  Device::FPRoundToZero |
+                                  Device::FPRoundToInf |
+                                  Device::FPFusedMultiplyAdd |
+                                  FPCorrectlyRoundedDivideSqrt;
+
+  DoublePrecisionFPCapabilities = Device::FPDenormalization | 
+                                  Device::FPInfNaN |
+                                  Device::FPRoundToNearest |
+                                  Device::FPRoundToZero |
+                                  Device::FPRoundToInf |
+                                  Device::FPFusedMultiplyAdd;
 
   GlobalMemoryCacheType = DeviceInfo::ReadWriteCache;
 
@@ -450,6 +491,7 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   // Available is a virtual property.
 
   CompilerAvailable = false;
+  LinkerAvailable = false;
 
   ExecutionCapabilities = DeviceInfo::CanExecKernel |
                           DeviceInfo::CanExecNativeKernel;
