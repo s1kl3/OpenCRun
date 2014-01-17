@@ -6,6 +6,7 @@
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
 
+#include "llvm/Linker.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/PassManager.h"
 #include "llvm/Support/Host.h"
@@ -529,13 +530,6 @@ void CPUDevice::InitJIT() {
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
 
-  // Force compilation of all functions.
-  for(llvm::Module::iterator I = BitCodeLibrary->begin(),
-                             E = BitCodeLibrary->end();
-                             I != E;
-                             ++I)
-    Engine->runJITOnFunction(&*I);
-
   // Save pointer.
   JIT.reset(Engine);
 }
@@ -769,6 +763,12 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // Retrieve it.
   std::string EntryName = MangleBlockParallelKernelName(KernName);
   llvm::Function *EntryFn = Mod.getFunction(EntryName);
+
+  // Link opencrunCPULib.bc with kernel module.
+  llvm::Linker::LinkModules(&Mod,
+                            &(*BitCodeLibrary),
+                            0,
+                            NULL);
 
   // Force translation to native code.
   SignalJITCallStart(*this);
