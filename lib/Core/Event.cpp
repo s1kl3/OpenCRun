@@ -6,6 +6,15 @@
 using namespace opencrun;
 
 //
+// EventCallbackClojure implementation.
+//
+
+void EventCallbackClojure::Notify(Event &Ev, int Status) const {
+  if(Callback)
+    Callback(&Ev, Status, UserData);
+}
+
+//
 // Event implementation.
 //
 
@@ -16,6 +25,12 @@ int Event::Wait() {
     Mnt.Wait();
 
   return Status;
+}
+
+void Event::AddEventCallback(int CallbackType, EventCallbackClojure &Callback) {
+  sys::ScopedMonitor Mnt(Monitor);
+
+  Callbacks[CallbackType].push_back(Callback); 
 }
 
 void Event::Signal(int Status) {
@@ -30,6 +45,15 @@ void Event::Signal(int Status) {
 
   // This OpenCL event has not been delayed, update internal status.
   this->Status = Status;
+
+  // If present, call the user-defined callback functions for status
+  // change notification.
+  if(Callbacks.count(Status))
+    for(const_call_iterator I = Callbacks[Status].begin(),
+                            E = Callbacks[Status].end();
+                            I != E;
+                            ++I)
+      I->Notify(*this, Status);
 
   if(Status == CL_COMPLETE || Status < 0)
     Mnt.Broadcast();
@@ -91,4 +115,23 @@ void InternalEvent::MarkCompleted(int Status, ProfileSample *Sample) {
   Signal(Status);
 
   Queue->CommandDone(*this);
+}
+
+//
+// UserEvent implementation.
+//
+
+UserEvent::UserEvent(Context &Ctx) :
+  Event(Event::UserEvent, CL_SUBMITTED),
+  Ctx(&Ctx) { }
+
+bool UserEvent::SetStatus(int Status) {
+  sys::ScopedMonitor Mnt(Monitor);
+
+  // Status already changed
+  if(GetStatus() != CL_SUBMITTED)
+    return false;
+
+  Signal(Status);
+  return true;
 }

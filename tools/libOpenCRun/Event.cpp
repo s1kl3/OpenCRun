@@ -103,8 +103,17 @@ clGetEventInfo(cl_event event,
 CL_API_ENTRY cl_event CL_API_CALL
 clCreateUserEvent(cl_context context,
                   cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_1 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+  if(!context)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_CONTEXT);
+
+  opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
+
+  opencrun::UserEvent *Ev = new UserEvent(Ctx);
+
+  if(Ev)
+    Ev->Retain();
+
+  return Ev;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -132,7 +141,20 @@ clReleaseEvent(cl_event event) CL_API_SUFFIX__VERSION_1_0 {
 CL_API_ENTRY cl_int CL_API_CALL
 clSetUserEventStatus(cl_event event,
                      cl_int execution_status) CL_API_SUFFIX__VERSION_1_1 {
-  llvm_unreachable("Not yet implemented");
+  if(!event)
+    return CL_INVALID_EVENT;
+
+  if(execution_status != CL_COMPLETE &&
+     execution_status >= 0)
+    return CL_INVALID_VALUE;
+
+  opencrun::Event &Ev = *llvm::cast<opencrun::Event>(event);
+  if(Ev.GetType() != opencrun::Event::UserEvent)
+    return CL_INVALID_EVENT;
+
+  if(!(llvm::cast<opencrun::UserEvent>(Ev)).SetStatus(execution_status))
+    return CL_INVALID_OPERATION;
+
   return CL_SUCCESS;
 }
 
@@ -143,6 +165,16 @@ clSetEventCallback(cl_event event,
                                                   cl_int,
                                                   void *),
                    void *user_data) CL_API_SUFFIX__VERSION_1_1 {
-  llvm_unreachable("Not yet implemented");
+  if(!event)
+    return CL_INVALID_EVENT;
+
+  if(!pfn_notify || command_exec_callback_type != CL_COMPLETE)
+    return CL_INVALID_VALUE;
+
+  opencrun::Event &Ev = *llvm::cast<opencrun::Event>(event);
+  opencrun::EventCallbackClojure Callback(pfn_notify, user_data);
+
+  Ev.AddEventCallback(command_exec_callback_type, Callback);
+
   return CL_SUCCESS;
 }

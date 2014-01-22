@@ -1,5 +1,6 @@
 
 // CL_EVENT_COMMAND_QUEUE manually implemented.
+PROPERTY(CL_EVENT_CONTEXT, GetContext, cl_context, opencrun::Context &) 
 // CL_EVENT_COMMAND_TYPE manually implemented.
 PROPERTY(CL_EVENT_COMMAND_EXECUTION_STATUS, GetStatus, cl_int, int)
 PROPERTY(CL_EVENT_REFERENCE_COUNT, GetReferenceCount, cl_uint, unsigned)
