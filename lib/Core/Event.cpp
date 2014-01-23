@@ -89,6 +89,36 @@ Context &InternalEvent::GetContext() const {
   return Queue->GetContext();
 }
 
+unsigned long InternalEvent::GetProfiledQueuedTime() const {
+  return GetProfiledTime(ProfileSample::CommandEnqueued);
+}
+
+unsigned long InternalEvent::GetProfiledSubmittedTime() const {
+  return GetProfiledTime(ProfileSample::CommandSubmitted);
+}
+ 
+unsigned long InternalEvent::GetProfiledRunningTime() const {
+  return GetProfiledTime(ProfileSample::CommandRunning);
+}
+
+unsigned long InternalEvent::GetProfiledCompletedTime() const {
+  return GetProfiledTime(ProfileSample::CommandCompleted);
+}
+
+unsigned long InternalEvent::GetProfiledTime(ProfileSample::Label SampleLabel) const {
+  for(ProfileTrace::const_iterator I = Profile.begin(),
+                                   E = Profile.end();
+                                   I != E;
+                                   ++I) {
+    if((*I)->GetLabel() != SampleLabel)
+      continue;
+
+    return (*I)->GetTime().AsLong();
+  }
+
+  return 0;
+}
+
 void InternalEvent::MarkSubmitted(ProfileSample *Sample) {
   Profile << Sample;
   Signal(CL_SUBMITTED);

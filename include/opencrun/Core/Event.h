@@ -116,11 +116,20 @@ public:
   const ProfileTrace &GetProfile() const { return Profile; }
 
 public:
+  unsigned long GetProfiledQueuedTime() const;
+  unsigned long GetProfiledSubmittedTime() const;
+  unsigned long GetProfiledRunningTime() const;
+  unsigned long GetProfiledCompletedTime() const;
+
+public:
   void MarkSubmitted(ProfileSample *Sample = NULL);
   void MarkRunning(ProfileSample *Sample = NULL);
   void MarkSubRunning(ProfileSample *Sample = NULL);
   void MarkSubCompleted(ProfileSample *Sample = NULL);
   void MarkCompleted(int Status, ProfileSample *Sample = NULL);
+
+protected:
+  unsigned long GetProfiledTime(ProfileSample::Label SampleLabel) const;
 
 private:
   llvm::IntrusiveRefCntPtr<CommandQueue> Queue;
