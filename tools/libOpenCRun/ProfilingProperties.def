@@ -1,0 +1,5 @@
+
+PROPERTY(CL_PROFILING_COMMAND_QUEUED, GetProfiledQueuedTime, cl_ulong, unsigned long)
+PROPERTY(CL_PROFILING_COMMAND_SUBMIT, GetProfiledSubmittedTime, cl_ulong, unsigned long)
+PROPERTY(CL_PROFILING_COMMAND_START, GetProfiledRunningTime, cl_ulong, unsigned long)
+PROPERTY(CL_PROFILING_COMMAND_END, GetProfiledCompletedTime, cl_ulong, unsigned long)
