@@ -837,7 +837,7 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
   // Reserve space for local buffers.
   // TODO: reserve space for local automatic buffers.
-  Local.Reset(0);
+  Local.Reset(Cmd.GetStaticLocalSize());
   Cmd.SetLocalParams(Local);
 
   // Get function and arguments.

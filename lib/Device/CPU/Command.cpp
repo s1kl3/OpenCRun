@@ -12,18 +12,22 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
                                 ArgsMappings &GlobalArgs,
                                 DimensionInfo::iterator I,
                                 DimensionInfo::iterator E,
+                                unsigned StaticLocalSize,
                                 CPUCommand::ResultRecorder &Result) :
   CPUMultiExecCommand(CPUCommand::NDRangeKernelBlock,
                       Cmd,
                       Result,
                       I.GetWorkGroup()),
   Entry(Entry),
+  StaticLocalSize(StaticLocalSize),
   Start(I),
   End(E) {
   Kernel &Kern = GetKernel();
 
+  unsigned ArgsCount = Kern.GetArgCount() + (StaticLocalSize > 0);
+
   // Hold arguments to be passed to stubs.
-  Args = static_cast<void **>(sys::CAlloc(Kern.GetArgCount(), sizeof(void *)));
+  Args = static_cast<void **>(sys::CAlloc(ArgsCount, sizeof(void *)));
 
   // We can start filling some arguments: global/constant buffers, images and arguments
   // passed by value.
@@ -88,6 +92,9 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(LocalMemory &Local) {
 
     ++J;
   }
+
+  if (StaticLocalSize)
+    Args[J] = Local.GetStaticPtr();
 }
 
 cl_uint NDRangeKernelBlockCPUCommand::GetDeviceSampler(const Sampler &Smplr) {

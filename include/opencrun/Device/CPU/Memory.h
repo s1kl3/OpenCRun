@@ -64,15 +64,18 @@ public:
   ~LocalMemory();
 
 public:
-  void Reset(size_t AutomaticVarSize = 0);
+  void Reset(size_t StaticSize = 0);
 
   void *Alloc(MemoryObj &MemObj);
+
+  void *GetStaticPtr() const { return Static; }
 
 private:
   size_t Size;
 
   void *Base;
   void *Next;
+  void *Static;
 };
 
 } // End namespace cpu.

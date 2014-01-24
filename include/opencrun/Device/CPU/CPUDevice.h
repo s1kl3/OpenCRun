@@ -21,6 +21,8 @@ public:
 
   typedef std::map<Kernel *, BlockParallelEntryPoint> BlockParallelEntryPoints;
 
+  typedef std::map<Kernel *, unsigned> BlockParallelStaticLocalSizes;
+
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
 
 public:
@@ -91,6 +93,8 @@ private:
                            GlobalArgMappingsContainer &GlobalArgs);
 
   CPUDevice::BlockParallelEntryPoint GetBlockParallelEntryPoint(Kernel &Kern);
+  unsigned GetBlockParallelStaticLocalSize(Kernel &Kern);
+
   void *LinkLibFunction(const std::string &Name);
 
   void LocateMemoryObjArgAddresses(Kernel &Kern,
@@ -111,6 +115,7 @@ private:
   llvm::OwningPtr<llvm::ExecutionEngine> JIT;
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
+  BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
 
   friend void *LibLinker(const std::string &);
 };

@@ -652,6 +652,9 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
 
+  // Static local size
+  unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(Cmd.GetKernel());
+
   // Decide the work group size.
   if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
     llvm::SmallVector<size_t, 4> Sizes;
@@ -683,6 +686,7 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                                   GlobalArgs,
                                                   I,
                                                   I + WorkGroupSize,
+                                                  StaticLocalSize,
                                                   *Result);
 
     // Submit command.
@@ -746,6 +750,22 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   return Entry;
 }
 
+unsigned CPUDevice::GetBlockParallelStaticLocalSize(Kernel &Kern) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  if (BlockParallelStaticLocalsCache.count(&Kern))
+    return BlockParallelStaticLocalsCache[&Kern];
+
+  llvm::Module &Mod = *Kern.GetModule(*this);
+
+  llvm::KernelInfo Info = ModuleInfo(Mod).getKernelInfo(Kern.GetName());
+
+  unsigned StaticLocalSize = Info.getStaticLocalSize();
+  BlockParallelStaticLocalsCache[&Kern] = StaticLocalSize;
+
+  return StaticLocalSize;
+}
+
 void *CPUDevice::LinkLibFunction(const std::string &Name) {
   // Bit-code function.
   if(llvm::Function *Func = JIT->FindFunctionNamed(Name.c_str()))
@@ -783,8 +803,17 @@ void CPUDevice::LocateMemoryObjArgAddresses(
     }
 }
 
+static void createAutoLocalVarsPass(const llvm::PassManagerBuilder &PMB,
+                                    llvm::PassManagerBase &PM) {
+  PM.add(createAutomaticLocalVariablesPass());
+}
+
 void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
                                        LLVMOptimizerParams &Params) const {
+  PMB.addExtension(llvm::PassManagerBuilder::EP_ModuleOptimizerEarly,
+                   createAutoLocalVarsPass);
+  PMB.addExtension(llvm::PassManagerBuilder::EP_EnabledOnOptLevel0,
+                   createAutoLocalVarsPass);
 }
 
 //
