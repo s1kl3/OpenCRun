@@ -102,7 +102,7 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
     if(!Cur.IsBuilt())
       continue;
 
-    if(Cur.GetKernelType(KernName) != Fst.GetKernelType(KernName))
+    if(Cur.GetKernelSignature(KernName) != Fst.GetKernelSignature(KernName))
       RETURN_WITH_ERROR(ErrCode,
                         CL_INVALID_KERNEL_DEFINITION,
                         "kernel signatures do not match");
@@ -145,12 +145,12 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
     if(!Cur.IsBuilt())
       continue;
 
-    BuildInformation::kernel_iterator KI = Cur.kernel_begin(),
-                                      KE = Cur.kernel_end();
+    BuildInformation::kernel_info_iterator KI = Cur.kernel_begin(),
+                                           KE = Cur.kernel_end();
 
     for(; KI != KE; ++KI) {
       llvm::StringRef KernName = KI->getName();
-      SignMap[KernName].push_back(std::make_pair(&Dev, &*KI));
+      SignMap[KernName].push_back(std::make_pair(&Dev, KI->getFunction()));
     }
   }
 

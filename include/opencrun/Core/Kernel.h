@@ -46,29 +46,29 @@ public:
   }
 
 public:
-  BufferKernelArg(unsigned Position, Buffer *Buf, clang::LangAS::ID AddrSpace) :
-    KernelArg(KernelArg::BufferArg, Position),
-    Buf(Buf),
-    AddrSpace(AddrSpace) { }
+  BufferKernelArg(unsigned Position, Buffer *Buf,
+                  opencl::AddressSpace AddrSpace)
+   : KernelArg(KernelArg::BufferArg, Position), Buf(Buf),
+     AddrSpace(AddrSpace) { }
 
 public:
   Buffer *GetBuffer() { return Buf; }
 
   bool OnGlobalAddressSpace() const {
-    return AddrSpace == clang::LangAS::opencl_global;
+    return AddrSpace == opencl::AS_Global;
   }
 
   bool OnConstantAddressSpace() const {
-    return AddrSpace == clang::LangAS::opencl_constant;
+    return AddrSpace == opencl::AS_Constant;
   }
 
   bool OnLocalAddressSpace() const {
-    return AddrSpace == clang::LangAS::opencl_local;
+    return AddrSpace == opencl::AS_Local;
   }
 
 private:
   Buffer *Buf;
-  clang::LangAS::ID AddrSpace;
+  opencl::AddressSpace AddrSpace;
 };
 
 class ImageKernelArg : public KernelArg {
@@ -78,25 +78,24 @@ public:
   }
 
 public:
-  ImageKernelArg(unsigned Position, Image *Img, clang::OpenCLImageAccess ImgAccess) :
-    KernelArg(KernelArg::ImageArg, Position),
-    Img(Img),
-    ImgAccess(ImgAccess) { }
+  ImageKernelArg(unsigned Position, Image *Img, opencl::ImageAccess ImgAccess)
+   : KernelArg(KernelArg::ImageArg, Position), Img(Img),
+     ImgAccess(ImgAccess) {}
 
 public:
   Image *GetImage() { return Img; }
 
   bool IsReadOnly() const {
-    return ImgAccess == clang::CLIA_read_only;
+    return ImgAccess == opencl::IA_ReadOnly;
   }
 
   bool IsWriteOnly() const {
-    return ImgAccess == clang::CLIA_write_only;
+    return ImgAccess == opencl::IA_WriteOnly;
   }
 
 private:
   Image *Img;
-  clang::OpenCLImageAccess ImgAccess;
+  opencl::ImageAccess ImgAccess;
 };
 
 class SamplerKernelArg : public KernelArg {
@@ -106,9 +105,9 @@ public:
   }
 
 public:
-  SamplerKernelArg(unsigned Position, Sampler *Smplr) :
-    KernelArg(KernelArg::SamplerArg, Position),
-    Smplr(Smplr) { }
+  SamplerKernelArg(unsigned Position, Sampler *Smplr)
+   : KernelArg(KernelArg::SamplerArg, Position),
+     Smplr(Smplr) { }
 
 public:
   Sampler *GetSampler() { return Smplr; }
@@ -124,9 +123,8 @@ public:
   }
 
 public:
-  ByValueKernelArg(unsigned Position, const void *Arg, size_t Size) :
-    KernelArg(KernelArg::ByValueArg, Position),
-    Size(Size) {
+  ByValueKernelArg(unsigned Position, const void *Arg, size_t Size)
+   : KernelArg(KernelArg::ByValueArg, Position), Size(Size) {
     // We need to allocate a chunk of memory for holding the parameter -- it is
     // passed by copy. Generally speaking, we do not have alignment
     // requirements. However, the CPU backed generates loads from this memory
@@ -172,16 +170,9 @@ public:
   cl_int SetArg(unsigned I, size_t Size, const void *Arg);
 
 public:
-  llvm::Function *GetFunction(Device &Dev) {
-    return Codes.count(&Dev) ? Codes[&Dev] : NULL;
-  }
-
-  llvm::FunctionType &GetType() const {
-    // All stored functions share the same signature, just return the first.
-    CodesContainer::const_iterator I = Codes.begin();
-    llvm::Function &Func = *I->second;
-
-    return *Func.getFunctionType();
+  llvm::Function *GetFunction(Device &Dev) const {
+    CodesContainer::const_iterator I = Codes.find(&Dev);
+    return (I != Codes.end()) ? I->second : NULL;
   }
 
   llvm::StringRef GetName() const {
@@ -193,13 +184,12 @@ public:
   }
 
   unsigned GetArgCount() const {
-    const llvm::FunctionType &FuncTy = GetType();
-
-    return FuncTy.getNumParams();
+    return GetSignature().getNumArguments();
   }
 
-  llvm::Module *GetModule(Device &Dev) {
-    return Codes.count(&Dev) ? Codes[&Dev]->getParent() : NULL;
+  llvm::Module *GetModule(Device &Dev) const {
+    CodesContainer::const_iterator I = Codes.find(&Dev);
+    return (I != Codes.end()) ? I->second->getParent() : NULL;
   }
 
   Context &GetContext() const { return Prog->GetContext(); }
@@ -224,51 +214,12 @@ public:
   bool GetMinPrivateMemoryUsage(size_t &Size, Device *Dev = NULL);
 
 private:
-  llvm::Type *GetArgType(unsigned I) const {
-    llvm::FunctionType &KernTy = GetType();
-
-    return I < KernTy.getNumParams() ? KernTy.getParamType(I) : NULL;
-  }
+  KernelSignature GetSignature() const;
 
   cl_int SetBufferArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetImageArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetSamplerArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetByValueArg(unsigned I, size_t Size, const void *Arg);
-
-  clang::LangAS::ID GetArgAddressSpace(unsigned I) {
-    // All stored functions share the same signature, use the first.
-    CodesContainer::iterator J = Codes.begin();
-    llvm::Function &Kern = *J->second;
-
-    OpenCLMetadataHandler OpenCLMDHandler(*Kern.getParent());
-
-    return OpenCLMDHandler.GetArgAddressSpace(Kern, I);
-  }
-
-  clang::OpenCLImageAccess GetArgAccessQual(unsigned I) {
-    // All stored functions share the same signature, use the first.
-    CodesContainer::iterator J = Codes.begin();
-    llvm::Function &Kern = *J->second;
-
-    OpenCLMetadataHandler OpenCLMDHandler(*Kern.getParent());
-
-    return OpenCLMDHandler.GetArgAccessQual(Kern, I);
-  }
-
-  llvm::StringRef GetArgTypeName(unsigned I) {
-    // All stored functions share the same signature, use the first.
-    CodesContainer::iterator J = Codes.begin();
-    llvm::Function &Kern = *J->second;
-
-    OpenCLMetadataHandler OpenCLMDHandler(*Kern.getParent());
-
-    return OpenCLMDHandler.GetArgTypeName(Kern, I);
-  }
-
-  bool IsSampler(unsigned I);
-  bool IsImage(unsigned I);
-  bool IsBuffer(llvm::Type &Ty);
-  bool IsByValue(llvm::Type &Ty);
 
   Device *RequireEstimates(Device *Dev = NULL);
 

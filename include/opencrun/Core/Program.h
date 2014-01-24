@@ -4,8 +4,8 @@
 
 #include "CL/opencl.h"
 
+#include "opencrun/Util/ModuleInfo.h"
 #include "opencrun/Util/MTRefCounted.h"
-#include "opencrun/Util/OpenCLMetadataHandler.h"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -54,19 +54,15 @@ private:
 
 class BuildInformation {
 public:
-  typedef OpenCLMetadataHandler::kernel_iterator kernel_iterator;
+  typedef ModuleInfo::kernel_info_iterator kernel_info_iterator;
 
 public:
-  kernel_iterator kernel_begin() {
-    OpenCLMetadataHandler MDHandler(*BitCode);
-
-    return MDHandler.kernel_begin();
+  kernel_info_iterator kernel_begin() {
+    return ModuleInfo(*BitCode).kernel_info_begin();
   }
 
-  kernel_iterator kernel_end() {
-    OpenCLMetadataHandler MDHandler(*BitCode);
-
-    return MDHandler.kernel_end();
+  kernel_info_iterator kernel_end() {
+    return ModuleInfo(*BitCode).kernel_info_end();
   }
 
 public:
@@ -98,25 +94,33 @@ public:
   cl_build_status GetBuildStatus() { return BuildStatus; }
 
   llvm::Function *GetKernel(llvm::StringRef KernName) {
-    if(!BitCode)
+    if (!BitCode)
       return NULL;
 
-    OpenCLMetadataHandler MDHandler(*BitCode); 
+    ModuleInfo Info(*BitCode); 
+    kernel_info_iterator I = Info.findKernel(KernName);
 
-    return MDHandler.GetKernel(KernName);
+    return I != Info.kernel_info_end() ? I->getFunction() : NULL;
   }
 
-  const llvm::FunctionType *GetKernelType(llvm::StringRef KernName) {
-    llvm::Function *Kern = GetKernel(KernName);
+  KernelSignature GetKernelSignature(llvm::StringRef KernName) {
+    if (!BitCode)
+      return NULL;
 
-    return Kern ? Kern->getFunctionType() : NULL;
+    ModuleInfo Info(*BitCode); 
+    kernel_info_iterator I = Info.findKernel(KernName);
+
+    return I != Info.kernel_info_end() ? I->getSignature() : NULL;
   }
 
 public:
   bool IsBuilt() const { return BuildStatus == CL_BUILD_SUCCESS; }
   bool BuildInProgress() const { return BuildStatus == CL_BUILD_IN_PROGRESS; }
   bool HasBitCode() const { return BitCode; }
-  bool DefineKernel(llvm::StringRef KernName) { return GetKernel(KernName); }
+
+  bool DefineKernel(llvm::StringRef KernName) {
+    return ModuleInfo(*BitCode).hasKernel(KernName);
+  }
 
 private:
   cl_build_status BuildStatus;
