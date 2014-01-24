@@ -1,6 +1,7 @@
 #include "opencrun/Core/Device.h"
 #include "opencrun/Device/CPU/CPUDevice.h"
-#include "opencrun/Util/EmitCustomLLVMOnlyAction.h"
+#include "opencrun/Util/LLVMCodeGenAction.h"
+#include "opencrun/Util/LLVMOptimizer.h"
 
 #include "clang/Basic/Version.h"
 #include "clang/Parse/ParseAST.h"
@@ -19,6 +20,20 @@
 #include <sstream>
 
 using namespace opencrun;
+
+namespace opencrun {
+
+template<>
+class LLVMOptimizerInterfaceTraits<Device> {
+public:
+  static void registerExtensions(Device &Dev,
+                                 llvm::PassManagerBuilder &PMB,
+                                 LLVMOptimizerParams &Params) {
+    Dev.addOptimizerExtensions(PMB, Params);
+  }
+};
+
+}
 
 Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
   BitCodeLibrary(NULL),
@@ -51,12 +66,15 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   Compiler.setInvocation(Invocation);
 
   // Launch compiler.
-  EmitCustomLLVMOnlyAction ToBitCode(&LLVMCtx);
+  LLVMCodeGenAction ToBitCode(&LLVMCtx);
   bool Success = Compiler.ExecuteAction(ToBitCode);
 
   Mod = ToBitCode.takeModule();
-  if(Mod != NULL) ToBitCode.AddKernelArgMetadata(*Mod, *ToBitCode.takeLLVMContext());
   Success = Success && !Mod->MaterializeAll();
+
+  LLVMOptimizer<Device> Opt(Compiler.getLangOpts(), Compiler.getCodeGenOpts(),
+                            Compiler.getTargetOpts(), *this);
+  Opt.run(Mod);
 
   return Success;
 }

@@ -14,15 +14,21 @@
 
 struct _cl_device_id { };
 
+namespace llvm {
+class PassManagerBuilder;
+}
+
 namespace opencrun {
 
-class MemoryObj;
-class HostBuffer;
-class HostAccessibleBuffer;
 class DeviceBuffer;
-class HostImage;
-class HostAccessibleImage;
 class DeviceImage;
+class HostAccessibleBuffer;
+class HostAccessibleImage;
+class HostBuffer;
+class HostImage;
+class LLVMOptimizerParams;
+template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
+class MemoryObj;
 
 class DeviceInfo {
 public:
@@ -389,6 +395,10 @@ public:
 
   virtual void UnregisterKernel(Kernel &Kern) { }
 
+protected:
+  virtual void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
+                                      LLVMOptimizerParams &Params) const {}
+
 private:
   void InitLibrary();
   void InitCompiler();
@@ -409,6 +419,9 @@ private:
 
   std::string Triple;
   std::string SystemResourcePath;
+
+  friend class LLVMOptimizerInterfaceTraits<Device>;
+  friend class DeviceBuiltinInfo;
 };
 
 class GPUDevice : public Device {

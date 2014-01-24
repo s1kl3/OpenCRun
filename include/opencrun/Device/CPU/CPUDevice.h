@@ -56,6 +56,10 @@ public:
   void NotifyDone(CPUServiceCommand *Cmd) { delete Cmd; }
   void NotifyDone(CPUExecCommand *Cmd, int ExitStatus);
 
+protected:
+  void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
+                              LLVMOptimizerParams &Params) const LLVM_OVERRIDE;
+
 private:
   void InitDeviceInfo(sys::HardwareNode &Node);
   void InitJIT();

@@ -11,6 +11,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace opencrun;
 
@@ -780,6 +781,10 @@ void CPUDevice::LocateMemoryObjArgAddresses(
       else
         GlobalArgs[I] = NULL;
     }
+}
+
+void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
+                                       LLVMOptimizerParams &Params) const {
 }
 
 //
