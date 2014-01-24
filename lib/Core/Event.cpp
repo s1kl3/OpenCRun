@@ -30,21 +30,26 @@ int Event::Wait() {
 void Event::AddEventCallback(int CallbackType, EventCallbackClojure &Callback) {
   sys::ScopedMonitor Mnt(Monitor);
 
-  Callbacks[CallbackType].push_back(Callback); 
+  // If the status for which the callback is being registered has
+  // already been reached or passed we call the callback immediately,
+  // otherwise we store the clojure and it will be triggered by a state
+  // change to a value past or equal to CallbackType.
+  if(Status <= CallbackType)
+    Callback.Notify(*this, CallbackType);
+  else
+    Callbacks[CallbackType].push_back(Callback); 
 }
 
 void Event::Signal(int Status) {
   sys::ScopedMonitor Mnt(Monitor);
 
   // Sometimes can happen that a logically previous event is delayed. If so,
-  // ignore it. OpenCL events are ordered from CL_QUEUED (3) to CL_COMPLETE (0).
+  // do not update status. OpenCL events are ordered from CL_QUEUED (3) to CL_COMPLETE (0).
   // Error events are lesser than 0, so the < operator can be used to filter out
   // delayed events.
-  if(this->Status < Status)
-    return;
-
   // This OpenCL event has not been delayed, update internal status.
-  this->Status = Status;
+  if(this->Status > Status)
+    this->Status = Status;
 
   // If present, call the user-defined callback functions for status
   // change notification.

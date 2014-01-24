@@ -168,7 +168,12 @@ clSetEventCallback(cl_event event,
   if(!event)
     return CL_INVALID_EVENT;
 
-  if(!pfn_notify || command_exec_callback_type != CL_COMPLETE)
+  // OpenCL 1.1 and 1.2 would accept only callback registered for
+  // CL_COMPLETE status but here we accept also CL_SUBMITTED and
+  // CL_RUNNING as stated by OpenCL 2.0 specifications.
+  if(!pfn_notify || (command_exec_callback_type != CL_COMPLETE &&
+                     command_exec_callback_type != CL_RUNNING &&
+                     command_exec_callback_type != CL_SUBMITTED))
     return CL_INVALID_VALUE;
 
   opencrun::Event &Ev = *llvm::cast<opencrun::Event>(event);
