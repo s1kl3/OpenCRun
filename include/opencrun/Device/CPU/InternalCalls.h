@@ -114,10 +114,6 @@ void MemFence(cl_mem_fence_flags flags);
 void ReadMemFence(cl_mem_fence_flags flags);
 void WriteMemFence(cl_mem_fence_flags flags);
 
-// Global Lock Functions.
-void AcquireGlobalLock();
-void ReleaseGlobalLock();
-
 } // End namespace cpu.
 } // End namespace opencrun.
 

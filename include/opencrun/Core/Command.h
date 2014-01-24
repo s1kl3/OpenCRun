@@ -790,7 +790,7 @@ public:
   }
 
 public:
-  EnqueueReadBufferBuilder(Context &Ctx, cl_mem Buf, void *Target);
+  EnqueueReadBufferBuilder(CommandQueue &Queue, cl_mem Buf, void *Target);
 
 public:
   EnqueueReadBufferBuilder &SetBlocking(bool Blocking = true);
@@ -821,7 +821,7 @@ public:
   }
 
 public:
-  EnqueueWriteBufferBuilder(Context &Ctx, cl_mem Buf, const void *Source);
+  EnqueueWriteBufferBuilder(CommandQueue &Queue, cl_mem Buf, const void *Source);
 
 public:
   EnqueueWriteBufferBuilder &SetBlocking(bool Blocking = true);
@@ -852,7 +852,7 @@ public:
   }
 
 public:
-  EnqueueCopyBufferBuilder(Context &Ctx, cl_mem TargetBuf, cl_mem SourceBuf);
+  EnqueueCopyBufferBuilder(CommandQueue &Queue, cl_mem TargetBuf, cl_mem SourceBuf);
 
 public:
   EnqueueCopyBufferBuilder &SetCopyArea(size_t TargetOffset, size_t SourceOffset, size_t Size);
@@ -1217,7 +1217,7 @@ public:
   }
 
 public:
-  EnqueueReadBufferRectBuilder(Context &Ctx, cl_mem Buf, void *Ptr);
+  EnqueueReadBufferRectBuilder(CommandQueue &Queue, cl_mem Buf, void *Ptr);
   
 public:
   EnqueueReadBufferRectBuilder &SetBlocking(bool Blocking = true);
@@ -1259,7 +1259,7 @@ public:
   }
 
 public:
-  EnqueueWriteBufferRectBuilder(Context &Ctx, cl_mem Buf, const void *Ptr);
+  EnqueueWriteBufferRectBuilder(CommandQueue &Queue, cl_mem Buf, const void *Ptr);
 
 public:
   EnqueueWriteBufferRectBuilder &SetBlocking(bool Blocking = true);
@@ -1301,7 +1301,7 @@ public:
   }
   
 public:
-  EnqueueCopyBufferRectBuilder(Context &Ctx, cl_mem TargetBuf, cl_mem SourceBuf);
+  EnqueueCopyBufferRectBuilder(CommandQueue &Queue, cl_mem TargetBuf, cl_mem SourceBuf);
   
 public:
   EnqueueCopyBufferRectBuilder &SetRegion(const size_t *Region);
@@ -1342,7 +1342,7 @@ public:
   }
   
 public:
-  EnqueueFillBufferBuilder(Context &Ctx, cl_mem Buf, const void *Pattern);
+  EnqueueFillBufferBuilder(CommandQueue &Queue, cl_mem Buf, const void *Pattern);
   
 public:
   EnqueueFillBufferBuilder &SetPatternSize(size_t PatternSize);

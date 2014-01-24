@@ -78,14 +78,16 @@ protected:
   MemoryObj(Type MemTy,
             Context &Ctx,
             size_t Size,
+            void *HostPtr,
             HostPtrUsageMode HostPtrMode,
             AccessProtection AccessProt,
             HostAccessProtection HostAccessProt) : MemTy(MemTy),
                                                    Ctx(&Ctx),
                                                    Size(Size),
+                                                   HostPtr(HostPtr),
                                                    HostPtrMode(HostPtrMode),
                                                    AccessProt(AccessProt),
-                                                   HostAccessProt(HostAccessProt)	{ }
+                                                   HostAccessProt(HostAccessProt) { }
 
 public:
   virtual ~MemoryObj();
@@ -104,6 +106,9 @@ public:
                                       AccessProt | 
                                       HostAccessProt); 
   }
+
+  void *GetHostPtr() { return HostPtr; }
+  bool HasHostPtr() const { return HostPtr; }
   
 public:
   bool AddNewMapping(void *MapBuf, const MappingInfo &MapInfo);
@@ -122,10 +127,16 @@ private:
   llvm::IntrusiveRefCntPtr<Context> Ctx;
   size_t Size;
   
+  // This attribute stores host-side initialization data location in case of
+  // CL_MEM_COPY_HOST_PTR flag.
+  // In case of CL_MEM_USE_HOST_PTR flag, it stores host-side buffer location
+  // used as the storage area for the memory object.
+  void *HostPtr;
+ 
   HostPtrUsageMode HostPtrMode;
   AccessProtection AccessProt;
   HostAccessProtection HostAccessProt;
-  
+
   llvm::sys::Mutex ThisLock;
   MappingsContainer Maps;
 };
@@ -156,19 +167,36 @@ public:
     return AttachedImages.erase(Img);
   }
 
+public:
+  bool IsSubBuffer() const { return Parent; }
+  size_t GetOffset() const { return Offset; }
+  Buffer *GetParent() const { return Parent; }
+
 protected:
   Buffer(Type MemTy,
          Context &Ctx,
+         Buffer *Parent,
+         size_t Offset,
          size_t Size,
+         void *HostPtr,
          MemoryObj::HostPtrUsageMode HostPtrMode,
          MemoryObj::AccessProtection AccessProt,
          MemoryObj::HostAccessProtection HostAccessProt) :
-  MemoryObj(MemTy, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt) { }
+  MemoryObj(MemTy, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt),
+  Parent(Parent),
+  Offset(0) { }
 
 private:
   // This container holds all 1D image buffers initialized using
   // the buffer object.
   ImagesContainer AttachedImages;
+
+  // In case of a sub-buffer object, this attribute points to the
+  // parent buffer.
+  Buffer *Parent;
+
+  // In case of a sub-buffer object, this attribute could be non-zero.
+  size_t Offset;
 };
 
 class Image : public MemoryObj {
@@ -243,6 +271,7 @@ protected:
   Image(Type MemTy,
         Context &Ctx,
         size_t Size,
+        void *HostPtr,
         TargetDevices &TargetDevs,
         ChannelOrder ChOrder,
         ChannelType ChDataType,
@@ -260,7 +289,7 @@ protected:
         MemoryObj::HostPtrUsageMode HostPtrMode,
         MemoryObj::AccessProtection AccessProt,
         MemoryObj::HostAccessProtection HostAccessProt) :
-  MemoryObj(MemTy, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
+  MemoryObj(MemTy, Ctx, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt),
   TargetDevs(TargetDevs),
   ChOrder(ChOrder),
   ChDataType(ChDataType),
@@ -276,7 +305,7 @@ protected:
     if(GetType() == HostImage) {
       // In case of CL_MEM_USE_HOST_PTR the storage area for the
       // image object is inside host memory and its address is
-      // given by Storage pointer (see HostImage class) and image
+      // given by HostPtr pointer (see HostImage class) and image
       // pitches coincide with storage pitches.
       HostPitches[0] = HostRowPitch;
       HostPitches[1] = HostSlicePitch;
@@ -377,23 +406,18 @@ public:
   
 private:
   HostBuffer(Context &Ctx,
+             Buffer *Parent,
+             size_t Offset,
              size_t Size,
-             void *Storage,
+             void *HostPtr,
              MemoryObj::HostPtrUsageMode HostPtrMode,
              MemoryObj::AccessProtection AccessProt,
              MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::HostBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
-      Storage(Storage) { }
+    : Buffer(MemoryObj::HostBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostBuffer(const HostBuffer &That); // Do not implement.
   void operator=(const HostBuffer &That); // Do not implement.
 
-public:
-  void *GetStorageData() const { return Storage; }
-
-private:
-  void *Storage;
-  
   friend class Context;
 };
 
@@ -405,24 +429,18 @@ public:
   
 private:
   HostAccessibleBuffer(Context &Ctx,
+                       Buffer *Parent,
+                       size_t Offset,
                        size_t Size,
-                       void *Src,
+                       void *HostPtr,
                        MemoryObj::HostPtrUsageMode HostPtrMode,
                        MemoryObj::AccessProtection AccessProt,
                        MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
-      Src(Src) { }
+    : Buffer(MemoryObj::HostAccessibleBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostAccessibleBuffer(const HostAccessibleBuffer &That); // Do not implement.
   void operator=(const HostAccessibleBuffer &That); // Do not implement.
 
-public:
-  const void *GetInitializationData() const { return Src; }
-  bool HasInitializationData() const { return Src; }
-  
-private:
-  void *Src;
-  
   friend class Context;
 };
 
@@ -434,23 +452,17 @@ public:
   
 private:
   DeviceBuffer(Context &Ctx,
+               Buffer *Parent,
+               size_t Offset,
                size_t Size,
-               void *Src,
+               void *HostPtr,
                MemoryObj::HostPtrUsageMode HostPtrMode,
                MemoryObj::AccessProtection AccessProt,
                MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::DeviceBuffer, Ctx, Size, HostPtrMode, AccessProt, HostAccessProt),
-      Src(Src) { }
+    : Buffer(MemoryObj::DeviceBuffer, Ctx, Parent, Offset, Size, HostPtr, HostPtrMode, AccessProt, HostAccessProt) { }
 
   DeviceBuffer(const DeviceBuffer &That); // Do not implement.
   void operator=(const DeviceBuffer &That); // Do not implement.
-
-public:
-  const void *GetInitializationData() const { return Src; }
-  bool HasInitializationData() const { return Src; }
-
-private:
-  void *Src;
 
   friend class Context;
 };
@@ -466,12 +478,11 @@ private:
                 size_t Size,
                 MemoryObj::AccessProtection AccessProt,
                 MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::VirtualBuffer, Ctx, Size, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
+    : Buffer(MemoryObj::VirtualBuffer, Ctx, NULL, 0, Size, NULL, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
 
   VirtualBuffer(const VirtualBuffer &That); // Do not implement.
   void operator=(const VirtualBuffer &That); // Do not implement.
 
-private:
   friend class Context;
 };
 
@@ -484,7 +495,7 @@ public:
 private:
   HostImage(Context &Ctx,
             size_t Size,
-            void *Storage,
+            void *HostPtr,
             TargetDevices &TargetDevs,
             ChannelOrder ChOrder,
             ChannelType ChDataType,
@@ -505,6 +516,7 @@ private:
     : Image(MemoryObj::HostImage,
             Ctx,
             Size,
+            HostPtr,
             TargetDevs,
             ChOrder, ChDataType,
             ElementSize,
@@ -515,18 +527,11 @@ private:
             NumMipLevels,
             NumSamples,
             Buf,
-            HostPtrMode, AccessProt, HostAccessProt),
-      Storage(Storage) { }
+            HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostImage(const HostImage &That); // Do not implement.
   void operator=(const HostImage &That); // Do not implement.
 
-public:
-  void *GetStorageData() const { return Storage; }
-
-private:
-  void *Storage;
-  
   friend class Context;
 };
 
@@ -539,7 +544,7 @@ public:
 private:
   HostAccessibleImage(Context &Ctx,
                        size_t Size,
-                       void *Src,
+                       void *HostPtr,
                        TargetDevices &TargetDevs,
                        ChannelOrder ChOrder,
                        ChannelType ChDataType,
@@ -560,6 +565,7 @@ private:
     : Image(MemoryObj::HostAccessibleImage,
             Ctx,
             Size,
+            HostPtr,
             TargetDevs,
             ChOrder, ChDataType,
             ElementSize,
@@ -570,19 +576,11 @@ private:
             NumMipLevels,
             NumSamples,
             Buf,
-            HostPtrMode, AccessProt, HostAccessProt),
-      Src(Src) { }
+            HostPtrMode, AccessProt, HostAccessProt) { }
 
   HostAccessibleImage(const HostAccessibleImage &That); // Do not implement.
   void operator=(const HostAccessibleImage &That); // Do not implement.
 
-public:
-  const void *GetInitializationData() const { return Src; }
-  bool HasInitializationData() const { return Src; }
-  
-private:
-  void *Src;
-  
   friend class Context;
 };
 
@@ -595,7 +593,7 @@ public:
 private:
   DeviceImage(Context &Ctx,
               size_t Size,
-              void *Src,
+              void *HostPtr,
               TargetDevices &TargetDevs,
               ChannelOrder ChOrder,
               ChannelType ChDataType,
@@ -616,6 +614,7 @@ private:
     : Image(MemoryObj::DeviceImage,
             Ctx,
             Size,
+            HostPtr,
             TargetDevs,
             ChOrder, ChDataType,
             ElementSize,
@@ -626,18 +625,10 @@ private:
             NumMipLevels,
             NumSamples,
             Buf,
-            HostPtrMode, AccessProt, HostAccessProt),
-      Src(Src) { }
+            HostPtrMode, AccessProt, HostAccessProt) { }
 
   DeviceImage(const DeviceImage &That); // Do not implement.
   void operator=(const DeviceImage &That); // Do not implement.
-
-public:
-  const void *GetInitializationData() const { return Src; }
-  bool HasInitializationData() const { return Src; }
-
-private:
-  void *Src;
 
   friend class Context;
 };
@@ -664,9 +655,9 @@ public:
   Type GetType() const { return BldTy; }
 
 public:
-  MemoryObjBuilder &SetUseHostMemory(bool Enabled, void *Storage);
+  MemoryObjBuilder &SetUseHostMemory(bool Enabled, void *HostPtr);
   MemoryObjBuilder &SetAllocHostMemory(bool Enabled);
-  MemoryObjBuilder &SetCopyHostMemory(bool Enabled, void *Src);
+  MemoryObjBuilder &SetCopyHostMemory(bool Enabled, void *HostPtr);
   MemoryObjBuilder &SetReadWrite(bool Enabled);
   MemoryObjBuilder &SetWriteOnly(bool Enabled);
   MemoryObjBuilder &SetReadOnly(bool Enabled);
@@ -699,10 +690,11 @@ public:
 
 public:
   BufferBuilder(Context &Ctx, size_t Size);
+  BufferBuilder(Buffer &Parent, size_t Offset, size_t Size);
 
 public:
-  BufferBuilder &SetUseHostMemory(bool Enabled, void *Storage) {
-    MemoryObjBuilder::SetUseHostMemory(Enabled, Storage);
+  BufferBuilder &SetUseHostMemory(bool Enabled, void *HostPtr) {
+    MemoryObjBuilder::SetUseHostMemory(Enabled, HostPtr);
     return *this;
   }
 
@@ -755,6 +747,10 @@ private:
     MemoryObjBuilder::NotifyError(ErrCode, Msg);
     return *this;
   }
+
+private:
+  Buffer *Parent;
+  size_t Offset;
 };
 
 class ImageBuilder : public MemoryObjBuilder {
@@ -767,8 +763,8 @@ public:
   ImageBuilder(Context &Ctx);
   
 public:
-  ImageBuilder &SetUseHostMemory(bool Enabled, void *Storage) {
-    MemoryObjBuilder::SetUseHostMemory(Enabled, Storage);
+  ImageBuilder &SetUseHostMemory(bool Enabled, void *HostPtr) {
+    MemoryObjBuilder::SetUseHostMemory(Enabled, HostPtr);
     return *this;
   }
 

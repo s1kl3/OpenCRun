@@ -84,9 +84,13 @@ PROPERTY(CL_DEVICE_IMAGE2D_MAX_HEIGHT, GetImage2DMaxHeight, size_t, size_t)
 PROPERTY(CL_DEVICE_IMAGE3D_MAX_WIDTH, GetImage3DMaxWidth, size_t, size_t)
 PROPERTY(CL_DEVICE_IMAGE3D_MAX_HEIGHT, GetImage3DMaxHeight, size_t, size_t)
 PROPERTY(CL_DEVICE_IMAGE3D_MAX_DEPTH, GetImage3DMaxDepth, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE_MAX_BUFFER_SIZE, GetImageMaxBufferSize, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE_MAX_ARRAY_SIZE, GetImageMaxArraySize, size_t, size_t)
 PROPERTY(CL_DEVICE_MAX_SAMPLERS, GetMaxSamplers, cl_uint, unsigned)
 
 PROPERTY(CL_DEVICE_MAX_PARAMETER_SIZE, GetMaxParameterSize, size_t, size_t)
+
+PROPERTY(CL_DEVICE_PRINTF_BUFFER_SIZE, GetPrintfBufferSize, size_t, size_t)
 
 PROPERTY(CL_DEVICE_MEM_BASE_ADDR_ALIGN,
          GetMemoryBaseAddressAlignment,
@@ -99,6 +103,14 @@ PROPERTY(CL_DEVICE_MIN_DATA_TYPE_ALIGN_SIZE,
 
 PROPERTY(CL_DEVICE_SINGLE_FP_CONFIG,
          GetSinglePrecisionFPCapabilities,
+         cl_bitfield,
+         unsigned)
+PROPERTY(CL_DEVICE_DOUBLE_FP_CONFIG,
+         GetDoublePrecisionFPCapabilities,
+         cl_bitfield,
+         unsigned)
+PROPERTY(CL_DEVICE_HALF_FP_CONFIG,
+         GetHalfPrecisionFPCapabilities,
          cl_bitfield,
          unsigned)
 
@@ -149,6 +161,12 @@ PROPERTY(CL_DEVICE_ENDIAN_LITTLE, IsLittleEndian, cl_bool, bool)
 PROPERTY(CL_DEVICE_AVAILABLE, IsAvailable, cl_bool, bool)
 
 PROPERTY(CL_DEVICE_COMPILER_AVAILABLE, IsCompilerAvailable, cl_bool, bool)
+PROPERTY(CL_DEVICE_LINKER_AVAILABLE, IsLinkerAvailable, cl_bool, bool)
+
+PROPERTY(CL_DEVICE_PREFERRED_INTEROP_USER_SYNC,
+         IsPreferredInteropUserSync,
+         cl_bool,
+         bool)
 
 PROPERTY(CL_DEVICE_EXECUTION_CAPABILITIES,
          GetExecutionCapabilities,
@@ -162,4 +180,11 @@ PROPERTY(CL_DEVICE_QUEUE_PROPERTIES,
 
 // CL_PLATFORM manually implemented.
 
+PROPERTY(CL_DEVICE_VENDOR, GetVendor, char, llvm::StringRef)
 PROPERTY(CL_DEVICE_NAME, GetName, char, llvm::StringRef)
+PROPERTY(CL_DEVICE_VERSION, GetVersion, char, llvm::StringRef)
+PROPERTY(CL_DRIVER_VERSION, GetDriverVersion, char, llvm::StringRef)
+PROPERTY(CL_DEVICE_OPENCL_C_VERSION, GetOpenCLCVersion, char, llvm::StringRef)
+PROPERTY(CL_DEVICE_PROFILE, GetProfile, char, llvm::StringRef)
+PROPERTY(CL_DEVICE_EXTENSIONS, GetExtensions, char, llvm::StringRef)
+PROPERTY(CL_DEVICE_BUILT_IN_KERNELS, GetBuiltInKernels, char, llvm::StringRef)

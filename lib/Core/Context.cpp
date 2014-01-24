@@ -55,14 +55,18 @@ CommandQueue *Context::GetQueueForDevice(Device &Dev,
     return new InOrderQueue(*this, Dev, EnableProfile);
 }
 
-HostBuffer *Context::CreateHostBuffer(size_t Size,
-                                      void *Storage,
+HostBuffer *Context::CreateHostBuffer(Buffer *Parent,
+                                      size_t Offset,
+                                      size_t Size,
+                                      void *HostPtr,
                                       MemoryObj::AccessProtection AccessProt,
                                       MemoryObj::HostAccessProtection HostAccessProt,
                                       cl_int *ErrCode) {
-  HostBuffer *Buf = new HostBuffer(*this, 
+  HostBuffer *Buf = new HostBuffer(*this,
+                                   Parent,
+                                   Offset,
                                    Size, 
-                                   Storage, 
+                                   HostPtr, 
                                    MemoryObj::UseHostPtr, 
                                    AccessProt, 
                                    HostAccessProt);
@@ -93,6 +97,8 @@ HostBuffer *Context::CreateHostBuffer(size_t Size,
 }
 
 HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
+                                 Buffer *Parent,
+                                 size_t Offset,
                                  size_t Size,
                                  void *Src,
                                  MemoryObj::AccessProtection AccessProt,
@@ -104,7 +110,9 @@ HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
                     static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
                   );
     
-  HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this, 
+  HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this,
+                                                       Parent,
+                                                       Offset,
                                                        Size, 
                                                        Src, 
                                                        HostPtrMode, 
@@ -138,6 +146,8 @@ HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
 }
 
 DeviceBuffer *Context::CreateDeviceBuffer(
+                         Buffer *Parent,
+                         size_t Offset,
                          size_t Size,
                          void *Src,
                          MemoryObj::AccessProtection AccessProt,
@@ -149,7 +159,9 @@ DeviceBuffer *Context::CreateDeviceBuffer(
                     static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
                   );
     
-  DeviceBuffer *Buf = new DeviceBuffer(*this, 
+  DeviceBuffer *Buf = new DeviceBuffer(*this,
+                                       Parent,
+                                       Offset,
                                        Size, 
                                        Src, 
                                        HostPtrMode,

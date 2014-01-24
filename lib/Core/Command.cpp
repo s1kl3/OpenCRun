@@ -10,6 +10,8 @@
 
 #include "llvm/Support/ErrorHandling.h"
 
+#include <algorithm>
+
 using namespace opencrun;
 
 //
@@ -517,10 +519,10 @@ CommandBuilder &CommandBuilder::NotifyError(cl_int ErrCode, const char *Msg) {
 //
 
 EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf,
   void *Target) : CommandBuilder(CommandBuilder::EnqueueReadBufferBuilder,
-                                 Ctx),
+                                 Queue.GetContext()),
                   Source(NULL),
                   Target(Target),
                   Blocking(false),
@@ -531,12 +533,20 @@ EnqueueReadBufferBuilder::EnqueueReadBufferBuilder(
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
+
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
   
   else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
           (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
 
-  else if(Ctx != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Target)
@@ -561,8 +571,6 @@ EnqueueReadBufferBuilder &EnqueueReadBufferBuilder::SetCopyArea(size_t Offset,
 
   if(Offset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "out of bounds buffer read");
-
-  // TODO: checking for sub-buffers.
 
   this->Offset = Offset;
   this->Size = Size;
@@ -606,10 +614,10 @@ EnqueueReadBuffer *EnqueueReadBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf,
   const void *Source) : CommandBuilder(CommandBuilder::EnqueueWriteBufferBuilder,
-                                    Ctx),
+                                       Queue.GetContext()),
                         Target(NULL),
                         Source(Source),
                         Blocking(false),
@@ -620,12 +628,20 @@ EnqueueWriteBufferBuilder::EnqueueWriteBufferBuilder(
 
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
-  
+
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+ 
   else if((Target->GetHostAccessProtection() == MemoryObj::HostReadOnly) ||
           (Target->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
 
-  else if(Ctx != Target->GetContext())
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Source)
@@ -650,8 +666,6 @@ EnqueueWriteBufferBuilder &EnqueueWriteBufferBuilder::SetCopyArea(size_t Offset,
 
   if(Offset + Size > Target->GetSize())
     return NotifyError(CL_INVALID_VALUE, "data size exceeds buffer capacity");
-
-  // TODO: checking for sub-buffers.
 
   this->Offset = Offset;
   this->Size = Size;
@@ -695,10 +709,10 @@ EnqueueWriteBuffer *EnqueueWriteBufferBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem TargetBuf,
   cl_mem SourceBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferBuilder,
-                                  Ctx),
+                                     Queue.GetContext()),
                       Target(NULL),
                       Source(NULL),
                       TargetOffset(0),
@@ -709,8 +723,16 @@ EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
   
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
-    
-  else if(Ctx != Target->GetContext())
+ 
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+   
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
   
   if(!SourceBuf)
@@ -718,8 +740,16 @@ EnqueueCopyBufferBuilder::EnqueueCopyBufferBuilder(
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not a buffer");				 
-    
-  else if(Ctx != Source->GetContext())
+ 
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
+   
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context"); 
 }
 
@@ -734,8 +764,19 @@ EnqueueCopyBufferBuilder &EnqueueCopyBufferBuilder::SetCopyArea(size_t TargetOff
     
   if(SourceOffset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "data size exceeds source buffer capacity");
-  
-  // TODO: checking for sub-buffers.
+
+  // Target and Source are the same buffer or sub-buffer object and the source and
+  // destination regions overlap  if((Target == Source) 
+  if((Target == Source) &&
+     (std::max(SourceOffset, TargetOffset) - std::min(SourceOffset, TargetOffset) < Size))
+    return NotifyError(CL_MEM_COPY_OVERLAP, "source and destination regions overlap");
+
+  // Target and Source are different sub-buffers of the same associated buffer object
+  // and they overlap.
+  if((Target != Source) && (Target->IsSubBuffer() && Source->IsSubBuffer()) &&
+     (Target->GetParent() == Source->GetParent()) &&
+     (std::max(SourceOffset, TargetOffset) - std::min(SourceOffset, TargetOffset) < Size))
+    return NotifyError(CL_MEM_COPY_OVERLAP, "source and destination regions overlap");
 
   this->TargetOffset = TargetOffset;
   this->SourceOffset = SourceOffset;
@@ -1149,6 +1190,14 @@ EnqueueCopyImageToBufferBuilder::EnqueueCopyImageToBufferBuilder(
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy target is not a buffer");
 
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+
   else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
 
@@ -1253,7 +1302,15 @@ EnqueueCopyBufferToImageBuilder::EnqueueCopyBufferToImageBuilder(
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "copy source is not an buffer");
-  
+ 
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
+ 
   else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context");
 
@@ -1358,8 +1415,16 @@ EnqueueMapBufferBuilder::EnqueueMapBufferBuilder(
 
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "map source is not a buffer");	
-    
-  else if(Ctx != Source->GetContext())
+ 
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
+   
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
 }
 
@@ -1416,8 +1481,6 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapArea(size_t Offset,
 
   if(Offset + Size > Source->GetSize())
     return NotifyError(CL_INVALID_VALUE, "out of bounds buffer mapping");
-
-  // TODO: checking for sub-buffers.
 
   this->Offset = Offset;
   this->Size = Size;
@@ -1725,10 +1788,10 @@ EnqueueUnmapMemObject *EnqueueUnmapMemObjectBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueReadBufferRectBuilder::EnqueueReadBufferRectBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf,
   void *Ptr) : CommandBuilder(CommandBuilder::EnqueueReadBufferRectBuilder,
-                              Ctx),
+                              Queue.GetContext()),
                Target(Ptr),
                Source(NULL),
                Blocking(false),
@@ -1743,11 +1806,19 @@ EnqueueReadBufferRectBuilder::EnqueueReadBufferRectBuilder(
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
   
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
+
   else if((Source->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
           (Source->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid read buffer operation");
   
-  else if(Ctx != Source->GetContext())
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Target)
@@ -1902,10 +1973,10 @@ EnqueueReadBufferRect *EnqueueReadBufferRectBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueWriteBufferRectBuilder::EnqueueWriteBufferRectBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf,
   const void *Ptr) : CommandBuilder(CommandBuilder::EnqueueWriteBufferRectBuilder,
-                                    Ctx),
+                                    Queue.GetContext()),
                      Target(NULL),
                      Source(Ptr),
                      Blocking(false),
@@ -1920,11 +1991,19 @@ EnqueueWriteBufferRectBuilder::EnqueueWriteBufferRectBuilder(
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
   
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+  
   else if((Target->GetHostAccessProtection() == MemoryObj::HostWriteOnly) ||
           (Target->GetHostAccessProtection() == MemoryObj::HostNoAccess))
     NotifyError(CL_INVALID_OPERATION, "invalid write buffer operation");
   
-  else if(Ctx != Target->GetContext())
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Source)
@@ -2079,10 +2158,10 @@ EnqueueWriteBufferRect *EnqueueWriteBufferRectBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueCopyBufferRectBuilder::EnqueueCopyBufferRectBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem TargetBuf,
   cl_mem SourceBuf) : CommandBuilder(CommandBuilder::EnqueueCopyBufferRectBuilder,
-                                  Ctx),
+                                     Queue.GetContext()),
                       Target(NULL),
                       Source(NULL),
                       Region(NULL),
@@ -2095,8 +2174,16 @@ EnqueueCopyBufferRectBuilder::EnqueueCopyBufferRectBuilder(
 
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(TargetBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "write target is not a buffer");
-  
-  else if(Ctx != Target->GetContext())
+   
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+ 
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and target buffer have different context");
     
   if(!SourceBuf)
@@ -2105,7 +2192,15 @@ EnqueueCopyBufferRectBuilder::EnqueueCopyBufferRectBuilder(
   else if(!(Source = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(SourceBuf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "read source is not a buffer");
   
-  else if(Ctx != Source->GetContext())
+  else if(Source->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Source->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "source sub-buffer offset is not aligned with device");
+  }
+
+  else if(Queue.GetContext() != Source->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and source buffer have different context");
 }
 
@@ -2213,12 +2308,14 @@ EnqueueCopyBufferRectBuilder &EnqueueCopyBufferRectBuilder::CheckCopyOverlap() {
   if(!Target || !Source || !Region || !TargetOrigin || !SourceOrigin)
     return *this;
 
-  if(Target == Source) {
-    // Since target and source buffers are the same object they must have the
-    // same row and slice pitches.
+  // Target and Source are the same buffer objects or they are different sub-buffers
+  // of the same associated buffer object.
+  if((Target == Source) ||
+     ((Target->IsSubBuffer() && Source->IsSubBuffer()) &&
+      (Target->GetParent() == Source->GetParent()))) {
     if((TargetPitches[0] != SourcePitches[0]) && 
        (TargetPitches[1] != SourcePitches[1]))
-      return NotifyError(CL_INVALID_VALUE, "different pitches for the same buffer");
+      return NotifyError(CL_INVALID_VALUE, "different pitches between target and source buffer.");
    
     // Row and slice pitches are the same.
     size_t RowPitch = TargetPitches[0];
@@ -2328,22 +2425,29 @@ EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
 //
 
 EnqueueFillBufferBuilder::EnqueueFillBufferBuilder(
-  Context &Ctx,
+  CommandQueue &Queue,
   cl_mem Buf,
-  const void *Pattern) :
-  CommandBuilder(CommandBuilder::EnqueueFillBufferBuilder, Ctx),
-  Target(NULL),
-  Source(Pattern),
-  SourceSize(0),
-  TargetOffset(0),
-  TargetSize(0) {
+  const void *Pattern) : CommandBuilder(CommandBuilder::EnqueueFillBufferBuilder, Queue.GetContext()),
+                         Target(NULL),
+                         Source(Pattern),
+                         SourceSize(0),
+                         TargetOffset(0),
+                         TargetSize(0) {
   if(!Buf)
     NotifyError(CL_INVALID_MEM_OBJECT, "fill target is null");
 
   else if(!(Target = llvm::dyn_cast<Buffer>(llvm::cast<MemoryObj>(Buf))))
     NotifyError(CL_INVALID_MEM_OBJECT, "fill target is not a buffer");
-  
-  else if(Ctx != Target->GetContext())
+
+  else if(Target->IsSubBuffer()) {
+    Device &Dev = Queue.GetDevice();
+    if((Dev.GetMemoryBaseAddressAlignment() != 0) &&
+       ((Target->GetOffset() % Dev.GetMemoryBaseAddressAlignment()) != 0))
+      NotifyError(CL_MISALIGNED_SUB_BUFFER_OFFSET, 
+                  "target sub-buffer offset is not aligned with device");
+  }
+
+  else if(Queue.GetContext() != Target->GetContext())
     NotifyError(CL_INVALID_CONTEXT, "command queue and buffer have different context");
     
   if(!Source)

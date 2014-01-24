@@ -21,7 +21,3 @@ INTERNAL_CALL(wait_group_events, "viPe", opencrun::cpu::WaitGroupEvents)
 INTERNAL_CALL(mem_fence, "vi", opencrun::cpu::MemFence)
 INTERNAL_CALL(read_mem_fence, "vi", opencrun::cpu::ReadMemFence)
 INTERNAL_CALL(write_mem_fence, "vi", opencrun::cpu::WriteMemFence)
-
-// Global Lock Functions.
-INTERNAL_CALL(acquire_global_lock, "v", opencrun::cpu::AcquireGlobalLock)
-INTERNAL_CALL(release_global_lock, "v", opencrun::cpu::ReleaseGlobalLock)

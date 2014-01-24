@@ -41,6 +41,7 @@ public:
     FPRoundToZero = CL_FP_ROUND_TO_ZERO,
     FPRoundToInf = CL_FP_ROUND_TO_INF,
     FPFusedMultiplyAdd = CL_FP_FMA,
+    FPCorrectlyRoundedDivideSqrt = CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT,
     FPSoftFloat = CL_FP_SOFT_FLOAT
   };
 
@@ -98,11 +99,15 @@ public:
                  NumImgFmts(0),
                 
                  MaxParameterSize(0),
+
+                 PrintfBufferSize(0),
                 
                  MemoryBaseAddressAlignment(0),
                  MinimumDataTypeAlignment(0),
                 
                  SinglePrecisionFPCapabilities(FPRoundToNearest | FPInfNaN),
+                 DoublePrecisionFPCapabilities(0),
+                 HalfPrecisionFPCapabilities(0),
                 
                  GlobalMemoryCacheType(NoCache),
                  GlobalMemoryCachelineSize(0),
@@ -118,18 +123,28 @@ public:
 
                  HostUnifiedMemory(false),
 
+                 PreferredInteropUserSync(true),
+
                  ProfilingTimerResolution(0),
 
                  LittleEndian(true),
                  // Available is a virtual attribute.
 
                  CompilerAvailable(false),
+                 LinkerAvailable(false),
 
                  ExecutionCapabilities(CanExecKernel),
 
                  QueueProperties(ProfilingEnabled),
 
+                 Vendor(""),
                  Name(""),
+                 Version(""),
+                 DriverVersion(""),
+                 OpenCLCVersion(""),
+                 Profile(""),
+                 Extensions(""),
+                 BuiltInKernels(""),
 
                  // Other, non OpenCL specific properties.
                  SizeTypeMax((1ull << 32) - 1),
@@ -212,6 +227,8 @@ public:
 
   size_t GetMaxParameterSize() const { return MaxParameterSize; }
 
+  size_t GetPrintfBufferSize() const { return PrintfBufferSize; }
+
   unsigned GetMemoryBaseAddressAlignment() const {
     return MemoryBaseAddressAlignment;
   }
@@ -221,6 +238,14 @@ public:
 
   unsigned GetSinglePrecisionFPCapabilities() const {
     return SinglePrecisionFPCapabilities;
+  }
+
+  unsigned GetDoublePrecisionFPCapabilities() const {
+    return DoublePrecisionFPCapabilities;
+  }
+
+  unsigned GetHalfPrecisionFPCapabilities() const {
+    return HalfPrecisionFPCapabilities;
   }
 
   CacheType GetGlobalMemoryCacheType() const { return GlobalMemoryCacheType; }
@@ -239,6 +264,8 @@ public:
 
   bool HasHostUnifiedMemory() const { return HostUnifiedMemory; }
 
+  bool IsPreferredInteropUserSync() const { return PreferredInteropUserSync; }
+
   unsigned long GetProfilingTimerResolution() const {
     return ProfilingTimerResolution;
   }
@@ -247,12 +274,20 @@ public:
   virtual bool IsAvailable() const { return true; }
 
   bool IsCompilerAvailable() const { return CompilerAvailable; }
+  bool IsLinkerAvailable() const { return LinkerAvailable; }
 
   unsigned GetExecutionCapabilities() const { return ExecutionCapabilities; }
 
   unsigned GetQueueProperties() const { return QueueProperties; }
 
+  llvm::StringRef GetVendor() const { return Vendor; }
   llvm::StringRef GetName() const { return Name; }
+  llvm::StringRef GetVersion() const { return Version; }
+  llvm::StringRef GetDriverVersion() const { return DriverVersion; }
+  llvm::StringRef GetOpenCLCVersion() const { return OpenCLCVersion; }
+  llvm::StringRef GetProfile() const { return Profile; }
+  llvm::StringRef GetExtensions() const { return Extensions; }
+  llvm::StringRef GetBuiltInKernels() const { return BuiltInKernels; }
 
   // Other, non OpenCL specific properties.
 
@@ -314,10 +349,14 @@ protected:
 
   size_t MaxParameterSize;
 
+  size_t PrintfBufferSize;
+
   unsigned MemoryBaseAddressAlignment;
   unsigned MinimumDataTypeAlignment;
 
   unsigned SinglePrecisionFPCapabilities;
+  unsigned DoublePrecisionFPCapabilities;
+  unsigned HalfPrecisionFPCapabilities;
 
   CacheType GlobalMemoryCacheType;
   size_t GlobalMemoryCachelineSize;
@@ -333,18 +372,28 @@ protected:
 
   bool HostUnifiedMemory;
 
+  bool PreferredInteropUserSync;
+
   unsigned long ProfilingTimerResolution;
 
   bool LittleEndian;
   // Available is a virtual property.
 
   bool CompilerAvailable;
+  bool LinkerAvailable;
 
   unsigned ExecutionCapabilities;
 
   unsigned QueueProperties;
 
+  llvm::StringRef Vendor;
   llvm::StringRef Name;
+  llvm::StringRef Version;
+  llvm::StringRef DriverVersion;
+  llvm::StringRef OpenCLCVersion;
+  llvm::StringRef Profile;
+  llvm::StringRef Extensions;
+  llvm::StringRef BuiltInKernels;
 
   // Other, non OpenCL specific properties.
 
