@@ -35,6 +35,10 @@ public:
     return Seconds + (double) NanoSeconds / NanoInSeconds;
   }
 
+  unsigned long AsLong() const {
+    return Seconds * NanoInSeconds + NanoSeconds;
+  }
+
 private:
   int64_t Seconds;
   int64_t NanoSeconds;
