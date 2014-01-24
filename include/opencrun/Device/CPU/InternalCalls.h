@@ -14,7 +14,7 @@
 
 // However, some types are used only inside the OpenCL C language and they are
 // not available on the host. Define them here.
-typedef cl_ulong cl_mem_fence_flags;
+typedef cl_uint cl_mem_fence_flags;
 
 // Event type used to identify asynchronous copies from local to global memory
 // and vice-versa.

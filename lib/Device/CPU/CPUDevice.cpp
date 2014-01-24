@@ -5,6 +5,7 @@
 #include "opencrun/Device/CPUPasses/AllPasses.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
+#include "opencrun/Util/BuiltinInfo.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/PassManager.h"
@@ -468,18 +469,15 @@ void CPUDevice::InitJIT() {
   // Configure the JIT.
   Engine->InstallLazyFunctionCreator(LibLinker);
 
-  // Init internal calls.
-  opencrun::OpenCLMetadataHandler MDHandler(*BitCodeLibrary);
-
   intptr_t AddrInt;
   void *Addr;
 
   llvm::Function *Func;
 
-  #define INTERNAL_CALL(N, F)                 \
-    AddrInt = reinterpret_cast<intptr_t>(F);  \
-    Addr = reinterpret_cast<void *>(AddrInt); \
-    Func = MDHandler.GetBuiltin(#N);          \
+  #define INTERNAL_CALL(N, Fmt, F)                                    \
+    AddrInt = reinterpret_cast<intptr_t>(F);                          \
+    Addr = reinterpret_cast<void *>(AddrInt);                         \
+    Func = DeviceBuiltinInfo::getPrototype(*BitCodeLibrary, "__builtin_ocl_" #N, Fmt); \
     Engine->addGlobalMapping(Func, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
@@ -718,7 +716,7 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // Build the entry point and optimize.
   llvm::PassManager PM;
   PM.add(Inliner);
-  PM.add(CreateGroupParallelStubPass(KernName));
+  PM.add(CreateGroupParallelStubPass(this, KernName));
   PM.run(Mod);
 
   // Check whether there was a problem at inline time.

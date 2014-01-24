@@ -1,7 +1,7 @@
 
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Passes/AggressiveInliner.h"
-#include "opencrun/Util/OpenCLMetadataHandler.h"
+#include "opencrun/Util/ModuleInfo.h"
 
 #define DEBUG_TYPE "aggressive-inliner"
 
@@ -27,21 +27,18 @@ bool AggressiveInliner::runOnSCC(llvm::CallGraphSCC &SCC) {
 
 bool AggressiveInliner::doInitialization(llvm::CallGraph &CG) {
   llvm::Module &Mod = CG.getModule();
-  OpenCLMetadataHandler MD(Mod);
+  ModuleInfo Info(Mod);
 
   llvm::SmallVector<const llvm::Function *, 16> ToVisit;
   llvm::SmallPtrSet<const llvm::Function *, 16> Visited;
 
-  llvm::Function *KernelFun;
-
   // First, get the roots of the graph.
-  if(Kernel != "" && (KernelFun = MD.GetKernel(Kernel)))
-    ToVisit.push_back(KernelFun);
-  else for(OpenCLMetadataHandler::kernel_iterator I = MD.kernel_begin(),
-                                                  E = MD.kernel_end();
-                                                  I != E;
-                                                  ++I)
-    ToVisit.push_back(&*I);
+  if(Kernel != "" && Info.hasKernel(Kernel))
+    ToVisit.push_back(Info.getKernelInfo(Kernel).getFunction());
+  else
+    for(ModuleInfo::kernel_info_iterator I = Info.kernel_info_begin(),
+        E = Info.kernel_info_end(); I != E; ++I)
+      ToVisit.push_back(I->getFunction());
 
   // Then, find all reachable functions.
   while(!ToVisit.empty()) {
