@@ -81,16 +81,16 @@ extern "C" {
             #define CL_EXT_SUFFIX__VERSION_1_0_DEPRECATED
             #define CL_EXT_PREFIX__VERSION_1_0_DEPRECATED    
         #else
-            #define CL_EXT_SUFFIX__VERSION_1_0_DEPRECATED __attribute__((deprecated))
-            #define CL_EXT_PREFIX__VERSION_1_0_DEPRECATED    
+            #define CL_EXT_SUFFIX__VERSION_1_0_DEPRECATED
+            #define CL_EXT_PREFIX__VERSION_1_0_DEPRECATED __attribute__((deprecated))    
         #endif
     
         #ifdef CL_USE_DEPRECATED_OPENCL_1_1_APIS
             #define CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED    
             #define CL_EXT_PREFIX__VERSION_1_1_DEPRECATED    
         #else
-            #define CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED __attribute__((deprecated))
-            #define CL_EXT_PREFIX__VERSION_1_1_DEPRECATED    
+            #define CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED
+            #define CL_EXT_PREFIX__VERSION_1_1_DEPRECATED __attribute__((deprecated))    
         #endif
     #elif _WIN32
         #ifdef CL_USE_DEPRECATED_OPENCL_1_0_APIS

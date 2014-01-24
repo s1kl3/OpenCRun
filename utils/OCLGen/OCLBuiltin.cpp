@@ -146,6 +146,52 @@ apply(const BuiltinSign &Ops) const {
   return Size1 == Size2;
 }
 
+bool OCLCompatibleWithImageDim::
+apply(const BuiltinSign &Ops) const {
+  const OCLBasicType *P1 = FirstParam.get(Ops);
+  const OCLBasicType *P2 = SecondParam.get(Ops);
+  
+  const OCLOpaqueType *I;
+  const OCLType *T;
+
+  if (const OCLOpaqueType *T_I = llvm::dyn_cast<OCLOpaqueType>(P1))
+    I = T_I;
+  else if (const OCLType *T_S = llvm::dyn_cast<OCLScalarType>(P1))
+    T = T_S;
+  else if (const OCLType *T_V = llvm::dyn_cast<OCLVectorType>(P1))
+    T = T_V;
+
+  if (const OCLOpaqueType *T_I = llvm::dyn_cast<OCLOpaqueType>(P2))
+    I = T_I;
+  else if (const OCLType *T_S = llvm::dyn_cast<OCLScalarType>(P2))
+    T = T_S;
+  else if (const OCLType *T_V = llvm::dyn_cast<OCLVectorType>(P2))
+    T = T_V;
+
+  if(!llvm::isa<OCLOpaqueType>(I) || !llvm::isa<OCLType>(T))
+    return false;
+
+  // At this point I will be a pointer to an opaque-type and T will be a
+  // pointer to a scalar or a vector type.
+  std::string I_Ty = I->getName(); 
+  if (I_Ty == "image1d_t") {
+    if (llvm::isa<OCLScalarType>(T)) return true;
+  } else if(I_Ty == "image1d_buffer_t") {
+    if (llvm::isa<OCLScalarType>(T)) return true;
+  } else if (I_Ty == "image1d_array_t") {
+    if (const OCLVectorType *T_V = llvm::dyn_cast<OCLVectorType>(T))
+      return (T_V->getWidth() == 2) ? true : false;
+  } else if (I_Ty == "image2d_t") {
+    if (const OCLVectorType *T_V = llvm::dyn_cast<OCLVectorType>(T))
+      return (T_V->getWidth() == 2) ? true : false;
+  } else if((I_Ty == "image2d_array_t") || (I_Ty == "image3d_t")) {
+    if (const OCLVectorType *T_V = llvm::dyn_cast<OCLVectorType>(T))
+      return (T_V->getWidth() == 4) ? true : false;
+  }
+  
+  return false;
+}
+
 OCLBuiltin::~OCLBuiltin() {
   llvm::DeleteContainerSeconds(Variants);
 }
@@ -310,8 +356,10 @@ private:
       assert(Vars.empty());
       Vars.push_back(&R);
     }
-    for (unsigned i = 0, e = Vars.size(); i != e; ++i)
-      BuildBuiltinVariant(*Vars[i], Variants);
+    for (unsigned i = 0, e = Vars.size(); i != e; ++i) {
+      PredicateSet Preds = FetchPredicates(R); 
+      BuildBuiltinVariant(*Vars[i], Variants, Preds);
+    }
 
     if (R.isSubClassOf("OCLGenericBuiltin"))
       Builtin = new OCLGenericBuiltin(Group, Name, Variants);
@@ -325,11 +373,10 @@ private:
     } else
       llvm::PrintFatalError("Invalid builtin: " + R.getName());
 
-    Builtin->setPredicates(FetchPredicates(R));
     Builtins[&R] = Builtin;
   }
 
-  void BuildBuiltinVariant(llvm::Record &R, OCLBuiltin::VariantsMap &Var) {
+  void BuildBuiltinVariant(llvm::Record &R, OCLBuiltin::VariantsMap &Var, PredicateSet &BuiltinPreds) {
     std::vector<llvm::Record*> Ops = R.getValueAsListOfDefs("Operands");
     OCLBuiltinVariant::OperandsContainer Operands;
     Operands.reserve(Ops.size());
@@ -344,7 +391,9 @@ private:
 
     llvm::StringRef VarName = R.getValueAsString("VariantName");
 
-    Var[VarName] = new OCLBuiltinVariant(Operands, ConstrVec, VarName);
+    PredicateSet Preds = FetchPredicates(R);
+    Preds.insert(BuiltinPreds.begin(), BuiltinPreds.end());
+    Var[VarName] = new OCLBuiltinVariant(Operands, ConstrVec, VarName, Preds);
   }
 
   void BuildConstraint(llvm::Record &R) {
@@ -368,6 +417,8 @@ private:
         Constraint = new OCLSameBaseKindTypeConstraint(P1, P2);
       else if (R.isSubClassOf("isSameBitSizeAs"))
         Constraint = new OCLSameBitSizeTypeConstraint(P1, P2);
+      else if (R.isSubClassOf("isCompatibleWithImageDim"))
+        Constraint = new OCLCompatibleWithImageDim(P1, P2);
       else
         llvm::PrintFatalError("Invalid TypeConstraint: " + R.getName());
     }
@@ -619,7 +670,7 @@ static ConstraintMap ComputeConstraintMap(const OCLBuiltinVariant &B) {
 }
 
 void opencrun::ExpandSigns(const OCLBuiltinVariant &B, BuiltinSignList &L) {
-  BuiltinSign S;
+  BuiltinSign S(B.getPredicates());
   S.reserve(B.size());
 
   ConstraintMap CMap = ComputeConstraintMap(B);

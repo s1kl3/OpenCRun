@@ -22,6 +22,93 @@ void SignalJITCallEnd();
 } // End anonymous namespace.
 
 //
+// Supported image formats.
+//
+
+static const cl_image_format CPUImgFmts[] = {
+  { CL_R, CL_SNORM_INT8 },
+  { CL_R, CL_SNORM_INT16 },
+  { CL_R, CL_UNORM_INT8 },
+  { CL_R, CL_UNORM_INT16 },
+  { CL_R, CL_SIGNED_INT8 },
+  { CL_R, CL_SIGNED_INT16 },
+  { CL_R, CL_SIGNED_INT32 },
+  { CL_R, CL_UNSIGNED_INT8 },
+  { CL_R, CL_UNSIGNED_INT16 },
+  { CL_R, CL_UNSIGNED_INT32 },
+  { CL_R, CL_HALF_FLOAT },
+  { CL_R, CL_FLOAT },
+  { CL_A, CL_SNORM_INT8 },
+  { CL_A, CL_SNORM_INT16 },
+  { CL_A, CL_UNORM_INT8 },
+  { CL_A, CL_UNORM_INT16 },
+  { CL_A, CL_SIGNED_INT8 },
+  { CL_A, CL_SIGNED_INT16 },
+  { CL_A, CL_SIGNED_INT32 },
+  { CL_A, CL_UNSIGNED_INT8 },
+  { CL_A, CL_UNSIGNED_INT16 },
+  { CL_A, CL_UNSIGNED_INT32 },
+  { CL_A, CL_HALF_FLOAT },
+  { CL_A, CL_FLOAT },
+  { CL_RG, CL_SNORM_INT8 },
+  { CL_RG, CL_SNORM_INT16 },
+  { CL_RG, CL_UNORM_INT8 },
+  { CL_RG, CL_UNORM_INT16 },
+  { CL_RG, CL_SIGNED_INT8 },
+  { CL_RG, CL_SIGNED_INT16 },
+  { CL_RG, CL_SIGNED_INT32 },
+  { CL_RG, CL_UNSIGNED_INT8 },
+  { CL_RG, CL_UNSIGNED_INT16 },
+  { CL_RG, CL_UNSIGNED_INT32 },
+  { CL_RG, CL_HALF_FLOAT },
+  { CL_RG, CL_FLOAT },
+  { CL_RGBA, CL_SNORM_INT8 },
+  { CL_RGBA, CL_SNORM_INT16 },
+  { CL_RGBA, CL_UNORM_INT8 },
+  { CL_RGBA, CL_UNORM_INT16 },
+  { CL_RGBA, CL_SIGNED_INT8 },
+  { CL_RGBA, CL_SIGNED_INT16 },
+  { CL_RGBA, CL_SIGNED_INT32 },
+  { CL_RGBA, CL_UNSIGNED_INT8 },
+  { CL_RGBA, CL_UNSIGNED_INT16 },
+  { CL_RGBA, CL_UNSIGNED_INT32 },
+  { CL_RGBA, CL_HALF_FLOAT },
+  { CL_RGBA, CL_FLOAT },
+  { CL_ARGB, CL_SNORM_INT8 },
+  { CL_ARGB, CL_UNORM_INT8 },
+  { CL_ARGB, CL_SIGNED_INT8 },
+  { CL_ARGB, CL_UNSIGNED_INT8 },
+  { CL_BGRA, CL_SNORM_INT8 },
+  { CL_BGRA, CL_UNORM_INT8 },
+  { CL_BGRA, CL_SIGNED_INT8 },
+  { CL_BGRA, CL_UNSIGNED_INT8 },
+  { CL_LUMINANCE, CL_SNORM_INT8 },
+  { CL_LUMINANCE, CL_SNORM_INT16 },
+  { CL_LUMINANCE, CL_UNORM_INT8 },
+  { CL_LUMINANCE, CL_UNORM_INT16 },
+  { CL_LUMINANCE, CL_HALF_FLOAT },
+  { CL_LUMINANCE, CL_FLOAT },
+  { CL_INTENSITY, CL_SNORM_INT8 },
+  { CL_INTENSITY, CL_SNORM_INT16 },
+  { CL_INTENSITY, CL_UNORM_INT8 },
+  { CL_INTENSITY, CL_UNORM_INT16 },
+  { CL_INTENSITY, CL_HALF_FLOAT },
+  { CL_INTENSITY, CL_FLOAT },
+  { CL_RA, CL_SNORM_INT8 },
+  { CL_RA, CL_SNORM_INT16 },
+  { CL_RA, CL_UNORM_INT8 },
+  { CL_RA, CL_UNORM_INT16 },
+  { CL_RA, CL_SIGNED_INT8 },
+  { CL_RA, CL_SIGNED_INT16 },
+  { CL_RA, CL_SIGNED_INT32 },
+  { CL_RA, CL_UNSIGNED_INT8 },
+  { CL_RA, CL_UNSIGNED_INT16 },
+  { CL_RA, CL_UNSIGNED_INT32 },
+  { CL_RA, CL_HALF_FLOAT },
+  { CL_RA, CL_FLOAT }
+};
+
+//
 // CPUDevice implementation.
 //
 
@@ -58,19 +145,67 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
 }
 
 bool CPUDevice::CreateHostBuffer(HostBuffer &Buf) {
-  return false;
+  return Global.Alloc(Buf);
 }
 
 bool CPUDevice::CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) {
-  return false;
+  return Global.Alloc(Buf);
 }
 
 bool CPUDevice::CreateDeviceBuffer(DeviceBuffer &Buf) {
   return Global.Alloc(Buf);
 }
 
+bool CPUDevice::CreateHostImage(HostImage &Img) {
+  return Global.Alloc(Img);
+}
+
+bool CPUDevice::CreateHostAccessibleImage(HostAccessibleImage &Img) {
+  return Global.Alloc(Img);
+}
+
+bool CPUDevice::CreateDeviceImage(DeviceImage &Img) {
+  return Global.Alloc(Img);
+}
+
 void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
   Global.Free(MemObj);
+}
+
+bool CPUDevice::MappingDoesAllocation(MemoryObj::Type MemObjTy) {
+  // Memory objects are directly accessible by the host, so mapping
+  // nevere requires memory allocation on the host side.
+  return false;
+}
+
+void *CPUDevice::CreateMapBuffer(MemoryObj &MemObj, 
+                                 MemoryObj::MappingInfo &MapInfo) {
+  void *MapBuf;
+ 
+  // A CPU device has only one physical address space so host-side
+  // code can access directly to memory object's storage area.
+  if(llvm::isa<Buffer>(MemObj)) {
+    MapBuf = reinterpret_cast<void *>(
+        reinterpret_cast<uintptr_t>(Global[MemObj]) + MapInfo.Offset);
+  } else if(Image *Img = llvm::dyn_cast<Image>(&MemObj)) {
+    MapBuf = reinterpret_cast<void *>(
+        reinterpret_cast<uintptr_t>(Global[MemObj]) +
+        Img->GetElementSize() * MapInfo.Origin[0] +
+        Img->GetRowPitch() * MapInfo.Origin[1] +
+        Img->GetSlicePitch() * MapInfo.Origin[2]);
+  }
+
+  if(!MemObj.AddNewMapping(MapBuf, MapInfo))
+    MapBuf = NULL;
+
+  return MapBuf;
+}
+
+void CPUDevice::FreeMapBuffer(void *MapBuf) {
+  // This method does nothing in particular for CPU target, but for
+  // those target having separated physical address spaces it would be
+  // used inside clEnqueueMapBuffer and clEnqueueMapImage to free
+  // host allocated memory in case of errors before returning to the caller.
 }
 
 bool CPUDevice::Submit(Command &Cmd) {
@@ -89,6 +224,50 @@ bool CPUDevice::Submit(Command &Cmd) {
 
   else if(EnqueueWriteBuffer *Write = llvm::dyn_cast<EnqueueWriteBuffer>(&Cmd))
     Submitted = Submit(*Write);
+
+  else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
+    Submitted = Submit(*Copy);
+
+  else if(EnqueueReadImage *ReadImg = llvm::dyn_cast<EnqueueReadImage>(&Cmd))
+    Submitted = Submit(*ReadImg);
+
+  else if(EnqueueWriteImage *WriteImg = llvm::dyn_cast<EnqueueWriteImage>(&Cmd))
+    Submitted = Submit(*WriteImg);
+
+  else if(EnqueueCopyImage *CopyImg = llvm::dyn_cast<EnqueueCopyImage>(&Cmd))
+    Submitted = Submit(*CopyImg);
+
+  else if(EnqueueCopyImageToBuffer *CopyImgToBuf = 
+      llvm::dyn_cast<EnqueueCopyImageToBuffer>(&Cmd))
+    Submitted = Submit(*CopyImgToBuf);
+
+  else if(EnqueueCopyBufferToImage *CopyBufToImg = 
+      llvm::dyn_cast<EnqueueCopyBufferToImage>(&Cmd))
+    Submitted = Submit(*CopyBufToImg);
+
+  else if(EnqueueMapBuffer *MapBuf = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
+    Submitted = Submit(*MapBuf);
+  
+  else if(EnqueueMapImage *MapImg = llvm::dyn_cast<EnqueueMapImage>(&Cmd))
+    Submitted = Submit(*MapImg);
+
+  else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
+    Submitted = Submit(*Unmap);
+
+  else if(EnqueueReadBufferRect *ReadRect = llvm::dyn_cast<EnqueueReadBufferRect>(&Cmd))
+    Submitted = Submit(*ReadRect);
+
+  else if(EnqueueWriteBufferRect *WriteRect = llvm::dyn_cast<EnqueueWriteBufferRect>(&Cmd))
+    Submitted = Submit(*WriteRect);
+    
+  else if(EnqueueCopyBufferRect *CopyRect = llvm::dyn_cast<EnqueueCopyBufferRect>(&Cmd))
+    Submitted = Submit(*CopyRect);
+
+  else if(EnqueueFillBuffer *Fill = llvm::dyn_cast<EnqueueFillBuffer>(&Cmd))
+    Submitted = Submit(*Fill);
+    
+  else if(EnqueueFillImage *Fill = llvm::dyn_cast<EnqueueFillImage>(&Cmd))
+    Submitted = Submit(*Fill);
 
   else if(EnqueueNDRangeKernel *NDRange =
             llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
@@ -170,14 +349,73 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   MaxWorkItemSizes.assign(3, 1024);
   MaxWorkGroupSize = 1024;
 
-  // TODO: Preferred* should be gathered by the compiler.
-  // TODO: Native* should be gathered by the compiler.
+  // Preferred* and Native* gathered by the compiler.
+#if defined(__AVX__)
+  PreferredCharVectorWidth = 16;
+  PreferredShortVectorWidth = 8;
+  PreferredIntVectorWidth = 4;
+  PreferredLongVectorWidth = 2;
+  PreferredFloatVectorWidth = 4;
+  PreferredDoubleVectorWidth = 2;
+
+  NativeCharVectorWidth = 16;
+  NativeShortVectorWidth = 8;
+  NativeIntVectorWidth = 4;
+  NativeLongVectorWidth = 2;
+  NativeFloatVectorWidth = 8;
+  NativeDoubleVectorWidth = 4;
+#elif defined(__SSE2__)
+  PreferredCharVectorWidth = 16;
+  PreferredShortVectorWidth = 8;
+  PreferredIntVectorWidth = 4;
+  PreferredLongVectorWidth = 2;
+  PreferredFloatVectorWidth = 4;
+  PreferredDoubleVectorWidth = 2;
+
+  NativeCharVectorWidth = 16;
+  NativeShortVectorWidth = 8;
+  NativeIntVectorWidth = 4;
+  NativeLongVectorWidth = 2;
+  NativeFloatVectorWidth = 4;
+  NativeDoubleVectorWidth = 2;
+#else
+  PreferredCharVectorWidth = 1;
+  PreferredShortVectorWidth = 1;
+  PreferredIntVectorWidth = 1;
+  PreferredLongVectorWidth = 1;
+  PreferredFloatVectorWidth = 1;
+  PreferredDoubleVectorWidth = 1;
+
+  NativeCharVectorWidth = 1;
+  NativeShortVectorWidth = 1;
+  NativeIntVectorWidth = 1;
+  NativeLongVectorWidth = 1;
+  NativeFloatVectorWidth = 1;
+  NativeDoubleVectorWidth = 1;
+#endif
+
+  PreferredHalfVectorWidth = PreferredShortVectorWidth;
+  NativeHalfVectorWidth = NativeShortVectorWidth;
+
   // TODO: set MaxClockFrequency.
   // TODO: set AddressBits.
 
   MaxMemoryAllocSize = Node.GetMemorySize();
 
-  // TODO: set image properties.
+  // Image properties set to the minimum values for CPU target.
+  SupportImages = true;
+  MaxReadableImages = 128;
+  MaxWriteableImages = 8;
+  Image2DMaxWidth = 8192;
+  Image2DMaxHeight = 8192;
+  Image3DMaxWidth = 2048;
+  Image3DMaxHeight = 2048;
+  Image3DMaxDepth = 2048;
+  ImageMaxBufferSize = 65536;
+  ImageMaxArraySize = 2048;
+  MaxSamplers = 16;
+  NumImgFmts = sizeof(CPUImgFmts)/sizeof(cl_image_format);
+  ImgFmts = CPUImgFmts;
 
   // TODO: set MaxParameterSize.
 
@@ -284,6 +522,104 @@ bool CPUDevice::Submit(EnqueueWriteBuffer &Cmd) {
   Multiprocessor &MP = **Multiprocessors.begin();
 
   return MP.Submit(new WriteBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+}
+
+bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueReadImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new ReadImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueWriteImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new WriteImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+}
+
+bool CPUDevice::Submit(EnqueueCopyImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyImageCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueCopyImageToBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyImageToBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueCopyBufferToImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyBufferToImageCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new MapBufferCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueMapImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new MapImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, Global[Cmd.GetMemObj()], Cmd.GetMappedPtr()));
+}
+
+bool CPUDevice::Submit(EnqueueReadBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueWriteBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new WriteBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Cmd.GetSource()));
+}
+
+bool CPUDevice::Submit(EnqueueCopyBufferRect &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new CopyBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+}
+
+bool CPUDevice::Submit(EnqueueFillBuffer &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new FillBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+}
+
+bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+
+  return MP.Submit(new FillImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
@@ -433,6 +769,14 @@ void CPUDevice::LocateMemoryObjArgAddresses(
 
       if(Buffer *Buf = Arg->GetBuffer())
         GlobalArgs[I] = Global[*Buf];
+      else
+        GlobalArgs[I] = NULL;
+    } else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(*I)) {
+      // Images are always allocated in __global AS.
+      unsigned I = Arg->GetPosition();
+
+      if(Image *Img = Arg->GetImage())
+        GlobalArgs[I] = Global[*Img];
       else
         GlobalArgs[I] = NULL;
     }

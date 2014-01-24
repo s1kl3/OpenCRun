@@ -31,6 +31,9 @@ public:
   void *Alloc(HostBuffer &Buf);
   void *Alloc(HostAccessibleBuffer &Buf);
   void *Alloc(DeviceBuffer &Buf);
+  void *Alloc(HostImage &Img);
+  void *Alloc(HostAccessibleImage &Img);
+  void *Alloc(DeviceImage &Img);
 
   void Free(MemoryObj &MemObj);
 

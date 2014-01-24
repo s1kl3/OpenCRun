@@ -58,24 +58,103 @@ CommandQueue *Context::GetQueueForDevice(Device &Dev,
 HostBuffer *Context::CreateHostBuffer(size_t Size,
                                       void *Storage,
                                       MemoryObj::AccessProtection AccessProt,
+                                      MemoryObj::HostAccessProtection HostAccessProt,
                                       cl_int *ErrCode) {
-  return NULL;
+  HostBuffer *Buf = new HostBuffer(*this, 
+                                   Size, 
+                                   Storage, 
+                                   MemoryObj::UseHostPtr, 
+                                   AccessProt, 
+                                   HostAccessProt);
+  bool Rollback = false;
+
+  for(device_iterator I = Devices.begin(),
+                      E = Devices.end();
+                      I != E && !Rollback;
+                      ++I)
+    if(!(*I)->CreateHostBuffer(*Buf))
+      Rollback = true;
+
+  if(Rollback) {
+    for(device_iterator I = Devices.begin(), E = Devices.end(); I != E; ++I)
+      (*I)->DestroyMemoryObj(*Buf);
+
+    delete Buf;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device buffer");
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Buf;
 }
 
 HostAccessibleBuffer *Context::CreateHostAccessibleBuffer(
                                  size_t Size,
                                  void *Src,
                                  MemoryObj::AccessProtection AccessProt,
+                                 MemoryObj::HostAccessProtection HostAccessProt,
                                  cl_int *ErrCode) {
-  return NULL;
+  MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::AllocHostPtr;
+  if(Src)
+    HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+    
+  HostAccessibleBuffer *Buf = new HostAccessibleBuffer(*this, 
+                                                       Size, 
+                                                       Src, 
+                                                       HostPtrMode, 
+                                                       AccessProt, 
+                                                       HostAccessProt);
+  bool Rollback = false;
+
+  for(device_iterator I = Devices.begin(),
+                      E = Devices.end();
+                      I != E && !Rollback;
+                      ++I)
+    if(!(*I)->CreateHostAccessibleBuffer(*Buf))
+      Rollback = true;
+
+  if(Rollback) {
+    for(device_iterator I = Devices.begin(), E = Devices.end(); I != E; ++I)
+      (*I)->DestroyMemoryObj(*Buf);
+
+    delete Buf;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device buffer");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Buf;
 }
 
 DeviceBuffer *Context::CreateDeviceBuffer(
                          size_t Size,
                          void *Src,
                          MemoryObj::AccessProtection AccessProt,
+                         MemoryObj::HostAccessProtection HostAccessProt,
                          cl_int *ErrCode) {
-  DeviceBuffer *Buf = new DeviceBuffer(*this, Size, Src, AccessProt);
+  MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::NoHostPtrUsage;
+  if(Src)
+    HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+    
+  DeviceBuffer *Buf = new DeviceBuffer(*this, 
+                                       Size, 
+                                       Src, 
+                                       HostPtrMode,
+                                       AccessProt, 
+                                       HostAccessProt);
   bool Rollback = false;
 
   for(device_iterator I = Devices.begin(),
@@ -105,16 +184,223 @@ DeviceBuffer *Context::CreateDeviceBuffer(
 
 Buffer *Context::CreateVirtualBuffer(size_t Size,
                                      MemoryObj::AccessProtection AccessProt,
+                                     MemoryObj::HostAccessProtection HostAccessProt,
                                      cl_int *ErrCode) {
   if(!Size)
     RETURN_WITH_ERROR(ErrCode, CL_INVALID_BUFFER_SIZE, "buffer size is zero");
 
-  VirtualBuffer *Buf = new VirtualBuffer(*this, Size, AccessProt);
+  VirtualBuffer *Buf = new VirtualBuffer(*this, Size, AccessProt, HostAccessProt);
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
   return Buf;
+}
+
+HostImage *Context::CreateHostImage(
+    size_t Size,
+    void *Storage,
+    Image::TargetDevices &TargetDevs,
+    Image::ChannelOrder ChOrder,
+    Image::ChannelType ChDataType,
+    size_t ElementSize,
+    Image::ImgType ImgTy,
+    size_t Width,
+    size_t Height,
+    size_t Depth,
+    size_t ArraySize,
+    size_t RowPitch,
+    size_t SlicePitch,
+    unsigned NumMipLevels,
+    unsigned NumSamples,
+    Buffer *Buf,
+    MemoryObj::AccessProtection AccessProt,
+    MemoryObj::HostAccessProtection HostAccessProt,
+    cl_int *ErrCode) {
+  HostImage *Img = new HostImage(*this,
+                                 Size,
+                                 Storage,
+                                 TargetDevs,
+                                 ChOrder, ChDataType,
+                                 ElementSize,
+                                 ImgTy,
+                                 Width, Height, Depth,
+                                 ArraySize,
+                                 RowPitch, SlicePitch,
+                                 NumMipLevels, NumSamples,
+                                 Buf,
+                                 MemoryObj::UseHostPtr, AccessProt, HostAccessProt);
+
+  bool Rollback = false;
+  
+  for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                E = TargetDevs.end();
+                                I != E && !Rollback;
+                                ++I)
+    if(!(*I)->CreateHostImage(*Img))
+      Rollback = true;
+      
+  if(Rollback) {
+    for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                  E = TargetDevs.end();
+                                  I != E;
+                                  ++I)
+      (*I)->DestroyMemoryObj(*Img);
+
+    delete Img;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device image");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Img;																			
+}
+
+HostAccessibleImage *Context::CreateHostAccessibleImage(
+    size_t Size,
+    void *Src,
+    Image::TargetDevices &TargetDevs,
+    Image::ChannelOrder ChOrder,
+    Image::ChannelType ChDataType,
+    size_t ElementSize,
+    Image::ImgType ImgTy,
+    size_t Width,
+    size_t Height,
+    size_t Depth,
+    size_t ArraySize,
+    size_t RowPitch,
+    size_t SlicePitch,
+    unsigned NumMipLevels,
+    unsigned NumSamples,
+    Buffer *Buf,
+    MemoryObj::AccessProtection AccessProt,
+    MemoryObj::HostAccessProtection HostAccessProt,
+    cl_int *ErrCode) {
+  MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::AllocHostPtr;
+  if(Src)
+    HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+    
+  HostAccessibleImage *Img = new HostAccessibleImage(
+                                  *this,
+                                  Size,
+                                  Src,
+                                  TargetDevs,
+                                  ChOrder, ChDataType,
+                                  ElementSize,
+                                  ImgTy,
+                                  Width, Height, Depth,
+                                  ArraySize,
+                                  RowPitch, SlicePitch,
+                                  NumMipLevels, NumSamples,
+                                  Buf,
+                                  HostPtrMode, AccessProt, HostAccessProt
+                                );
+    
+  bool Rollback = false;
+
+  for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                E = TargetDevs.end();
+                                I != E && !Rollback;
+                                ++I)
+    if(!(*I)->CreateHostAccessibleImage(*Img))
+      Rollback = true;
+
+  if(Rollback) {
+    for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                  E = TargetDevs.end();
+                                  I != E;
+                                  ++I)
+      (*I)->DestroyMemoryObj(*Img);
+
+    delete Img;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device image");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Img;
+}
+
+DeviceImage *Context::CreateDeviceImage(
+    size_t Size,
+    void *Src,
+    Image::TargetDevices &TargetDevs,
+    Image::ChannelOrder ChOrder,
+    Image::ChannelType ChDataType,
+    size_t ElementSize,
+    Image::ImgType ImgTy,
+    size_t Width,
+    size_t Height,
+    size_t Depth,
+    size_t ArraySize,
+    size_t RowPitch,
+    size_t SlicePitch,
+    unsigned NumMipLevels,
+    unsigned NumSamples,
+    Buffer *Buf,
+    MemoryObj::AccessProtection AccessProt,
+    MemoryObj::HostAccessProtection HostAccessProt,
+    cl_int *ErrCode) {
+  MemoryObj::HostPtrUsageMode HostPtrMode = MemoryObj::NoHostPtrUsage;
+  if(Src)
+    HostPtrMode = static_cast<MemoryObj::HostPtrUsageMode>(
+                    static_cast<int>(HostPtrMode) | MemoryObj::CopyHostPtr
+                  );
+    
+  DeviceImage *Img = new DeviceImage(*this, 
+                                     Size, 
+                                     Src,
+                                     TargetDevs,
+                                     ChOrder, ChDataType,
+                                     ElementSize,
+                                     ImgTy,
+                                     Width, Height, Depth,
+                                     ArraySize,
+                                     RowPitch, SlicePitch,
+                                     NumMipLevels, NumSamples,
+                                     Buf,
+                                     HostPtrMode, AccessProt, HostAccessProt);
+                                     
+  bool Rollback = false;
+
+  for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                E = TargetDevs.end();
+                                I != E && !Rollback;
+                                ++I)
+    if(!(*I)->CreateDeviceImage(*Img))
+      Rollback = true;
+
+  if(Rollback) {
+    for(Image::targetdev_iterator I = TargetDevs.begin(),
+                                E = TargetDevs.end();
+                                I != E;
+                                ++I)
+      (*I)->DestroyMemoryObj(*Img);
+
+    delete Img;
+
+    RETURN_WITH_ERROR(ErrCode,
+                      CL_OUT_OF_RESOURCES,
+                      "failed allocating resources for device image");
+
+  }
+  
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+
+  return Img;
 }
 
 void Context::DestroyMemoryObj(MemoryObj &MemObj) {

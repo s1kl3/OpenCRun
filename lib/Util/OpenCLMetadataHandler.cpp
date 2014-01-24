@@ -8,6 +8,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace opencrun;
 
@@ -247,19 +248,18 @@ OpenCLMetadataHandler::GetArgAddressSpace(llvm::Function &Kern, unsigned I) {
 
   llvm::NamedMDNode *OCLMetadata = Mod.getNamedMetadata("opencl.kernels");
 
-  if (!OCLMetadata) return clang::LangAS::Last;
+  if(!OCLMetadata) return clang::LangAS::Last;
 
-  for (unsigned k = 0, ke = OCLMetadata->getNumOperands(); k != ke; ++k) {
+  for(unsigned k = 0, ke = OCLMetadata->getNumOperands(); k != ke; ++k) {
     llvm::MDNode *KernMD = OCLMetadata->getOperand(k);
 
     assert(KernMD->getNumOperands() > 0 && 
            llvm::isa<llvm::Function>(KernMD->getOperand(0)) && 
            "Bad kernel metadata!");
-
     
-    if (KernMD->getOperand(0) != &Kern) continue;
+    if(KernMD->getOperand(0) != &Kern) continue;
 
-    for (unsigned i = 1, e = KernMD->getNumOperands(); i != e; ++i) {
+    for(unsigned i = 1, e = KernMD->getNumOperands(); i != e; ++i) {
       llvm::MDNode *ArgsMD = llvm::cast<llvm::MDNode>(KernMD->getOperand(i));
 
       assert(ArgsMD->getNumOperands() > I + 1 && 
@@ -269,13 +269,13 @@ OpenCLMetadataHandler::GetArgAddressSpace(llvm::Function &Kern, unsigned I) {
       llvm::MDString *InfoKind = 
         llvm::cast<llvm::MDString>(ArgsMD->getOperand(0));
 
-      if (InfoKind->getString() != "opencrun_kernel_arg_addr_space") continue;
+      if(InfoKind->getString() != "opencrun_kernel_arg_addr_space") continue;
 
       // The translation is based on the FakeAddressSpaceMap defined in 
       // clang/lib/AST/ASTContext.cpp
       llvm::ConstantInt *AS =
         llvm::cast<llvm::ConstantInt>(ArgsMD->getOperand(I + 1));
-      switch (AS->getZExtValue()) {
+      switch(AS->getZExtValue()) {
       case 1: return clang::LangAS::opencl_global;
       case 2: return clang::LangAS::opencl_local;
       case 3: return clang::LangAS::opencl_constant;
@@ -285,6 +285,87 @@ OpenCLMetadataHandler::GetArgAddressSpace(llvm::Function &Kern, unsigned I) {
   }
 
   return clang::LangAS::Last;
+}
+
+clang::OpenCLImageAccess
+OpenCLMetadataHandler::GetArgAccessQual(llvm::Function &Kern, unsigned I) {
+  llvm::Module &Mod = *Kern.getParent();
+
+  llvm::NamedMDNode *OCLMetadata = Mod.getNamedMetadata("opencl.kernels");
+
+  if(!OCLMetadata) return clang::CLIA_read_write;
+
+  for(unsigned k = 0, ke = OCLMetadata->getNumOperands(); k != ke; ++k) {
+    llvm::MDNode *KernMD = OCLMetadata->getOperand(k);
+
+    assert(KernMD->getNumOperands() > 0 && 
+           llvm::isa<llvm::Function>(KernMD->getOperand(0)) && 
+           "Bad kernel metadata!");
+    
+    if(KernMD->getOperand(0) != &Kern) continue;
+
+    for(unsigned i = 1, e = KernMD->getNumOperands(); i != e; ++i) {
+      llvm::MDNode *ArgsMD = llvm::cast<llvm::MDNode>(KernMD->getOperand(i));
+
+      assert(ArgsMD->getNumOperands() > I + 1 && 
+             llvm::isa<llvm::MDString>(ArgsMD->getOperand(0)) && 
+             "Bad arg metadata!");
+
+      llvm::MDString *InfoKind = 
+        llvm::cast<llvm::MDString>(ArgsMD->getOperand(0));
+
+      if(InfoKind->getString() != "kernel_arg_access_qual") continue;
+      
+      llvm::MDString *AccessQual = 
+        llvm::cast<llvm::MDString>(ArgsMD->getOperand(I + 1));
+      return llvm::StringSwitch<clang::OpenCLImageAccess>(AccessQual->getString())
+              .Case("read_only", clang::CLIA_read_only)
+              .Case("write_only", clang::CLIA_write_only)
+              .Case("read_write", clang::CLIA_read_write)
+              .Case("none", clang::CLIA_read_write)
+              .Default(clang::CLIA_read_write);
+    }
+  }
+
+  return clang::CLIA_read_write;
+}
+
+llvm::StringRef
+OpenCLMetadataHandler::GetArgTypeName(llvm::Function &Kern, unsigned I) {
+  llvm::Module &Mod = *Kern.getParent();
+
+  llvm::NamedMDNode *OCLMetadata = Mod.getNamedMetadata("opencl.kernels");
+
+  if(!OCLMetadata) return llvm::StringRef();
+
+  for(unsigned k = 0, ke = OCLMetadata->getNumOperands(); k != ke; ++k) {
+    llvm::MDNode *KernMD = OCLMetadata->getOperand(k);
+
+    assert(KernMD->getNumOperands() > 0 && 
+           llvm::isa<llvm::Function>(KernMD->getOperand(0)) && 
+           "Bad kernel metadata!");
+    
+    if(KernMD->getOperand(0) != &Kern) continue;
+
+    for(unsigned i = 1, e = KernMD->getNumOperands(); i != e; ++i) {
+      llvm::MDNode *ArgsMD = llvm::cast<llvm::MDNode>(KernMD->getOperand(i));
+
+      assert(ArgsMD->getNumOperands() > I + 1 && 
+             llvm::isa<llvm::MDString>(ArgsMD->getOperand(0)) && 
+             "Bad arg metadata!");
+
+      llvm::MDString *InfoKind = 
+        llvm::cast<llvm::MDString>(ArgsMD->getOperand(0));
+
+      if(InfoKind->getString() != "kernel_arg_type") continue;
+      
+      llvm::MDString *Type = 
+        llvm::cast<llvm::MDString>(ArgsMD->getOperand(I + 1));
+      return Type->getString();
+    }
+  }
+
+  return llvm::StringRef(); 
 }
 
 llvm::Function *OpenCLMetadataHandler::GetBuiltin(llvm::StringRef Name) {

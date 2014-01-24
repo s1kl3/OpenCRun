@@ -55,7 +55,7 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   bool Success = Compiler.ExecuteAction(ToBitCode);
 
   Mod = ToBitCode.takeModule();
-  ToBitCode.AddKernelArgMetadata(*Mod, *ToBitCode.takeLLVMContext());
+  if(Mod != NULL) ToBitCode.AddKernelArgMetadata(*Mod, *ToBitCode.takeLLVMContext());
   Success = Success && !Mod->MaterializeAll();
 
   return Success;

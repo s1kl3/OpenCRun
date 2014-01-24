@@ -1,2 +1,22 @@
 
+// CL_MEM_TYPE not yet implemented.
+PROPERTY(CL_MEM_FLAGS, GetMemFlags, cl_mem_flags, unsigned long)
+PROPERTY(CL_MEM_SIZE, GetSize, size_t, size_t)
+// CL_MEM_HOST_PTR manually implemented.
+PROPERTY(CL_MEM_MAP_COUNT, GetMappedCount, cl_uint, unsigned)
 PROPERTY(CL_MEM_REFERENCE_COUNT, GetReferenceCount, cl_uint, unsigned)
+PROPERTY(CL_MEM_CONTEXT, GetContext, cl_context, opencrun::Context &)
+// CL_MEM_ASSOCIATED_MEMOBJECT not yet implemented.
+// CL_MEM_OFFSET not yet implemented.
+
+IMG_PROPERTY(CL_IMAGE_FORMAT, GetImageFormat, cl_image_format, cl_image_format)
+IMG_PROPERTY(CL_IMAGE_ELEMENT_SIZE, GetElementSize, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_ROW_PITCH, GetRowPitch, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_SLICE_PITCH, GetSlicePitch, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_WIDTH, GetWidth, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_HEIGHT, GetHeight, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_DEPTH, GetDepth, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_ARRAY_SIZE, GetArraySize, size_t, size_t)
+IMG_PROPERTY(CL_IMAGE_BUFFER, GetBuffer, cl_mem, opencrun::MemoryObj *)
+IMG_PROPERTY(CL_IMAGE_NUM_MIP_LEVELS, GetNumMipLevels, cl_uint, unsigned)
+IMG_PROPERTY(CL_IMAGE_NUM_SAMPLES, GetNumSamples, cl_uint, unsigned)

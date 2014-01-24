@@ -1,5 +1,6 @@
 
 #include "opencrun/Device/CPU/Command.h"
+#include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/System/OS.h"
 
 using namespace opencrun;
@@ -24,7 +25,7 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
   // Hold arguments to be passed to stubs.
   Args = static_cast<void **>(sys::CAlloc(Kern.GetArgCount(), sizeof(void *)));
 
-  // We can start filling some arguments: global/constant buffers and arguments
+  // We can start filling some arguments: global/constant buffers, images and arguments
   // passed by value.
   unsigned J = 0;
   for(Kernel::arg_iterator I = Kern.arg_begin(),
@@ -38,6 +39,25 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
       if(Arg->OnGlobalAddressSpace() || Arg->OnConstantAddressSpace())
         Args[J] = GlobalArgs[J];
 
+    } 
+    
+    // An image can be allocated by the CPUDevice.
+    else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(*I)) {
+      Image *Img = Arg->GetImage();
+      DeviceImage *DevImg = new DeviceImage(*Img, GlobalArgs[J]);
+      DevImgs.push_back(DevImg);
+
+      // Store image descriptor address.
+      Args[J] = DevImg; 
+
+    } else if(SamplerKernelArg *Arg = llvm::dyn_cast<SamplerKernelArg>(*I)) {
+      Sampler *Smplr = Arg->GetSampler();
+      DeviceSampler *DevSmplr = new DeviceSampler(GetDeviceSampler(*Smplr));
+      DevSmplrs.push_back(DevSmplr);
+
+      // Store sampler address.
+      Args[J] = DevSmplr;
+
     // For arguments passed by copy, we need to setup a pointer for the stub.
     } else if(ByValueKernelArg *Arg = llvm::dyn_cast<ByValueKernelArg>(*I))
       Args[J] = Arg->GetArg();
@@ -47,6 +67,10 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
 }
 
 NDRangeKernelBlockCPUCommand::~NDRangeKernelBlockCPUCommand() {
+  // Image descriptors can be freed.
+  llvm::DeleteContainerPointers(DevImgs);
+  // Sampler addresses can be freed.
+  llvm::DeleteContainerPointers(DevSmplrs);
   sys::Free(Args);
 }
 
@@ -64,4 +88,50 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(LocalMemory &Local) {
 
     ++J;
   }
+}
+
+cl_uint NDRangeKernelBlockCPUCommand::GetDeviceSampler(const Sampler &Smplr) {
+  cl_uint flags = 0;
+
+  switch(Smplr.GetNormalizedCoords()) {
+    case true:
+      flags |= CLK_NORMALIZED_COORDS_TRUE;
+      break;
+    case false:
+      flags |= CLK_NORMALIZED_COORDS_FALSE;
+      break;
+  }
+
+  switch(Smplr.GetAddressingMode()) {
+    case Sampler::AddressNone:
+      flags |= CLK_ADDRESS_NONE;
+      break;
+    case Sampler::AddressClampToEdge:
+      flags |= CLK_ADDRESS_CLAMP_TO_EDGE;
+      break;
+    case Sampler::AddressClamp:
+      flags |= CLK_ADDRESS_CLAMP;
+      break;
+    case Sampler::AddressRepeat:
+      flags |= CLK_ADDRESS_REPEAT;
+      break;
+    case Sampler::AddressMirroredRepeat:
+      flags |= CLK_ADDRESS_MIRRORED_REPEAT;
+      break;
+    case Sampler::NoAddressing:
+      break;
+  }
+
+  switch(Smplr.GetFilterMode()) {
+    case Sampler::FilterNearest:
+      flags |= CLK_FILTER_NEAREST;
+      break;
+    case Sampler::FilterLinear:
+      flags |= CLK_FILTER_LINEAR;
+      break;
+    case Sampler::NoFilter:
+      break;
+  }
+
+  return flags;
 }

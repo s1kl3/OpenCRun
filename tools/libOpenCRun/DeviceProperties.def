@@ -79,11 +79,11 @@ PROPERTY(CL_DEVICE_MAX_WRITE_IMAGE_ARGS,
          GetMaxWriteableImages,
          cl_uint,
          unsigned)
-PROPERTY(CL_DEVICE_IMAGE2D_MAX_WIDTH, Get2DImageMaxWidth, size_t, size_t)
-PROPERTY(CL_DEVICE_IMAGE2D_MAX_HEIGHT, Get2DImageMaxHeight, size_t, size_t)
-PROPERTY(CL_DEVICE_IMAGE3D_MAX_WIDTH, Get3DImageMaxWidth, size_t, size_t)
-PROPERTY(CL_DEVICE_IMAGE3D_MAX_HEIGHT, Get3DImageMaxHeight, size_t, size_t)
-PROPERTY(CL_DEVICE_IMAGE3D_MAX_DEPTH, Get3DImageMaxDepth, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE2D_MAX_WIDTH, GetImage2DMaxWidth, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE2D_MAX_HEIGHT, GetImage2DMaxHeight, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE3D_MAX_WIDTH, GetImage3DMaxWidth, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE3D_MAX_HEIGHT, GetImage3DMaxHeight, size_t, size_t)
+PROPERTY(CL_DEVICE_IMAGE3D_MAX_DEPTH, GetImage3DMaxDepth, size_t, size_t)
 PROPERTY(CL_DEVICE_MAX_SAMPLERS, GetMaxSamplers, cl_uint, unsigned)
 
 PROPERTY(CL_DEVICE_MAX_PARAMETER_SIZE, GetMaxParameterSize, size_t, size_t)

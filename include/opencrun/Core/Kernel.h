@@ -5,6 +5,7 @@
 #include "CL/cl.h"
 
 #include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/Sampler.h"
 #include "opencrun/Core/Program.h"
 #include "opencrun/Passes/FootprintEstimate.h"
 #include "opencrun/System/OS.h"
@@ -21,6 +22,8 @@ class KernelArg {
 public:
   enum Type {
     BufferArg,
+    ImageArg,
+    SamplerArg,
     ByValueArg
   };
 
@@ -66,6 +69,52 @@ public:
 private:
   Buffer *Buf;
   clang::LangAS::ID AddrSpace;
+};
+
+class ImageKernelArg : public KernelArg {
+public:
+  static bool classof(const KernelArg *Arg) {
+    return Arg->GetType() == KernelArg::ImageArg;
+  }
+
+public:
+  ImageKernelArg(unsigned Position, Image *Img, clang::OpenCLImageAccess ImgAccess) :
+    KernelArg(KernelArg::ImageArg, Position),
+    Img(Img),
+    ImgAccess(ImgAccess) { }
+
+public:
+  Image *GetImage() { return Img; }
+
+  bool IsReadOnly() const {
+    return ImgAccess == clang::CLIA_read_only;
+  }
+
+  bool IsWriteOnly() const {
+    return ImgAccess == clang::CLIA_write_only;
+  }
+
+private:
+  Image *Img;
+  clang::OpenCLImageAccess ImgAccess;
+};
+
+class SamplerKernelArg : public KernelArg {
+public:
+  static bool classof(const KernelArg *Arg) {
+    return Arg->GetType() == KernelArg::SamplerArg;
+  }
+
+public:
+  SamplerKernelArg(unsigned Position, Sampler *Smplr) :
+    KernelArg(KernelArg::SamplerArg, Position),
+    Smplr(Smplr) { }
+
+public:
+  Sampler *GetSampler() { return Smplr; }
+
+private:
+  Sampler *Smplr;
 };
 
 class ByValueKernelArg : public KernelArg {
@@ -182,6 +231,8 @@ private:
   }
 
   cl_int SetBufferArg(unsigned I, size_t Size, const void *Arg);
+  cl_int SetImageArg(unsigned I, size_t Size, const void *Arg);
+  cl_int SetSamplerArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetByValueArg(unsigned I, size_t Size, const void *Arg);
 
   clang::LangAS::ID GetArgAddressSpace(unsigned I) {
@@ -194,6 +245,28 @@ private:
     return OpenCLMDHandler.GetArgAddressSpace(Kern, I);
   }
 
+  clang::OpenCLImageAccess GetArgAccessQual(unsigned I) {
+    // All stored functions share the same signature, use the first.
+    CodesContainer::iterator J = Codes.begin();
+    llvm::Function &Kern = *J->second;
+
+    OpenCLMetadataHandler OpenCLMDHandler(*Kern.getParent());
+
+    return OpenCLMDHandler.GetArgAccessQual(Kern, I);
+  }
+
+  llvm::StringRef GetArgTypeName(unsigned I) {
+    // All stored functions share the same signature, use the first.
+    CodesContainer::iterator J = Codes.begin();
+    llvm::Function &Kern = *J->second;
+
+    OpenCLMetadataHandler OpenCLMDHandler(*Kern.getParent());
+
+    return OpenCLMDHandler.GetArgTypeName(Kern, I);
+  }
+
+  bool IsSampler(unsigned I);
+  bool IsImage(unsigned I);
   bool IsBuffer(llvm::Type &Ty);
   bool IsByValue(llvm::Type &Ty);
 

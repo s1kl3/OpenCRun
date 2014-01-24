@@ -21,14 +21,18 @@ include "opencrun/Device/Library/Builtin.td"
 //      z       size_t
 //      v       void
 //      e       event_t
+//      M       sampler_t
+//      I       image types
 //
-// Each one may be preceded by the following modifiers:
+// Occasionally preceded by the following modifiers:
 //
 //      U       unsigned only OCLGroupType
 //      S       signed only OCLGroupType
-//      V       vectorial or vectorial only OCLGroupType
+//      V       vector or vectorial only OCLGroupType
 //      C       scalar or scalar only OCLGroupType
 //      Px      pointer (x = 1|2|3|4 => AS = global|local|constant|private)
+//      Dx      image type (x = 1 | 2 | 3 | 12 | 23 | a | b 
+//                          => 1D | 2D | 1&2D | 2&3D | array | buffer)
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,6 +41,7 @@ include "opencrun/Device/Library/Atomic.td"
 include "opencrun/Device/Library/Common.td"
 include "opencrun/Device/Library/Convert.td"
 include "opencrun/Device/Library/Geometric.td"
+include "opencrun/Device/Library/Image.td"
 include "opencrun/Device/Library/Integer.td"
 include "opencrun/Device/Library/Math.td"
 include "opencrun/Device/Library/Mfence.td"

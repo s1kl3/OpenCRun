@@ -39,6 +39,104 @@ bool Multiprocessor::Submit(WriteBufferCPUCommand *Cmd) {
   return Thr.Submit(static_cast<CPUCommand *>(Cmd));
 }
 
+bool Multiprocessor::Submit(CopyBufferCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(ReadImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(WriteImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(CopyImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(CopyImageToBufferCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(CopyBufferToImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(MapBufferCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(MapImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(UnmapMemObjectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(ReadBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(WriteBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(CopyBufferRectCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(FillBufferCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
+bool Multiprocessor::Submit(FillImageCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
 bool Multiprocessor::Submit(NDRangeKernelBlockCPUCommand *Cmd) {
   CPUThread &Thr = GetLesserLoadedThread();
 

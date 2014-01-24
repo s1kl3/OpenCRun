@@ -16,6 +16,55 @@ let Group = "Memory flag constants" in {
   def : OCLConstant<"CLK_LOCAL_MEM_FENCE", "1">;
 }
 
+let Group = "Sampler flag constants" in {
+  def : OCLConstant<"CLK_NORMALIZED_COORDS_FALSE", "0x00">;
+  def : OCLConstant<"CLK_NORMALIZED_COORDS_TRUE", "0x08">;
+
+  def : OCLConstant<"CLK_ADDRESS_NONE", "0x00">;
+  def : OCLConstant<"CLK_ADDRESS_MIRRORED_REPEAT", "0x01">;
+  def : OCLConstant<"CLK_ADDRESS_REPEAT", "0x02">;
+  def : OCLConstant<"CLK_ADDRESS_CLAMP_TO_EDGE", "0x03">;
+  def : OCLConstant<"CLK_ADDRESS_CLAMP", "0x04">;
+
+  def : OCLConstant<"CLK_FILTER_NEAREST", "0x00">;
+  def : OCLConstant<"CLK_FILTER_LINEAR", "0x10">;
+}
+
+let Group = "Image format constants" in {
+  def : OCLConstant<"CLK_R", "0x10B0">;
+  def : OCLConstant<"CLK_A", "0x10B1">;
+  def : OCLConstant<"CLK_RG", "0x10B2">;
+  def : OCLConstant<"CLK_RA", "0x10B3">;
+  def : OCLConstant<"CLK_RGB", "0x10B4">;
+  def : OCLConstant<"CLK_RGBA", "0x10B5">;
+  def : OCLConstant<"CLK_BGRA", "0x10B6">;
+  def : OCLConstant<"CLK_ARGB", "0x10B7">;
+  def : OCLConstant<"CLK_INTENSITY", "0x10B8">;
+  def : OCLConstant<"CLK_LUMINANCE", "0x10B9">;
+  def : OCLConstant<"CLK_Rx", "0x10BA">;
+  def : OCLConstant<"CLK_RGx", "0x10BB">;
+  def : OCLConstant<"CLK_RGBx", "0x10BC">;
+  def : OCLConstant<"CLK_DEPTH", "0x10BD">;
+  def : OCLConstant<"CLK_DEPTH_STENCIL", "0x10BE">;
+
+  def : OCLConstant<"CLK_SNORM_INT8", "0x10D0">;
+  def : OCLConstant<"CLK_SNORM_INT16", "0x10D1">;
+  def : OCLConstant<"CLK_UNORM_INT8", "0x10D2">;
+  def : OCLConstant<"CLK_UNORM_INT16", "0x10D3">;
+  def : OCLConstant<"CLK_UNORM_SHORT_565", "0x10D4">;
+  def : OCLConstant<"CLK_UNORM_SHORT_555", "0x10D5">;
+  def : OCLConstant<"CLK_UNORM_INT_101010", "0x10D6">;
+  def : OCLConstant<"CLK_SIGNED_INT8", "0x10D7">;
+  def : OCLConstant<"CLK_SIGNED_INT16", "0x10D8">;
+  def : OCLConstant<"CLK_SIGNED_INT32", "0x10D9">;
+  def : OCLConstant<"CLK_UNSIGNED_INT8", "0x10DA">;
+  def : OCLConstant<"CLK_UNSIGNED_INT16", "0x10DB">;
+  def : OCLConstant<"CLK_UNSIGNED_INT32", "0x10DC">;
+  def : OCLConstant<"CLK_HALF_FLOAT", "0x10DD">;
+  def : OCLConstant<"CLK_FLOAT", "0x10DE">;
+  def : OCLConstant<"CLK_UNORM_INT24", "0x10DF">;
+}
+
 let Group = "Integer types constants" in {
   def : OCLConstant<"CHAR_BIT", "8">;
   def : OCLConstant<"CHAR_MAX", "SCHAR_MAX">;

@@ -37,8 +37,17 @@ public:
   virtual bool CreateHostBuffer(HostBuffer &Buf);
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf);
+  
+  virtual bool CreateHostImage(HostImage &Img);
+  virtual bool CreateHostAccessibleImage(HostAccessibleImage &Img);
+  virtual bool CreateDeviceImage(DeviceImage &Img);
 
   virtual void DestroyMemoryObj(MemoryObj &MemObj);
+
+  virtual bool MappingDoesAllocation(MemoryObj::Type MemObjTy);
+  virtual void *CreateMapBuffer(MemoryObj &MemObj, 
+                                MemoryObj::MappingInfo &MapInfo);
+  virtual void FreeMapBuffer(void *MapBuf);
 
   virtual bool Submit(Command &Cmd);
 
@@ -57,6 +66,20 @@ private:
 
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
+  bool Submit(EnqueueCopyBuffer &Cmd);
+  bool Submit(EnqueueReadImage &Cmd);
+  bool Submit(EnqueueWriteImage &Cmd);
+  bool Submit(EnqueueCopyImage &Cmd);
+  bool Submit(EnqueueCopyImageToBuffer &Cmd);
+  bool Submit(EnqueueCopyBufferToImage &Cmd);
+  bool Submit(EnqueueMapBuffer &Cmd);
+  bool Submit(EnqueueMapImage &Cmd);
+  bool Submit(EnqueueUnmapMemObject &Cmd);
+  bool Submit(EnqueueReadBufferRect &Cmd);
+  bool Submit(EnqueueWriteBufferRect &Cmd);
+  bool Submit(EnqueueCopyBufferRect &Cmd);
+  bool Submit(EnqueueFillBuffer &Cmd);
+  bool Submit(EnqueueFillImage &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
 

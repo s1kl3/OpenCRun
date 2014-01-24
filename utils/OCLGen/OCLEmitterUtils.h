@@ -16,8 +16,7 @@ class OCLType;
 
 const char *AddressSpaceQualifier(AddressSpaceKind AS);
 
-PredicateSet ComputePredicates(const OCLBuiltin &B, const BuiltinSign &S, 
-                               bool IgnoreAS = false);
+PredicateSet ComputePredicates(const BuiltinSign &S, bool IgnoreAS = false);
 
 void EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
                           std::string Name = "");

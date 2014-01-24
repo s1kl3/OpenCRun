@@ -37,6 +37,9 @@ class isSameBaseKindAs<OCLParam op1, OCLParam op2>
 class isSameBitSizeAs<OCLParam op1, OCLParam op2>
  : OCLBinaryTypeConstraint<op1, op2>;
 
+class isCompatibleWithImageDim<OCLParam op1, OCLParam op2>
+ : OCLBinaryTypeConstraint<op1, op2>;
+
 class Not<OCLTypeConstraint c> : OCLTypeConstraint {
   OCLTypeConstraint Basic = c;
 }
@@ -54,11 +57,14 @@ def ocl_rm_rte : OCLRoundingMode<"rte", 0b10>;
 def ocl_rm_rtp : OCLRoundingMode<"rtp">;
 def ocl_rm_rtn : OCLRoundingMode<"rtn">;
 
-class OCLBuiltinVariant<list<OCLType> ops, list<OCLTypeConstraint> constrs,
-                        string name> {
+class OCLBuiltinVariant<list<OCLType> ops,
+                        list<OCLTypeConstraint> constrs,
+                        string name,
+                        list<OCLPredicate> preds = []> {
   string VariantName = name;
   list<OCLType> Operands = ops;
   list<OCLTypeConstraint> Constraints = constrs;
+  list<OCLPredicate> Predicates = preds;
 }
 
 class OCLBuiltin<string name, list<OCLBuiltinVariant> var> {

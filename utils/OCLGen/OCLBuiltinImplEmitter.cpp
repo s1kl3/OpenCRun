@@ -398,7 +398,7 @@ static void EmitOCLGenericBuiltinImpls(llvm::raw_ostream &OS,
 
     EmitRequirements(OS, *SI->second, EmittedReqs);
 
-    Preds.Push(ComputePredicates(B, Sign));
+    Preds.Push(ComputePredicates(Sign));
 
     if (M.size() > 1)
       OS << "__opencrun_overload\n";
@@ -442,7 +442,7 @@ static void EmitOCLCastBuiltinImpls(llvm::raw_ostream &OS,
 
     if (Ranges.front().second == ImplMapKeyIter(SI)) Ranges.pop_front();
 
-    Preds.Push(ComputePredicates(B, Sign));
+    Preds.Push(ComputePredicates(Sign));
 
     if (Ranges.front().first > 1)
       OS << "__opencrun_overload\n";

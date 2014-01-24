@@ -16,6 +16,7 @@ clReleaseCommandQueue
 clGetCommandQueueInfo
 clCreateBuffer
 clCreateSubBuffer
+clCreateImage
 clCreateImage2D
 clCreateImage3D
 clRetainMemObject
@@ -57,10 +58,12 @@ clEnqueueReadBuffer
 clEnqueueReadBufferRect
 clEnqueueWriteBuffer
 clEnqueueWriteBufferRect
+clEnqueueFillBuffer
 clEnqueueCopyBuffer
 clEnqueueCopyBufferRect
 clEnqueueReadImage
 clEnqueueWriteImage
+clEnqueueFillImage
 clEnqueueCopyImage
 clEnqueueCopyImageToBuffer
 clEnqueueCopyBufferToImage

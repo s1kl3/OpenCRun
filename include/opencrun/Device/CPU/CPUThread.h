@@ -76,6 +76,20 @@ private:
   bool Submit(CPUExecCommand *Cmd);
   bool Submit(ReadBufferCPUCommand *Cmd) { return true; }
   bool Submit(WriteBufferCPUCommand *Cmd) { return true; }
+  bool Submit(CopyBufferCPUCommand *Cmd) { return true; }
+  bool Submit(ReadImageCPUCommand *Cmd) { return true; }
+  bool Submit(WriteImageCPUCommand *Cmd) { return true; }
+  bool Submit(CopyImageCPUCommand *Cmd) { return true; }
+  bool Submit(CopyImageToBufferCPUCommand *Cmd) { return true; }
+  bool Submit(CopyBufferToImageCPUCommand *Cmd) { return true; }
+  bool Submit(MapBufferCPUCommand *Cmd) { return true; }
+  bool Submit(MapImageCPUCommand *Cmd) { return true; }
+  bool Submit(UnmapMemObjectCPUCommand *Cmd) { return true; }
+  bool Submit(ReadBufferRectCPUCommand *Cmd) { return true; }
+  bool Submit(WriteBufferRectCPUCommand *Cmd) { return true; }
+  bool Submit(CopyBufferRectCPUCommand *Cmd) { return true; }
+  bool Submit(FillBufferCPUCommand *Cmd) { return true; }
+  bool Submit(FillImageCPUCommand *Cmd) { return true; }
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
   bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
 
@@ -85,10 +99,84 @@ private:
   void Execute(StopDeviceCPUCommand *Cmd) { Mode = Stopped; }
 
   void Execute(CPUExecCommand *Cmd);
+  
   int Execute(ReadBufferCPUCommand &Cmd);
   int Execute(WriteBufferCPUCommand &Cmd);
+  int Execute(CopyBufferCPUCommand &Cmd);
+  int Execute(ReadImageCPUCommand &Cmd);
+  int Execute(WriteImageCPUCommand &Cmd);
+  int Execute(CopyImageCPUCommand &Cmd);
+  int Execute(CopyImageToBufferCPUCommand &Cmd);
+  int Execute(CopyBufferToImageCPUCommand &Cmd);
+  int Execute(MapBufferCPUCommand &Cmd);
+  int Execute(MapImageCPUCommand &Cmd);
+  int Execute(UnmapMemObjectCPUCommand &Cmd);
+  int Execute(ReadBufferRectCPUCommand &Cmd);
+  int Execute(WriteBufferRectCPUCommand &Cmd);
+  int Execute(CopyBufferRectCPUCommand &Cmd);
+  int Execute(FillBufferCPUCommand &Cmd);
+  int Execute(FillImageCPUCommand &Cmd);
   int Execute(NDRangeKernelBlockCPUCommand &Cmd);
   int Execute(NativeKernelCPUCommand &Cmd);
+
+private:
+  // Method used to copy data between rectangular regions.
+  void MemRectCpy(void *Target, 
+                  const void *Source,
+                  const size_t *Region,
+                  size_t TargetRowPitch,
+                  size_t TargetSlicePitch,
+                  size_t SourceRowPitch,
+                  size_t SourceSlicePitch);
+
+  // Method used to rewrite colour compoment data from one
+  // of the RGBA channels in the input buffer to one channel
+  // in the output buffer and to convert it to the appropriate
+  // data type.
+  void WriteChannel(void *DataOut,
+                    const void *DataIn,
+                    size_t ToChNum,
+                    size_t FromChNum,
+                    const cl_image_format &ImgFmt);
+  
+  // Template method used to fill a target buffer with NumEls
+  // elements of type T pointed by Source.
+  template<typename T>
+  void MemFill(void *Target,
+               const void *Source,
+               size_t NumEls) {
+    T *Target_T = reinterpret_cast<T *>(Target);
+    const T Source_T = *(reinterpret_cast<const T *>(Source));
+
+    for(size_t I = 0; I < NumEls; ++I)
+      Target_T[I] = Source_T;
+  }
+
+  // Template method used to fill a rectangular region of a
+  // target buffer with RowEls elements of type T for each Region
+  // row.
+  template<typename T>
+  void MemRectFill(void *Target,
+                   const void *Source,
+                   const size_t *Region,
+                   size_t TargetRowPitch,
+                   size_t TargetSlicePitch,
+                   size_t RowEls) {
+    for(size_t Z = 0; Z < Region[2]; ++Z)
+      for(size_t Y = 0; Y < Region[1]; ++Y)
+        MemFill<T>(reinterpret_cast<void *>(
+                    reinterpret_cast<uintptr_t>(Target) +
+                    TargetRowPitch * Y +
+                    TargetSlicePitch * Z
+                   ),
+                   Source,
+                   RowEls);
+  }
+
+  // Conversion from single-precision floating point to half-precision
+  // floating point and its reversal.
+  cl_half FloatToHalf(cl_float f);
+  cl_float HalfToFloat(cl_half h);
 
 private:
   sys::Monitor ThisMnt;

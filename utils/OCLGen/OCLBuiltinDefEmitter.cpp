@@ -43,7 +43,7 @@ void EmitOCLGenericBuiltinPrototype(llvm::raw_ostream &OS,
        E = Alts.end(); I != E; ++I) {
     const BuiltinSign &S = *I;
 
-    Preds.Push(ComputePredicates(B, S, true));
+    Preds.Push(ComputePredicates(S, true));
     
     if (Alts.size() > 1)
       OS << "__opencrun_overload\n";
@@ -100,7 +100,7 @@ void EmitOCLCastBuiltinPrototype(llvm::raw_ostream &OS,
          << BD.getInternalName(&S) << "\n\n";
     }
  
-    Preds.Push(ComputePredicates(B, S, true));
+    Preds.Push(ComputePredicates(S, true));
 
     if (Ranges.front().first > 1)
       OS << "__opencrun_overload\n";
