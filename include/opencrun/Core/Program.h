@@ -157,13 +157,6 @@ public:
                                 cl_kernel *Kernels, 
                                 cl_uint *NumKernelsRet);
 
-
-  void UnregisterKernel(Kernel &Kern) {
-    llvm::sys::ScopedLock Lock(ThisLock);
-
-    AttachedKernels.erase(&Kern);
-  }
-
   Context &GetContext() { return *Ctx; }
 
   BuildInformation &GetBuildInformation(Device &Dev) { return *BuildInfo[&Dev]; }
@@ -172,7 +165,6 @@ public:
 
   AttachedKernelsContainer &GetAttachedKernels() { return AttachedKernels; }
   
-public:
   bool HasAttachedKernels() {
     llvm::sys::ScopedLock Lock(ThisLock);
 
@@ -185,14 +177,20 @@ public:
     return BuildInfo.count(&Dev);
   }
 
-private: 
-  cl_int Build(Device &Dev, llvm::StringRef Opts);
-
   void RegisterKernel(Kernel &Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);
 
     AttachedKernels.insert(&Kern);
   }
+
+  void UnregisterKernel(Kernel &Kern) {
+    llvm::sys::ScopedLock Lock(ThisLock);
+
+    AttachedKernels.erase(&Kern);
+  }
+
+private: 
+  cl_int Build(Device &Dev, llvm::StringRef Opts);
 
 private:
   llvm::sys::Mutex ThisLock;

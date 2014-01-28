@@ -111,7 +111,6 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
   }
 
   Kernel *Kern = new Kernel(*this, Codes);
-  RegisterKernel(*Kern);
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
@@ -173,7 +172,6 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
         Codes[DevFun[I].first] = DevFun[I].second;
 
       Kernel *Kern = new Kernel(*this, Codes);
-      RegisterKernel(*Kern);
       Kernels.push_back(Kern);
     }
 

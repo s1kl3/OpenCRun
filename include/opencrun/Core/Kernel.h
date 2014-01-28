@@ -28,7 +28,8 @@ public:
   };
 
 protected:
-  KernelArg(Type Ty, unsigned Position) : Ty(Ty), Position(Position) { }
+  KernelArg(Type Ty, unsigned Position) : Ty(Ty), Position(Position) {}
+  KernelArg(const KernelArg &Arg) : Ty(Arg.Ty), Position(Arg.Position) {}
 
 public:
   Type GetType() const { return Ty; }
@@ -49,10 +50,13 @@ public:
   BufferKernelArg(unsigned Position, Buffer *Buf,
                   opencl::AddressSpace AddrSpace)
    : KernelArg(KernelArg::BufferArg, Position), Buf(Buf),
-     AddrSpace(AddrSpace) { }
+     AddrSpace(AddrSpace) {}
+
+  BufferKernelArg(const BufferKernelArg &Arg)
+   : KernelArg(Arg), Buf(Arg.Buf), AddrSpace(Arg.AddrSpace) {}
 
 public:
-  Buffer *GetBuffer() { return Buf; }
+  Buffer *GetBuffer() { return Buf.getPtr(); }
 
   bool OnGlobalAddressSpace() const {
     return AddrSpace == opencl::AS_Global;
@@ -67,7 +71,7 @@ public:
   }
 
 private:
-  Buffer *Buf;
+  llvm::IntrusiveRefCntPtr<Buffer> Buf;
   opencl::AddressSpace AddrSpace;
 };
 
@@ -82,8 +86,11 @@ public:
    : KernelArg(KernelArg::ImageArg, Position), Img(Img),
      ImgAccess(ImgAccess) {}
 
+  ImageKernelArg(const ImageKernelArg &Arg)
+   : KernelArg(Arg), Img(Arg.Img), ImgAccess(Arg.ImgAccess) {}
+
 public:
-  Image *GetImage() { return Img; }
+  Image *GetImage() { return Img.getPtr(); }
 
   bool IsReadOnly() const {
     return ImgAccess == opencl::IA_ReadOnly;
@@ -94,7 +101,7 @@ public:
   }
 
 private:
-  Image *Img;
+  llvm::IntrusiveRefCntPtr<Image> Img;
   opencl::ImageAccess ImgAccess;
 };
 
@@ -107,13 +114,16 @@ public:
 public:
   SamplerKernelArg(unsigned Position, Sampler *Smplr)
    : KernelArg(KernelArg::SamplerArg, Position),
-     Smplr(Smplr) { }
+     Smplr(Smplr) {}
+
+  SamplerKernelArg(const SamplerKernelArg &Arg)
+   : KernelArg(Arg), Smplr(Arg.Smplr) {}
 
 public:
-  Sampler *GetSampler() { return Smplr; }
+  Sampler *GetSampler() { return Smplr.getPtr(); }
 
 private:
-  Sampler *Smplr;
+  llvm::IntrusiveRefCntPtr<Sampler> Smplr;
 };
 
 class ByValueKernelArg : public KernelArg {
@@ -136,6 +146,9 @@ public:
     std::memcpy(this->Arg, Arg, Size);
   }
 
+  ByValueKernelArg(const ByValueKernelArg &A)
+   : KernelArg(A), Arg(A.Arg), Size(A.Size) {}
+
 public:
   void *GetArg() { return Arg; }
 
@@ -149,6 +162,15 @@ public:
   static bool classof(const _cl_kernel *Kern) { return true; }
 
 public:
+  class LifetimeHandler : public MTRefCountedBase<LifetimeHandler> {
+  public:
+    LifetimeHandler(Kernel &KernHandle);
+    ~LifetimeHandler();
+
+  private:
+    Kernel &KernHandle;
+  };
+
   typedef std::map<Device *, llvm::Function *> CodesContainer;
 
   typedef llvm::SmallVector<KernelArg *, 8> ArgumentsContainer;
@@ -160,9 +182,11 @@ public:
   arg_iterator arg_end() { return Arguments.end(); }
 
 public:
-  Kernel(Program &Prog, CodesContainer &Codes) : Prog(&Prog),
-                                                 Codes(Codes),
-                                                 Arguments(GetArgCount()) { }
+  Kernel(Program &Prog, CodesContainer &Codes)
+   : Prog(&Prog), Codes(Codes), Arguments(GetArgCount()), 
+     Lifetime(new LifetimeHandler(*this)) {}
+
+  Kernel(const Kernel &K);
 
   ~Kernel();
 
@@ -213,6 +237,9 @@ public:
   bool GetMinLocalMemoryUsage(size_t &Size, Device *Dev = NULL);
   bool GetMinPrivateMemoryUsage(size_t &Size, Device *Dev = NULL);
 
+  void RegisterToDevices();
+  void UnregisterFromDevices();
+
 private:
   KernelSignature GetSignature() const;
 
@@ -221,15 +248,13 @@ private:
   cl_int SetSamplerArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetByValueArg(unsigned I, size_t Size, const void *Arg);
 
-  Device *RequireEstimates(Device *Dev = NULL);
-
 private:
   llvm::sys::Mutex ThisLock;
 
   llvm::IntrusiveRefCntPtr<Program> Prog;
   CodesContainer Codes;
-
   ArgumentsContainer Arguments;
+  llvm::IntrusiveRefCntPtr<LifetimeHandler> Lifetime;
 };
 
 } // End namespace opencrun.

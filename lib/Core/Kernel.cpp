@@ -17,19 +17,53 @@ using namespace opencrun;
   return ERR;                        \
   }
 
-Kernel::~Kernel() {
-  Prog->UnregisterKernel(*this);
+Kernel::LifetimeHandler::LifetimeHandler(Kernel &KernHandle)
+ : KernHandle(KernHandle) {
+  KernHandle.GetProgram().RegisterKernel(KernHandle);
+  KernHandle.RegisterToDevices();
+}
 
-  for(CodesContainer::iterator I = Codes.begin(),
-                               E = Codes.end();
-                               I != E;
-                               ++I) {
-    Device &Dev = *I->first;
+Kernel::LifetimeHandler::~LifetimeHandler() {
+  KernHandle.UnregisterFromDevices();
+  KernHandle.GetProgram().UnregisterKernel(KernHandle);
+}
 
-    Dev.UnregisterKernel(*this);
+Kernel::Kernel(const Kernel &K)
+ : Prog(K.Prog), Codes(K.Codes), Lifetime(K.Lifetime) {
+  for (unsigned I = 0, E = K.Arguments.size(); I != E; ++I) {
+    llvm::KernelArg *Arg = K.Arguments[I];
+    switch (Arg->GetType()) {
+    case KernelArg::BufferArg:
+      Arg = new BufferKernelArg(llvm::cast<BufferKernelArg>(*Arg));
+      break;
+    case KernelArg::ImageArg:
+      Arg = new ImageKernelArg(llvm::cast<ImageKernelArg>(*Arg));
+      break;
+    case KernelArg::SamplerArg:
+      Arg = new SamplerKernelArg(llvm::cast<SamplerKernelArg>(*Arg));
+      break;
+    case KernelArg::ByValueArg:
+      Arg = new ByValueKernelArg(llvm::cast<ByValueKernelArg>(*Arg));
+      break;
+    }
+    Arguments.push_back(Arg);
   }
+} 
 
+Kernel::~Kernel() {
   llvm::DeleteContainerPointers(Arguments);
+}
+
+void Kernel::RegisterToDevices() {
+  for (CodesContainer::const_iterator I = Codes.begin(),
+       E = Codes.end(); I != E; ++I)
+    I->first->RegisterKernel(*this);
+}
+
+void Kernel::UnregisterFromDevices() {
+  for (CodesContainer::const_iterator I = Codes.begin(),
+       E = Codes.end(); I != E; ++I)
+    I->first->UnregisterKernel(*this);
 }
 
 static bool isBufferArg(opencl::Type Ty) {

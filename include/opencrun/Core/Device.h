@@ -445,6 +445,7 @@ public:
                           llvm::MemoryBuffer &Src,
                           llvm::Module *&Mod);
 
+  virtual void RegisterKernel(Kernel &Kern) { }
   virtual void UnregisterKernel(Kernel &Kern) { }
 
 protected:
