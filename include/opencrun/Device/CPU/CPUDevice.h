@@ -19,9 +19,10 @@ public:
 public:
   typedef NDRangeKernelBlockCPUCommand::Signature BlockParallelEntryPoint;
 
-  typedef std::map<Kernel *, BlockParallelEntryPoint> BlockParallelEntryPoints;
-
-  typedef std::map<Kernel *, unsigned> BlockParallelStaticLocalSizes;
+  typedef llvm::Function *KernelID;
+  typedef std::map<KernelID, BlockParallelEntryPoint> BlockParallelEntryPoints;
+  typedef std::map<KernelID, unsigned> BlockParallelStaticLocalSizes;
+  typedef std::map<KernelID, Footprint> FootprintsContainer;
 
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
 
@@ -35,6 +36,8 @@ public:
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
                                           WorkSizes &LW) const;
+
+  virtual const Footprint &ComputeKernelFootprint(Kernel &Kern);
 
   virtual bool CreateHostBuffer(HostBuffer &Buf);
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
@@ -116,6 +119,7 @@ private:
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
+  FootprintsContainer KernelFootprints;
 
   friend void *LibLinker(const std::string &);
 };

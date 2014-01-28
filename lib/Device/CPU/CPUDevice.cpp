@@ -302,11 +302,12 @@ void CPUDevice::UnregisterKernel(Kernel &Kern) {
   llvm::Module &Mod = *Kern.GetModule(*this);
   JIT->removeModule(&Mod);
 
+  KernelID K = Kern.GetFunction(*this);
+
   // Erase kernel from the cache.
-  BlockParallelEntryPoints::iterator I = BlockParallelEntriesCache.find(&Kern),
-                                     E = BlockParallelEntriesCache.end();
-  if(I != E)
-    BlockParallelEntriesCache.erase(I);
+  BlockParallelEntriesCache.erase(K);
+  BlockParallelStaticLocalsCache.erase(K);
+  KernelFootprints.erase(K);
 
   // Invoke static destructors.
   JIT->runStaticConstructorsDestructors(&Mod, true);
@@ -742,9 +743,12 @@ CPUDevice::BlockParallelEntryPoint
 CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
+  KernelID K = Kern.GetFunction(*this);
+
   // Cache hit.
-  if(BlockParallelEntriesCache.count(&Kern))
-    return BlockParallelEntriesCache[&Kern];
+  BlockParallelEntryPoints::iterator I = BlockParallelEntriesCache.find(K);
+  if (I != BlockParallelEntriesCache.end())
+    return I->second;
 
   // Cache miss.
   llvm::Module &Mod = *Kern.GetModule(*this);
@@ -789,7 +793,7 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   uintptr_t EntryPtrInt = reinterpret_cast<uintptr_t>(EntryPtr);
   CPUDevice::BlockParallelEntryPoint Entry;
   Entry = reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtrInt);
-  BlockParallelEntriesCache[&Kern] = Entry;
+  BlockParallelEntriesCache[K] = Entry;
 
   return Entry;
 }
@@ -797,17 +801,42 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
 unsigned CPUDevice::GetBlockParallelStaticLocalSize(Kernel &Kern) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  if (BlockParallelStaticLocalsCache.count(&Kern))
-    return BlockParallelStaticLocalsCache[&Kern];
+  KernelID K = Kern.GetFunction(*this);
+
+  BlockParallelStaticLocalSizes::iterator I =
+    BlockParallelStaticLocalsCache.find(K);
+  if (I != BlockParallelStaticLocalsCache.end())
+    return I->second;
 
   llvm::Module &Mod = *Kern.GetModule(*this);
 
   llvm::KernelInfo Info = ModuleInfo(Mod).getKernelInfo(Kern.GetName());
 
   unsigned StaticLocalSize = Info.getStaticLocalSize();
-  BlockParallelStaticLocalsCache[&Kern] = StaticLocalSize;
+  BlockParallelStaticLocalsCache[K] = StaticLocalSize;
 
   return StaticLocalSize;
+}
+
+const Footprint &CPUDevice::ComputeKernelFootprint(Kernel &Kern) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  KernelID K = Kern.GetFunction(*this);
+  FootprintsContainer::iterator I = KernelFootprints.find(K);
+
+  if (I != KernelFootprints.end())
+    return I->second;
+
+  FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
+  llvm::Function *Fun = Kern.GetFunction(*this);
+
+  llvm::PassManager PM;
+  PM.add(Pass);
+  PM.run(*Fun->getParent());
+
+  KernelFootprints[K] = *Pass;
+
+  return KernelFootprints[K];
 }
 
 void *CPUDevice::LinkLibFunction(const std::string &Name) {

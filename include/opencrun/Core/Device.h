@@ -5,6 +5,7 @@
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Profiler.h"
 #include "opencrun/System/Env.h"
+#include "opencrun/Util/Footprint.h"
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LangOptions.h"
@@ -419,6 +420,8 @@ public:
                                           WorkSizes &LW) const {
     return false;
   }
+
+  virtual const Footprint &ComputeKernelFootprint(Kernel &Kern) = 0;
 
   virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;

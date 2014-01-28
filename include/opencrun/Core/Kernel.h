@@ -230,8 +230,6 @@ private:
   CodesContainer Codes;
 
   ArgumentsContainer Arguments;
-
-  llvm::OwningPtr<Footprint> Estimates;
 };
 
 } // End namespace opencrun.

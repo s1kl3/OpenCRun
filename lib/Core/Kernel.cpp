@@ -71,10 +71,9 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
 }
 
 bool Kernel::GetMaxWorkGroupSize(size_t &Size, Device *Dev) {
-  if(!(Dev = RequireEstimates(Dev)))
-    return false;
+  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
 
-  Size = Estimates->GetMaxWorkGroupSize(Dev->GetPrivateMemorySize());
+  Size = FP.GetMaxWorkGroupSize(Dev->GetPrivateMemorySize());
 
   size_t DevMaxSize = Dev->GetMaxWorkGroupSize();
   if(Size > DevMaxSize)
@@ -84,19 +83,17 @@ bool Kernel::GetMaxWorkGroupSize(size_t &Size, Device *Dev) {
 }
 
 bool Kernel::GetMinLocalMemoryUsage(size_t &Size, Device *Dev) {
-  if(!(Dev = RequireEstimates(Dev)))
-    return false;
+  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
 
-  Size = Estimates->GetLocalMemoryUsage();
+  Size = FP.GetLocalMemoryUsage();
 
   return true;
 }
 
 bool Kernel::GetMinPrivateMemoryUsage(size_t &Size, Device *Dev) {
-  if(!(Dev = RequireEstimates(Dev)))
-    return false;
+  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
 
-  Size = Estimates->GetPrivateMemoryUsage();
+  Size = FP.GetPrivateMemoryUsage();
 
   return true;
 }
@@ -215,39 +212,6 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   ThisLock.release();
 
   return CL_SUCCESS;
-}
-
-Device *Kernel::RequireEstimates(Device *Dev) {
-  CodesContainer::iterator I;
-  if(!Dev && Codes.size() == 1) {
-    CodesContainer::iterator I = Codes.begin();
-    Dev = I->first;
-  }
-
-  if(!Dev || !IsBuiltFor(*Dev))
-    return NULL;
-
-  // Double checked lock, unsafe read.
-  if(Estimates)
-    return Dev;
-
-  llvm::sys::ScopedLock Lock(ThisLock);
-
-  // Double checked lock, safe read.
-  // TODO: is this thread safe with respect to compiler invocation?
-  if(!Estimates) {
-    llvm::PassManager PM;
-
-    FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
-    llvm::Function *Fun = GetFunction(*Dev);
-
-    PM.add(Pass);
-    PM.run(*Fun->getParent());
-
-    Estimates.reset(new Footprint(*Pass));
-  }
-
-  return Dev;
 }
 
 KernelSignature Kernel::GetSignature() const {
