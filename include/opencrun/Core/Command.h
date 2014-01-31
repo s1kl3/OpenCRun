@@ -52,9 +52,11 @@ public:
     MapBuffer = CL_COMMAND_MAP_BUFFER,
     MapImage = CL_COMMAND_MAP_IMAGE,
     UnmapMemObject = CL_COMMAND_UNMAP_MEM_OBJECT,
+    Marker = CL_COMMAND_MARKER,
     ReadBufferRect = CL_COMMAND_READ_BUFFER_RECT,
     WriteBufferRect = CL_COMMAND_WRITE_BUFFER_RECT,
     CopyBufferRect = CL_COMMAND_COPY_BUFFER_RECT,
+    Barrier = CL_COMMAND_BARRIER,
     FillBuffer = CL_COMMAND_FILL_BUFFER,
     FillImage = CL_COMMAND_FILL_IMAGE
   };
@@ -487,6 +489,18 @@ private:
   friend class EnqueueUnmapMemObjectBuilder;
 };
 
+class EnqueueMarkerWithWaitList : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::Marker;
+  }
+
+private:
+  EnqueueMarkerWithWaitList(EventsContainer &WaitList);
+
+  friend class EnqueueMarkerWithWaitListBuilder;
+};
+
 class EnqueueReadBufferRect : public Command {
 public:
   static bool classof(const Command *Cmd) {
@@ -604,6 +618,18 @@ private:
   size_t SourcePitches[2];
   
   friend class EnqueueCopyBufferRectBuilder;
+};
+
+class EnqueueBarrierWithWaitList : public Command {
+public:
+  static bool classof(const Command *Cmd) {
+    return Cmd->GetType() == Command::Barrier;
+  }
+
+private:
+  EnqueueBarrierWithWaitList(EventsContainer &WaitList);
+
+  friend class EnqueueBarrierWithWaitListBuilder;
 };
 
 class EnqueueFillBuffer : public Command {
@@ -750,9 +776,11 @@ public:
     EnqueueMapBufferBuilder,
     EnqueueMapImageBuilder,
     EnqueueUnmapMemObjectBuilder,
+    EnqueueMarkerWithWaitListBuilder,
     EnqueueReadBufferRectBuilder,
     EnqueueWriteBufferRectBuilder,
     EnqueueCopyBufferRectBuilder,
+    EnqueueBarrierWithWaitListBuilder,
     EnqueueFillBufferBuilder,
     EnqueueFillImageBuilder
   };
@@ -1210,6 +1238,31 @@ private:
   void *MappedPtr;
 };
 
+class EnqueueMarkerWithWaitListBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueMarkerWithWaitListBuilder;
+  }
+
+public:
+  EnqueueMarkerWithWaitListBuilder(CommandQueue &Queue);
+
+public:
+  EnqueueMarkerWithWaitListBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueMarkerWithWaitList *Create(cl_int *ErrCode);
+
+private:
+  EnqueueMarkerWithWaitListBuilder &NotifyError(cl_int ErrCode,
+                                                const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
+
+private:
+  CommandQueue &Queue;
+};
+
 class EnqueueReadBufferRectBuilder : public CommandBuilder {
 public:
   static bool classof(const CommandBuilder *Bld) {
@@ -1333,6 +1386,28 @@ private:
   size_t SourcePitches[2];
   size_t TargetOffset;
   size_t SourceOffset;
+};
+
+class EnqueueBarrierWithWaitListBuilder : public CommandBuilder {
+public:
+  static bool classof(const CommandBuilder *Bld) {
+    return Bld->GetType() == CommandBuilder::EnqueueBarrierWithWaitListBuilder;
+  }
+
+public:
+  EnqueueBarrierWithWaitListBuilder(CommandQueue &Queue);
+
+public:
+  EnqueueBarrierWithWaitListBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+
+  EnqueueBarrierWithWaitList *Create(cl_int *ErrCode);
+
+private:
+  EnqueueBarrierWithWaitListBuilder &NotifyError(cl_int ErrCode,
+                                                const char *Msg = "") {
+    CommandBuilder::NotifyError(ErrCode, Msg);
+    return *this;
+  }
 };
 
 class EnqueueFillBufferBuilder : public CommandBuilder {

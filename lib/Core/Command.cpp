@@ -289,7 +289,14 @@ EnqueueUnmapMemObject::EnqueueUnmapMemObject(MemoryObj &MemObj,
                                              EventsContainer &WaitList)
   :	Command(Command::UnmapMemObject, WaitList),
     MemObj(&MemObj),
-    MappedPtr(MappedPtr) { }    
+    MappedPtr(MappedPtr) { }
+
+//
+// EnqueueMarkerWithWaitList implementation.
+//
+
+EnqueueMarkerWithWaitList::EnqueueMarkerWithWaitList(EventsContainer &WaitList)
+  : Command(Command::Marker, WaitList) { }
 
 //
 // EnqueueReadBufferRect implementation.
@@ -359,6 +366,13 @@ EnqueueCopyBufferRect::EnqueueCopyBufferRect(Buffer &Target,
   std::memcpy(this->SourcePitches, SourcePitches, 2 * sizeof(size_t));
 }
     
+//
+// EnqueueBarrierWithWaitList implementation.
+//
+
+EnqueueBarrierWithWaitList::EnqueueBarrierWithWaitList(EventsContainer &WaitList)
+  : Command(Command::Barrier, WaitList) { }
+
 //
 // EnqueueFillBuffer implementation.
 //
@@ -1784,6 +1798,41 @@ EnqueueUnmapMemObject *EnqueueUnmapMemObjectBuilder::Create(cl_int *ErrCode) {
 }
 
 //
+// EnqueueMarkerWithWaitListBuilder implementation.
+//
+
+EnqueueMarkerWithWaitListBuilder::EnqueueMarkerWithWaitListBuilder(CommandQueue &Queue)
+  : CommandBuilder(CommandBuilder::EnqueueMarkerWithWaitListBuilder,
+                   Queue.GetContext()),
+    Queue(Queue) { }
+
+EnqueueMarkerWithWaitListBuilder
+&EnqueueMarkerWithWaitListBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+
+  return llvm::cast<EnqueueMarkerWithWaitListBuilder>(Super);
+}
+
+EnqueueMarkerWithWaitList *EnqueueMarkerWithWaitListBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+    
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+    
+  return new EnqueueMarkerWithWaitList(WaitList);
+}
+
+//
 // EnqueueReadBufferRectBuilder implementation.
 //
 
@@ -2418,6 +2467,40 @@ EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
                                    TargetPitches, 
                                    SourcePitches, 
                                    WaitList);
+}
+
+//
+// EnqueueBarrierWithWaitListBuilder implementation.
+//
+
+EnqueueBarrierWithWaitListBuilder::EnqueueBarrierWithWaitListBuilder(CommandQueue &Queue)
+  : CommandBuilder(CommandBuilder::EnqueueBarrierWithWaitListBuilder,
+                   Queue.GetContext()) { }
+
+EnqueueBarrierWithWaitListBuilder
+&EnqueueBarrierWithWaitListBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+  CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
+
+  for(Command::const_event_iterator I = WaitList.begin(), 
+                                    E = WaitList.end(); 
+                                    I != E; 
+                                    ++I) {
+    if(Ctx != (*I)->GetContext())
+      return NotifyError(CL_INVALID_CONTEXT,
+                         "command queue and event in wait list with different context");
+  }
+
+  return llvm::cast<EnqueueBarrierWithWaitListBuilder>(Super);
+}
+
+EnqueueBarrierWithWaitList *EnqueueBarrierWithWaitListBuilder::Create(cl_int *ErrCode) {
+  if(this->ErrCode != CL_SUCCESS)
+    RETURN_WITH_ERROR(ErrCode);
+    
+  if(ErrCode)
+    *ErrCode = CL_SUCCESS;
+    
+  return new EnqueueBarrierWithWaitList(WaitList);
 }
 
 //

@@ -73,8 +73,10 @@ clEnqueueUnmapMemObject
 clEnqueueNDRangeKernel
 clEnqueueTask
 clEnqueueNativeKernel
+clEnqueueMarkerWithWaitList
 clEnqueueMarker
 clEnqueueWaitForEvents
+clEnqueueBarrierWithWaitList
 clEnqueueBarrier
 clGetExtensionFunctionAddress
 clIcdGetPlatformIDsKHR

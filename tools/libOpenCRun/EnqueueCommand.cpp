@@ -821,22 +821,88 @@ clEnqueueNativeKernel(cl_command_queue command_queue,
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
+clEnqueueMarkerWithWaitList(cl_command_queue command_queue,
+                            cl_uint num_events_in_wait_list,
+                            const cl_event *event_wait_list,
+                            cl_event *event) CL_API_SUFFIX__VERSION_1_2 {
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  cl_int ErrCode;
+
+  opencrun::EnqueueMarkerWithWaitListBuilder Bld(*Queue);
+  opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);
+}
+
+CL_API_ENTRY CL_EXT_PREFIX__VERSION_1_1_DEPRECATED cl_int CL_API_CALL
 clEnqueueMarker(cl_command_queue command_queue,
-                cl_event *event) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+                cl_event *event) CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED {
+  if(!event)
+    return CL_INVALID_VALUE;
+
+  return clEnqueueMarkerWithWaitList(command_queue, 0, NULL, event);
 }
 
-CL_API_ENTRY cl_int CL_API_CALL
+CL_API_ENTRY CL_EXT_PREFIX__VERSION_1_1_DEPRECATED cl_int CL_API_CALL
 clEnqueueWaitForEvents(cl_command_queue command_queue,
-                       cl_uint num_events,
-                       const cl_event *event_list) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+                        cl_uint num_events,
+                        const cl_event *event_list) CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED {
+  if(!num_events || !event_list)
+    return CL_INVALID_VALUE;
+
+  for(unsigned I = 0; I < num_events; ++I)
+    if(!event_list[I]) return CL_INVALID_EVENT;
+
+  return clEnqueueBarrierWithWaitList(command_queue, num_events, event_list, NULL);
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
-clEnqueueBarrier(cl_command_queue command_queue) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return CL_SUCCESS;
+clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
+                             cl_uint num_events_in_wait_list,
+                             const cl_event *event_wait_list,
+                             cl_event *event) CL_API_SUFFIX__VERSION_1_2 {
+  if(!command_queue)
+    return CL_INVALID_COMMAND_QUEUE;
+
+  opencrun::CommandQueue *Queue;
+
+  Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
+
+  cl_int ErrCode;
+
+  opencrun::EnqueueBarrierWithWaitListBuilder Bld(*Queue);
+  opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
+                                           event_wait_list)
+                              .Create(&ErrCode);
+
+  if(!Cmd)
+    return ErrCode;
+
+  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+
+  if(!Ev)
+    return ErrCode;
+
+  RETURN_WITH_EVENT(event, Ev);
+}
+
+CL_API_ENTRY CL_EXT_PREFIX__VERSION_1_1_DEPRECATED cl_int CL_API_CALL
+clEnqueueBarrier(cl_command_queue command_queue) CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED {
+  return clEnqueueBarrierWithWaitList(command_queue, 0, NULL, NULL);
 }

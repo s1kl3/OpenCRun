@@ -128,9 +128,24 @@ bool InOrderQueue::RunScheduler() {
 
   Command &Cmd = *Commands.front();
 
-  if(Cmd.CanRun() && Dev.Submit(Cmd)) {
-    Commands.pop_front();
-    CommandOnFly = true;
+  if(Cmd.CanRun()) {
+    if(Cmd.GetType() == Command::Marker || Cmd.GetType() == Command::Barrier) {
+      Commands.pop_front();
+      CommandOnFly = true; // Not necessary but just for clarity.
+      unsigned Cnts = ProfilingEnabled() ? Profiler::Time : Profiler::None;
+      ProfileSample *Sample = GetProfilerSample(Dev,
+                                                Cnts,
+                                                ProfileSample::CommandCompleted);
+      
+      InternalEvent &Ev = Cmd.GetNotifyEvent();
+      Ev.MarkCompleted(CL_COMPLETE, Sample);
+      CommandOnFly = false; // Not necessary but just for clarity.
+    } else {
+      if(Dev.Submit(Cmd)) {
+        Commands.pop_front();
+        CommandOnFly = true;
+      }
+    }
   }
 
   return Commands.size();

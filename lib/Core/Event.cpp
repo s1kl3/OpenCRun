@@ -149,7 +149,8 @@ void InternalEvent::MarkCompleted(int Status, ProfileSample *Sample) {
   Profile << Sample;
   Signal(Status);
 
-  Queue->CommandDone(*this);
+  if(Cmd.GetType() != Command::Marker || Cmd.GetType() != Command::Barrier)
+    Queue->CommandDone(*this);
 }
 
 //
