@@ -295,7 +295,6 @@ ProgramBuilder &ProgramBuilder::SetSources(unsigned Count,
       Src = llvm::StringRef(Srcs[I]);
 
     Buf += Src;
-    Buf += '\n';
   }
 
   this->Srcs = llvm::MemoryBuffer::getMemBufferCopy(Buf);
