@@ -426,7 +426,8 @@ public:
     DK_TypedefUnsigned,
     DK_MinValue,
     DK_MaxValue,
-    DK_BuiltinName
+    DK_BuiltinName,
+    DK_LibM
   };
 
 protected:
@@ -546,6 +547,21 @@ public:
 private:
   std::string Name;
   const OCLBuiltin &Builtin;
+};
+
+class OCLLibMDecl : public OCLDecl {
+public:
+  static bool classof(const OCLDecl *D) {
+    return D->getKind() == DK_LibM;
+  }
+
+public:
+  OCLLibMDecl(const OCLParam &p) : OCLDecl(DK_LibM), Param(p) {}
+
+  const OCLParam &getParam() const { return Param; }
+
+private:
+  const OCLParam &Param;
 };
 
 class OCLReduction {

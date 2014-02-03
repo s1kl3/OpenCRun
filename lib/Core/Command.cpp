@@ -428,12 +428,12 @@ EnqueueFillImage ::EnqueueFillImage(Image &Target,
 // EnqueueNDRangeKernel implementation.
 //
 
-EnqueueNDRangeKernel::EnqueueNDRangeKernel(Kernel &Kern,
+EnqueueNDRangeKernel::EnqueueNDRangeKernel(const Kernel &Kern,
                                            DimensionInfo &DimInfo,
                                            EventsContainer &WaitList)
   : Command(Command::NDRangeKernel, WaitList),
-    Kern(&Kern),
-    DimInfo(DimInfo) { }
+    Kern(Kern),
+    DimInfo(DimInfo) {}
 
 //
 // EnqueueNativeKernel implementation.

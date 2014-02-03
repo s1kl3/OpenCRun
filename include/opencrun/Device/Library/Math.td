@@ -301,14 +301,14 @@ def blt_tanh        : MathBuiltin_rr<"tanh">;
 def blt_tgamma      : MathBuiltin_rr<"tgamma">;
 def blt_trunc       : MathBuiltin_rr<"trunc">;
 
-def blt_cospi       : MathBuiltin_ff_dd<"cospi">;
-def blt_sinpi       : MathBuiltin_ff_dd<"sinpi">;
-def blt_tanpi       : MathBuiltin_ff_dd<"tanpi">;
-def blt_acospi      : MathBuiltin_ff_dd<"acospi">;
-def blt_asinpi      : MathBuiltin_ff_dd<"asinpi">;
-def blt_atanpi      : MathBuiltin_ff_dd<"atanpi">;
-def blt_exp10       : MathBuiltin_ff_dd<"exp10">;
-def blt_rsqrt       : MathBuiltin_ff_dd<"rsqrt">;
+def blt_cospi       : MathBuiltin_rr<"cospi">;
+def blt_sinpi       : MathBuiltin_rr<"sinpi">;
+def blt_tanpi       : MathBuiltin_rr<"tanpi">;
+def blt_acospi      : MathBuiltin_rr<"acospi">;
+def blt_asinpi      : MathBuiltin_rr<"asinpi">;
+def blt_atanpi      : MathBuiltin_rr<"atanpi">;
+def blt_exp10       : MathBuiltin_rr<"exp10">;
+def blt_rsqrt       : MathBuiltin_rr<"rsqrt">;
 
 def blt_atan2       : MathBuiltin_rrr<"atan2">;
 def blt_copysign    : MathBuiltin_rrr<"copysign">;
@@ -322,7 +322,7 @@ def blt_pow         : MathBuiltin_rrr<"pow">;
 def blt_powr        : MathBuiltin_rrr<"powr">;
 def blt_remainder   : MathBuiltin_rrr<"remainder">;
 
-def blt_atan2pi     : MathBuiltin_fff_ddd<"atan2pi">;
+def blt_atan2pi     : MathBuiltin_rrr<"atan2pi">;
 
 def blt_fmin        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmin">;
 def blt_fmax        : MathBuiltin_rrr_VfVfCf_VdVdCd<"fmax">;
@@ -388,608 +388,340 @@ def blt_native_tan      : MathBuiltin_ff<"native_tan">;
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_acos, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_acosf(param1);
-    case 64:
-      return __builtin_acos(param1);
-  }
-}]>>;
+  return __libm(acos)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_acosh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_acoshf(param1);
-    case 64:
-      return __builtin_acosh(param1);
-  }
-}]>>;
+  return __libm(acosh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_acospi, RecursiveSplit<[{
-  return __builtin_acosf(param1)/M_PI_F;
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_acospi, RecursiveSplit<[{
-  return __builtin_acos(param1)/M_PI;
-}]>, "dd">;
+  return __libm(acos)(param1) / __libm_CONST_(M_PI);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_asin, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_asinf(param1);
-    case 64:
-      return __builtin_asin(param1);
-  }
-}]>>;
+  return __libm(asin)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_asinh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_asinhf(param1);
-    case 64:
-      return __builtin_asinh(param1);
-  }
-}]>>;
+  return __libm(asinh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_asinpi, RecursiveSplit<[{
-  return __builtin_asinf(param1)/M_PI_F;
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_asinpi, RecursiveSplit<[{
-  return __builtin_asin(param1)/M_PI;
-}]>, "dd">;
+  return __libm(asin)(param1) / __libm_CONST_(M_PI);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atan, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_atanf(param1);
-    case 64:
-      return __builtin_atan(param1);
-  }
-}]>>;
+  return __libm(atan)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atanh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_atanhf(param1);
-    case 64:
-      return __builtin_atanh(param1);
-  }
-}]>>;
+  return __libm(atanh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atanpi, RecursiveSplit<[{
-  return __builtin_atanf(param1)/M_PI_F;
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_atanpi, RecursiveSplit<[{
-  return __builtin_atan(param1)/M_PI;
-}]>, "dd">;
+  return __libm(atan)(param1) / __libm_CONST_(M_PI);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cbrt, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_cbrtf(param1);
-    case 64:
-      return __builtin_cbrt(param1);
-  }
-}]>>;
+  return __libm(cbrt)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_ceil, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_ceilf(param1);
-    case 64:
-      return __builtin_ceil(param1);
-  }
-}]>>;
+  return __libm(ceil)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cos, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_cosf(param1);
-    case 64:
-      return __builtin_cos(param1);
-  }
-}]>>;
+  return __libm(cos)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cosh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_coshf(param1);
-    case 64:
-      return __builtin_cosh(param1);
-  }
-}]>>;
+  return __libm(cosh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cospi, RecursiveSplit<[{
-  return __builtin_cosf(param1 * M_PI_F);
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_cospi, RecursiveSplit<[{
-  return __builtin_cos(param1 * M_PI);
-}]>, "dd">;
+  return __libm(cos)(param1) / __libm_CONST_(M_PI);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_erfc, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_erfcf(param1);
-    case 64:
-      return __builtin_erfc(param1);
-  }
-}]>>;
+  return __libm(erfc)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_erf, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_erff(param1);
-    case 64:
-      return __builtin_erf(param1);
-  }
-}]>>;
+  return __libm(erf)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_exp, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_expf(param1);
-    case 64:
-      return __builtin_exp(param1);
-  }
-}]>>;
+  return __libm(exp)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_exp2, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_exp2f(param1);
-    case 64:
-      return __builtin_exp2(param1);
-  }
-}]>>;
+  return __libm(exp2)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_exp10, RecursiveSplit<[{
-  return __builtin_expf(param1 * __builtin_logf(10.0f));
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_exp10, RecursiveSplit<[{
-  return __builtin_exp(param1 * __builtin_log(10.0));
-}]>, "dd">;
+  return __libm(exp)(param1 * __libm(log)(__libm_const(10.0)));
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_expm1, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_expm1f(param1);
-    case 64:
-      return __builtin_expm1(param1);
-  }
-}]>>;
+  return __libm(expm1)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fabs, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fabsf(param1);
-    case 64:
-      return __builtin_fabs(param1);
-  }
-}]>>;
+  return __libm(fabs)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_floor, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_floorf(param1);
-    case 64:
-      return __builtin_floor(param1);
-  }
-}]>>;
+  return __libm(floor)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_log, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_logf(param1);
-    case 64:
-      return __builtin_log(param1);
-  }
-}]>>;
+  return __libm(log)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_log2, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_log2f(param1);
-    case 64:
-      return __builtin_log2(param1);
-  }
-}]>>;
+  return __libm(log2)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_log10, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_log10f(param1);
-    case 64:
-      return __builtin_log10(param1);
-  }
-}]>>;
+  return __libm(log10)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_log1p, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_log1pf(param1);
-    case 64:
-      return __builtin_log1p(param1);
-  }
-}]>>;
+  return __libm(log1p)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_logb, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_logbf(param1);
-    case 64:
-      return __builtin_logb(param1);
-  }
-}]>>;
+  return __libm(logb)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_lgamma, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_lgammaf(param1);
-    case 64:
-      return __builtin_lgamma(param1);
-  }
-}]>>;
+  return __libm(lgamma)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_rint, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_rintf(param1);
-    case 64:
-      return __builtin_rint(param1);
-  }
-}]>>;
+  return __libm(rint)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_round, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_roundf(param1);
-    case 64:
-      return __builtin_round(param1);
-  }
-}]>>;
+  return __libm(round)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_rsqrt, RecursiveSplit<[{
-  return 1.0f/__builtin_sqrtf(param1);
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_rsqrt, RecursiveSplit<[{
-  return 1.0/__builtin_sqrt(param1);
-}]>, "dd">;
+  return __libm_const(1.0) / __libm(sqrt)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_sin, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_sinf(param1);
-    case 64:
-      return __builtin_sin(param1);
-  }
-}]>>;
+  return __libm(sin)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_sinh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_sinhf(param1);
-    case 64:
-      return __builtin_sinh(param1);
-  }
-}]>>;
+  return __libm(sinh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_sinpi, RecursiveSplit<[{
-  return __builtin_sinf(param1 * M_PI_F);
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_sinpi, RecursiveSplit<[{
-  return __builtin_sin(param1 * M_PI);
-}]>, "dd">;
+  return __libm(sin)(param1 * __libm_CONST_(M_PI));
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_sqrt, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_sqrtf(param1);
-    case 64:
-      return __builtin_sqrt(param1);
-  }
-}]>>;
+  return __libm(sqrt)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_tan, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_tanf(param1);
-    case 64:
-      return __builtin_tan(param1);
-  }
-}]>>;
+  return __libm(tan)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_tanh, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_tanhf(param1);
-    case 64:
-      return __builtin_tanh(param1);
-  }
-}]>>;
+  return __libm(tanh)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_tanpi, RecursiveSplit<[{
-  return __builtin_tanf(param1 * M_PI_F);
-}]>, "ff">;
-
-def : OCLBuiltinImpl<blt_tanpi, RecursiveSplit<[{
-  return __builtin_tan(param1 * M_PI);
-}]>, "dd">;
+  return __libm(tan)(param1 * __libm_CONST_(M_PI));
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_tgamma, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_tgammaf(param1);
-    case 64:
-      return __builtin_tgamma(param1);
-  }
-}]>>;
+  return __libm(tgamma)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_trunc, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_truncf(param1);
-    case 64:
-      return __builtin_trunc(param1);
-  }
-}]>>;
+  return __libm(trunc)(param1);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atan2, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_atan2f(param1, param2);
-    case 64:
-      return __builtin_atan2(param1, param2);
-  }
-}]>>;
+  return __libm(atan2)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atan2pi, RecursiveSplit<[{
-  return __builtin_atan2f(param1, param2)/M_PI_F;
-}]>, "fff">;
-
-def : OCLBuiltinImpl<blt_atan2pi, RecursiveSplit<[{
-  return __builtin_atan2(param1, param2)/M_PI;
-}]>, "ddd">;
+  return __libm(atan2)(param1, param2) / __libm_CONST_(M_PI);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_copysign, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_copysignf(param1, param2);
-    case 64:
-      return __builtin_copysign(param1, param2);
-  }
-}]>>;
+  return __libm(copysign)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fdim, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fdimf(param1, param2);
-    case 64:
-      return __builtin_fdim(param1, param2);
-  }
-}]>>;
+  return __libm(fdim)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fmod, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fmodf(param1, param2);
-    case 64:
-      return __builtin_fmod(param1, param2);
-  }
-}]>>;
+  return __libm(fmod)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_hypot, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_hypotf(param1, param2);
-    case 64:
-      return __builtin_hypot(param1, param2);
-  }
-}]>>;
+  return __libm(hypot)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_maxmag, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fmaxf(__builtin_fabsf(param1), __builtin_fabsf(param2));
-    case 64:
-      return __builtin_fmax(__builtin_fabs(param1), __builtin_fabs(param2));
-  }
+def : OCLBuiltinImpl<blt_maxmag, TemplateStrategy<[{
+  return __builtin_ocl_fmax(__builtin_ocl_fabs(param1),
+                            __builtin_ocl_fabs(param2));
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_minmag, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fminf(__builtin_fabsf(param1), __builtin_fabsf(param2));
-    case 64:
-      return __builtin_fmin(__builtin_fabs(param1), __builtin_fabs(param2));
-  }
+  return __builtin_ocl_fmin(__builtin_ocl_fabs(param1),
+                            __builtin_ocl_fabs(param2));
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_nextafter, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_nextafterf(param1, param2);
-    case 64:
-      return __builtin_nextafter(param1, param2);
-  }
-}]>>;
+  return __libm(nextafter)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_pow, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_powf(param1, param2);
-    case 64:
-      return __builtin_pow(param1, param2);
-  }
-}]>>;
+  return __libm(pow)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_powr, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_powf(param1, param2);
-    case 64:
-      return __builtin_pow(param1, param2);
-  }
-}]>>;
+  return __libm(pow)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_remainder, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_remainderf(param1, param2);
-    case 64:
-      return __builtin_remainder(param1, param2);
-  }
-}]>>;
+  return __libm(remainder)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fmin, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fminf(param1, param2);
-    case 64:
-      return __builtin_fmin(param1, param2);
-  }
-}]>>;
+  return __libm(fmin)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fmax, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fmaxf(param1, param2);
-    case 64:
-      return __builtin_fmax(param1, param2);
-  }
-}]>>;
+  return __libm(fmax)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_pown, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_powif(param1, param2);
-    case 64:
-      return __builtin_powi(param1, param2);
-  }
-}]>>;
+  return __libm(powi)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_rootn, RecursiveSplit<[{
-  return __builtin_powf(param1, 1.0f/param2);
-}]>, "ffSn">;
-
-def : OCLBuiltinImpl<blt_rootn, RecursiveSplit<[{
-  return __builtin_pow(param1, 1.0/param2);
-}]>, "ddSn">;
+  return __libm(pow)(param1, __libm_const(1.0) / param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -997,163 +729,71 @@ def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP1f">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ffP1f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP2f">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ffP2f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffep-1f);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ffP4f">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ffP4f">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP1d">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ddP1d">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP2d">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ddP2d">;
 
 def : OCLBuiltinImpl<blt_fract, DirectSplit<[{
   TYPE flr = __builtin_ocl_floor(param1);
   *param2 = flr;
   return __builtin_ocl_fmin(param1 - flr,  0x1.fffffffffffffp-1);
-}], [TypedefId<"TYPE", Pointee<2>>]>, "ddP4d">;
+}], [TypedefId<"TYPE", Id<0>>]>, "ddP4d">;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_frexp, DirectSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_frexpf(param1, (TYPE *) param2);
-    case 64:
-      return __builtin_frexp(param1, (TYPE *) param2);
-  }
-}], [TypedefId<"TYPE", Pointee<2>>]>>;
+  PTYPE exp;
+  TYPE res = __libm(frexp)(param1, &exp);
+  *param2 = exp;
+  return res;
+}], [LibM<Id<1>>, TypedefId<"TYPE", Id<1>>, TypedefId<"PTYPE", Pointee<2>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
   if (param1 <= 0) {
-    float i, f, s;
-    f = __builtin_modff(-param1, &i);
-    if (f == 0.0f) {
+    TYPE i, f, s;
+    f = __builtin_ocl_modf(-param1, &i);
+    if (f == __libm_const(0.0)) {
       *param2 = 1;
-      return HUGE_VALF;
+      return __libm_CONST(HUGE_VAL);
     }
-    *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PI_F * f);
+    *param2 = (__builtin_ocl_fmod(i, __libm_const(2.0)) != __libm_const(0.0)) ? 1 : -1;
+    s = __builtin_ocl_sinpi(f);
     if (s < 0) s = -s;
-      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
+    return __builtin_ocl_log(__libm_CONST_(M_PI)) - __builtin_ocl_log(s) - __builtin_ocl_lgamma(1 - param1);
   }
   *param2 = 1;
-  return __builtin_lgammaf(param1);
-}]>, "ffP1Sn">;
-
-def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
-  if (param1 <= 0) {
-    float i, f, s;
-    f = __builtin_modff(-param1, &i);
-    if (f == 0.0f) {
-      *param2 = 1;
-      return HUGE_VALF;
-    }
-    *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PI_F * f);
-    if (s < 0) s = -s;
-      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
-  }
-  *param2 = 1;
-  return __builtin_lgammaf(param1);
-}]>, "ffP2Sn">;
-
-def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
-  if (param1 <= 0) {
-    float i, f, s;
-    f = __builtin_modff(-param1, &i);
-    if (f == 0.0f) {
-      *param2 = 1;
-      return HUGE_VALF;
-    }
-    *param2 = (__builtin_fmodf(i, 2.0f) != 0.0f) ? 1 : -1;
-    s = __builtin_sinf(M_PI_F * f);
-    if (s < 0) s = -s;
-      return __builtin_logf(M_PI_F) - __builtin_logf(s) - __builtin_lgammaf(1 - param1);
-  }
-  *param2 = 1;
-  return __builtin_lgammaf(param1);
-}]>, "ffP4Sn">;
-
-def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
-  if (param1 <= 0) {
-    double i, f, s;
-    f = __builtin_modf(-param1, &i);
-    if (f == 0.0) {
-      *param2 = 1;
-      return HUGE_VAL;
-    }
-    *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
-    s = __builtin_sin(M_PI * f);
-    if (s < 0) s = -s;
-      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
-  }
-  *param2 = 1;
-  return __builtin_lgamma(param1);
-}]>, "ddP1Sn">;
-
-def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
-  if (param1 <= 0) {
-    double i, f, s;
-    f = __builtin_modf(-param1, &i);
-    if (f == 0.0) {
-      *param2 = 1;
-      return HUGE_VAL;
-    }
-    *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
-    s = __builtin_sin(M_PI * f);
-    if (s < 0) s = -s;
-      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
-  }
-  *param2 = 1;
-  return __builtin_lgamma(param1);
-}]>, "ddP2Sn">;
-
-def : OCLBuiltinImpl<blt_lgamma_r, DirectSplit<[{
-  if (param1 <= 0) {
-    double i, f, s;
-    f = __builtin_modf(-param1, &i);
-    if (f == 0.0) {
-      *param2 = 1;
-      return HUGE_VAL;
-    }
-    *param2 = (__builtin_fmod(i, 2.0) != 0.0) ? 1 : -1;
-    s = __builtin_sin(M_PI * f);
-    if (s < 0) s = -s;
-      return __builtin_log(M_PI) - __builtin_log(s) - __builtin_lgamma(1 - param1);
-  }
-  *param2 = 1;
-  return __builtin_lgamma(param1);
-}]>, "ddP4Sn">;
+  return __builtin_ocl_lgamma(param1);
+}], [LibM<Id<1>>, TypedefId<"TYPE", Id<1>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fma, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_fmaf(param1, param2, param3);
-    case 64:
-      return __builtin_fma(param1, param2, param3);
-  }
-}]>>;
+  return __libm(fma)(param1, param2, param3);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -1164,96 +804,60 @@ def : OCLBuiltinImpl<blt_mad, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_remquo, DirectSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_remquof(param1, param2, (TYPE *) param3);
-    case 64:
-      return __builtin_remquo(param1, param2, (TYPE *) param3);
-  }
-}], [TypedefId<"TYPE", Pointee<3>>]>, "rrrP4Sn">;
+  TYPE quo;
+  TYPE rem = __libm(remquo)(param1, param2, &quo);
+  *param3 = quo;
+  return rem;
+}], [LibM<Id<1>>, TypedefId<"TYPE", Pointee<3>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modff(param1, (float *) param2);
-}]>, "ffP1f">;
-
-def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modff(param1, (float *) param2);
-}]>, "ffP2f">;
-
-def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modff(param1, (float *) param2);
-}]>, "ffP4f">;
-
-def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modf(param1, (double *) param2);
-}]>, "ddP1d">;
-
-def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modf(param1, (double *) param2);
-}]>, "ddP2d">;
-
-def : OCLBuiltinImpl<blt_modf, DirectSplit<[{
-      return __builtin_modf(param1, (double *) param2);
-}]>, "ddP4d">;
+  TYPE intpart;
+  TYPE mod = __libm(modf)(param1, &intpart);
+  *param2 = intpart;
+  return mod;
+}], [LibM<Id<1>>, TypedefId<"TYPE", Pointee<2>>]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_sincos, DirectSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      *param2 = __builtin_cosf(param1);
-      return __builtin_sinf(param1);
-    case 64:
-      *param2 = __builtin_cos(param1);
-      return __builtin_sin(param1);
-  }
+def : OCLBuiltinImpl<blt_sincos, TemplateStrategy<[{
+  *param2 = __builtin_ocl_cos(param1);
+  return __builtin_ocl_sin(param1);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_ldexp, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_ldexpf(param1, param2);
-    case 64:
-      return __builtin_ldexp(param1, param2);
-  }
-}]>>;
+  return __libm(ldexp)(param1, param2);
+}], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_nan, RecursiveSplit<[{
-  union {
-    uint i;
-    float f;
-  } n;
-
-  n.i = (param1 | 0x7f800000U);
-  return n.f;
+  // Infinity/NaN encoding: s111 1111 1aXX XXXX XXXX XXXX XXXX XXXX
+  // Infinity <==> M == 0
+  // qNaN <==> a == 1
+  // sNaN <==> a == 0 && M != 0
+  uint val = (param1 | 0x7fc00000U);
+  return as_float(val);
 }]>, "fUn">;
 
 def : OCLBuiltinImpl<blt_nan, RecursiveSplit<[{
-  union {
-    ulong l;
-    double d;
-  } n;
-
-  n.l = (param1 | 0x7f80000000000000U);
-  return n.d;
+  // Infinity/NaN encoding: s111 1111 1111 aXXX XXXX XXXX XXXX XXXX
+  //                        XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+  // Infinity <==> M == 0
+  // qNaN <==> a == 1
+  // sNaN <==> a == 0 && M != 0
+  ulong val = (param1 | 0x7ff8000000000000U);
+  return as_double(val);
 }]>, "dUl">;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_ilogb, RecursiveSplit<[{
-  switch (sizeof(param1) * 8) {
-    case 32:
-      return __builtin_ilogb(param1);
-    case 64:
-      return __builtin_ilogb(param1);
-  }
-}]>>;
+  return __libm(ilogb)(param1);
+}], [LibM<Id<1>>]>>;
 
 //----------------------------------------------------------------------------//
 

@@ -86,6 +86,30 @@ static void EmitOCLDecl(llvm::raw_ostream &OS, const OCLDecl *D,
       OS << "#define " << T->getName() << " " 
          << BD.getInternalName(&Sign) << "\n";
     }
+  } else if (const OCLLibMDecl *T = llvm::dyn_cast<OCLLibMDecl>(D)) {
+    OS.indent(2);
+
+    if (End) {
+      OS << "#undef __libm" << "\n"; 
+      OS << "#undef __libm_const" << "\n"; 
+      OS << "#undef __libm_CONST_" << "\n"; 
+      OS << "#undef __libm_CONST" << "\n"; 
+    } else {
+      const OCLRealType *Ty = llvm::cast<OCLRealType>(T->getParam().get(Sign));
+      bool IsFloat = Ty->getBitWidth() == 32;
+      OS << "#define __libm(x) __builtin_ ## x ";
+      if (IsFloat) OS << "## f";
+      OS << "\n";
+      OS << "#define __libm_const(x) x";
+      if (IsFloat) OS << "## f";
+      OS << "\n";
+      OS << "#define __libm_CONST_(x) x";
+      if (IsFloat) OS << "## _F";
+      OS << "\n";
+      OS << "#define __libm_CONST(x) x";
+      if (IsFloat) OS << "## F";
+      OS << "\n";
+    }
   } else
     llvm::PrintFatalError("Illegal OCLDecl!");
 }

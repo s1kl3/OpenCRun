@@ -257,16 +257,19 @@ LocalMemory::LocalMemory(const sys::HardwareCache &Cache) :
   Size(Cache.GetSize()) {
   Base = sys::PageAlignedAlloc(Size);
   Next = Base;
+  Static = 0;
 }
 
 LocalMemory::~LocalMemory() {
   sys::Free(Base);
 }
 
-void LocalMemory::Reset(size_t AutomaticVarSize) {
-  assert(AutomaticVarSize <= Size && "Not enough space");
+void LocalMemory::Reset(size_t StaticSize) {
+  assert(StaticSize <= Size && "Not enough space");
 
-  uintptr_t NextAddr = reinterpret_cast<uintptr_t>(Base) + AutomaticVarSize;
+  Static = StaticSize ? Base : 0;
+
+  uintptr_t NextAddr = reinterpret_cast<uintptr_t>(Base) + StaticSize;
   Next = reinterpret_cast<void *>(NextAddr);
 }
 

@@ -705,12 +705,12 @@ public:
   }
 
 private:
-  EnqueueNDRangeKernel(Kernel &Kern,
+  EnqueueNDRangeKernel(const Kernel &Kern,
                        DimensionInfo &DimInfo,
                        EventsContainer &WaitList);
 
 public:
-  Kernel &GetKernel() { return *Kern; }
+  Kernel &GetKernel() { return Kern; }
   DimensionInfo &GetDimensionInfo() { return DimInfo; }
 
   unsigned GetWorkGroupsCount() const { return DimInfo.GetWorkGroupsCount(); }
@@ -721,7 +721,7 @@ public:
   }
 
 private:
-  llvm::IntrusiveRefCntPtr<Kernel> Kern;
+  Kernel Kern;
   DimensionInfo DimInfo;
 
   friend class EnqueueNDRangeKernelBuilder;

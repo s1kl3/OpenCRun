@@ -5,6 +5,7 @@
 #include "opencrun/Device/CPUPasses/AllPasses.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
+#include "opencrun/Util/BuiltinInfo.h"
 
 #include "llvm/Linker.h"
 #include "llvm/ADT/STLExtras.h"
@@ -12,6 +13,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace opencrun;
 
@@ -300,11 +302,12 @@ void CPUDevice::UnregisterKernel(Kernel &Kern) {
   llvm::Module &Mod = *Kern.GetModule(*this);
   JIT->removeModule(&Mod);
 
+  KernelID K = Kern.GetFunction(*this);
+
   // Erase kernel from the cache.
-  BlockParallelEntryPoints::iterator I = BlockParallelEntriesCache.find(&Kern),
-                                     E = BlockParallelEntriesCache.end();
-  if(I != E)
-    BlockParallelEntriesCache.erase(I);
+  BlockParallelEntriesCache.erase(K);
+  BlockParallelStaticLocalsCache.erase(K);
+  KernelFootprints.erase(K);
 
   // Invoke static destructors.
   JIT->runStaticConstructorsDestructors(&Mod, true);
@@ -514,18 +517,15 @@ void CPUDevice::InitJIT() {
   // Configure the JIT.
   Engine->InstallLazyFunctionCreator(LibLinker);
 
-  // Init internal calls.
-  opencrun::OpenCLMetadataHandler MDHandler(*BitCodeLibrary);
-
   intptr_t AddrInt;
   void *Addr;
 
   llvm::Function *Func;
 
-  #define INTERNAL_CALL(N, F)                 \
-    AddrInt = reinterpret_cast<intptr_t>(F);  \
-    Addr = reinterpret_cast<void *>(AddrInt); \
-    Func = MDHandler.GetBuiltin(#N);          \
+  #define INTERNAL_CALL(N, Fmt, F)                                    \
+    AddrInt = reinterpret_cast<intptr_t>(F);                          \
+    Addr = reinterpret_cast<void *>(AddrInt);                         \
+    Func = DeviceBuiltinInfo::getPrototype(*BitCodeLibrary, "__builtin_ocl_" #N, Fmt); \
     Engine->addGlobalMapping(Func, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
@@ -691,6 +691,9 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
 
+  // Static local size
+  unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(Cmd.GetKernel());
+
   // Decide the work group size.
   if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
     llvm::SmallVector<size_t, 4> Sizes;
@@ -722,6 +725,7 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                                   GlobalArgs,
                                                   I,
                                                   I + WorkGroupSize,
+                                                  StaticLocalSize,
                                                   *Result);
 
     // Submit command.
@@ -739,9 +743,12 @@ CPUDevice::BlockParallelEntryPoint
 CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
+  KernelID K = Kern.GetFunction(*this);
+
   // Cache hit.
-  if(BlockParallelEntriesCache.count(&Kern))
-    return BlockParallelEntriesCache[&Kern];
+  BlockParallelEntryPoints::iterator I = BlockParallelEntriesCache.find(K);
+  if (I != BlockParallelEntriesCache.end())
+    return I->second;
 
   // Cache miss.
   llvm::Module &Mod = *Kern.GetModule(*this);
@@ -753,7 +760,7 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // Build the entry point and optimize.
   llvm::PassManager PM;
   PM.add(Inliner);
-  PM.add(CreateGroupParallelStubPass(KernName));
+  PM.add(CreateGroupParallelStubPass(this, KernName));
   PM.run(Mod);
 
   // Check whether there was a problem at inline time.
@@ -786,9 +793,50 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   uintptr_t EntryPtrInt = reinterpret_cast<uintptr_t>(EntryPtr);
   CPUDevice::BlockParallelEntryPoint Entry;
   Entry = reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtrInt);
-  BlockParallelEntriesCache[&Kern] = Entry;
+  BlockParallelEntriesCache[K] = Entry;
 
   return Entry;
+}
+
+unsigned CPUDevice::GetBlockParallelStaticLocalSize(Kernel &Kern) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  KernelID K = Kern.GetFunction(*this);
+
+  BlockParallelStaticLocalSizes::iterator I =
+    BlockParallelStaticLocalsCache.find(K);
+  if (I != BlockParallelStaticLocalsCache.end())
+    return I->second;
+
+  llvm::Module &Mod = *Kern.GetModule(*this);
+
+  llvm::KernelInfo Info = ModuleInfo(Mod).getKernelInfo(Kern.GetName());
+
+  unsigned StaticLocalSize = Info.getStaticLocalSize();
+  BlockParallelStaticLocalsCache[K] = StaticLocalSize;
+
+  return StaticLocalSize;
+}
+
+const Footprint &CPUDevice::ComputeKernelFootprint(Kernel &Kern) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  KernelID K = Kern.GetFunction(*this);
+  FootprintsContainer::iterator I = KernelFootprints.find(K);
+
+  if (I != KernelFootprints.end())
+    return I->second;
+
+  FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
+  llvm::Function *Fun = Kern.GetFunction(*this);
+
+  llvm::PassManager PM;
+  PM.add(Pass);
+  PM.run(*Fun->getParent());
+
+  KernelFootprints[K] = *Pass;
+
+  return KernelFootprints[K];
 }
 
 void *CPUDevice::LinkLibFunction(const std::string &Name) {
@@ -826,6 +874,19 @@ void CPUDevice::LocateMemoryObjArgAddresses(
       else
         GlobalArgs[I] = NULL;
     }
+}
+
+static void createAutoLocalVarsPass(const llvm::PassManagerBuilder &PMB,
+                                    llvm::PassManagerBase &PM) {
+  PM.add(createAutomaticLocalVariablesPass());
+}
+
+void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
+                                       LLVMOptimizerParams &Params) const {
+  PMB.addExtension(llvm::PassManagerBuilder::EP_ModuleOptimizerEarly,
+                   createAutoLocalVarsPass);
+  PMB.addExtension(llvm::PassManagerBuilder::EP_EnabledOnOptLevel0,
+                   createAutoLocalVarsPass);
 }
 
 //

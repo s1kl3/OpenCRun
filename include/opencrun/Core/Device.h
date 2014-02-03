@@ -5,6 +5,7 @@
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Profiler.h"
 #include "opencrun/System/Env.h"
+#include "opencrun/Util/Footprint.h"
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LangOptions.h"
@@ -14,15 +15,21 @@
 
 struct _cl_device_id { };
 
+namespace llvm {
+class PassManagerBuilder;
+}
+
 namespace opencrun {
 
-class MemoryObj;
-class HostBuffer;
-class HostAccessibleBuffer;
 class DeviceBuffer;
-class HostImage;
-class HostAccessibleImage;
 class DeviceImage;
+class HostAccessibleBuffer;
+class HostAccessibleImage;
+class HostBuffer;
+class HostImage;
+class LLVMOptimizerParams;
+template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
+class MemoryObj;
 
 class DeviceInfo {
 public:
@@ -414,6 +421,8 @@ public:
     return false;
   }
 
+  virtual const Footprint &ComputeKernelFootprint(Kernel &Kern) = 0;
+
   virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;
   virtual bool CreateDeviceBuffer(DeviceBuffer &Buf) = 0;
@@ -436,7 +445,12 @@ public:
                           llvm::MemoryBuffer &Src,
                           llvm::Module *&Mod);
 
+  virtual void RegisterKernel(Kernel &Kern) { }
   virtual void UnregisterKernel(Kernel &Kern) { }
+
+protected:
+  virtual void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
+                                      LLVMOptimizerParams &Params) const {}
 
 private:
   void InitLibrary();
@@ -458,6 +472,9 @@ private:
 
   std::string Triple;
   std::string SystemResourcePath;
+
+  friend class LLVMOptimizerInterfaceTraits<Device>;
+  friend class DeviceBuiltinInfo;
 };
 
 class GPUDevice : public Device {

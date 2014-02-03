@@ -2,7 +2,7 @@
 #define DEBUG_TYPE "footprint-estimate"
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Passes/FootprintEstimate.h"
-#include "opencrun/Util/OpenCLMetadataHandler.h"
+#include "opencrun/Util/ModuleInfo.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -13,12 +13,16 @@
 using namespace opencrun;
 
 bool FootprintEstimate::runOnFunction(llvm::Function &Fun) {
-  OpenCLMetadataHandler MDHandler(*Fun.getParent());
+  llvm::StringRef Name = Fun.getName();
 
-  if(MDHandler.IsKernel(Fun) && (Kernel == Fun.getName() || Kernel == "")) {
-    for(llvm::inst_iterator I = inst_begin(Fun), E = inst_end(Fun); I != E; ++I)
-      AnalyzeMemoryUsage(*I);
-  }
+  if (Kernel.size() && Name != Kernel)
+    return false;
+
+  if (!ModuleInfo(*Fun.getParent()).hasKernel(Name))
+    return false;
+
+  for(llvm::inst_iterator I = inst_begin(Fun), E = inst_end(Fun); I != E; ++I)
+    AnalyzeMemoryUsage(*I);
 
   return false;
 }

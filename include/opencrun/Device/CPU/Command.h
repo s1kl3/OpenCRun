@@ -954,6 +954,7 @@ public:
                                ArgsMappings &GlobalArgs,
                                DimensionInfo::iterator I,
                                DimensionInfo::iterator E,
+                               unsigned StaticLocalSize,
                                CPUCommand::ResultRecorder &Result);
 
   ~NDRangeKernelBlockCPUCommand();
@@ -964,6 +965,7 @@ public:
 public:
   Signature &GetFunction() { return Entry; }
   void **GetArgumentsPointer() { return Args; }
+  unsigned GetStaticLocalSize() const { return StaticLocalSize; }
 
   Kernel &GetKernel() {
     return GetQueueCommandAs<EnqueueNDRangeKernel>().GetKernel();
@@ -979,6 +981,7 @@ private:
 private:
   Signature Entry;
   void **Args;
+  unsigned StaticLocalSize;
 
   DeviceImagesContainer DevImgs;
   DeviceSamplersContainer DevSmplrs;

@@ -102,7 +102,7 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
     if(!Cur.IsBuilt())
       continue;
 
-    if(Cur.GetKernelType(KernName) != Fst.GetKernelType(KernName))
+    if(Cur.GetKernelSignature(KernName) != Fst.GetKernelSignature(KernName))
       RETURN_WITH_ERROR(ErrCode,
                         CL_INVALID_KERNEL_DEFINITION,
                         "kernel signatures do not match");
@@ -111,7 +111,6 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
   }
 
   Kernel *Kern = new Kernel(*this, Codes);
-  RegisterKernel(*Kern);
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
@@ -145,12 +144,12 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
     if(!Cur.IsBuilt())
       continue;
 
-    BuildInformation::kernel_iterator KI = Cur.kernel_begin(),
-                                      KE = Cur.kernel_end();
+    BuildInformation::kernel_info_iterator KI = Cur.kernel_begin(),
+                                           KE = Cur.kernel_end();
 
     for(; KI != KE; ++KI) {
       llvm::StringRef KernName = KI->getName();
-      SignMap[KernName].push_back(std::make_pair(&Dev, &*KI));
+      SignMap[KernName].push_back(std::make_pair(&Dev, KI->getFunction()));
     }
   }
 
@@ -173,7 +172,6 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
         Codes[DevFun[I].first] = DevFun[I].second;
 
       Kernel *Kern = new Kernel(*this, Codes);
-      RegisterKernel(*Kern);
       Kernels.push_back(Kern);
     }
 
@@ -297,7 +295,6 @@ ProgramBuilder &ProgramBuilder::SetSources(unsigned Count,
       Src = llvm::StringRef(Srcs[I]);
 
     Buf += Src;
-    Buf += '\n';
   }
 
   this->Srcs = llvm::MemoryBuffer::getMemBufferCopy(Buf);

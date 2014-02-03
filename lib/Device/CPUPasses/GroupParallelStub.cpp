@@ -1,6 +1,7 @@
 
 #include "opencrun/Device/CPUPasses/AllPasses.h"
-#include "opencrun/Util/OpenCLMetadataHandler.h"
+#include "opencrun/Util/BuiltinInfo.h"
+#include "opencrun/Util/ModuleInfo.h"
 #include "opencrun/Util/PassOptions.h"
 
 #define DEBUG_TYPE "CPU-group-parallel-stub"
@@ -40,9 +41,8 @@ public:
   static char ID;
 
 public:
-  GroupParallelStub(llvm::StringRef Kernel = "") :
-    llvm::ModulePass(ID),
-    Kernel(GetKernelOption(Kernel)) { }
+  GroupParallelStub(const Device *Dev, llvm::StringRef Kernel = "")
+   : llvm::ModulePass(ID), DBI(Dev), Kernel(GetKernelOption(Kernel)) {}
 
 public:
   virtual bool runOnModule(llvm::Module &Mod);
@@ -59,6 +59,7 @@ private:
   }
 
 private:
+  DeviceBuiltinInfo DBI;
   std::string Kernel;
   llvm::Function *Barrier;
 };
@@ -66,23 +67,18 @@ private:
 } // End anonymous namespace.
 
 bool GroupParallelStub::runOnModule(llvm::Module &Mod) {
-  OpenCLMetadataHandler MDHandler(Mod);
+  ModuleInfo Info(Mod);
 
-  llvm::Function *KernelFun;
+  Barrier = DBI.getSimpleBuiltin(Mod, "barrier");
+
   bool Modified = false;
 
-  Barrier = MDHandler.GetBuiltin("barrier");
+  if (Kernel != "")
+    return BuildStub(*Info.getKernelInfo(Kernel).getFunction());
 
-  if(Kernel != "" && (KernelFun = MDHandler.GetKernel(Kernel)))
-    Modified = BuildStub(*KernelFun);
-  
-  else for(OpenCLMetadataHandler::kernel_iterator I = MDHandler.kernel_begin(),
-                                                  E = MDHandler.kernel_end();
-                                                  I != E;
-                                                  ++I)
-    // Use BuildStub(*I) as first || operand to force evaluation and avoid
-    // short-circuiting by the compiler.
-    Modified = BuildStub(*I) || Modified;
+  for(ModuleInfo::kernel_info_iterator I = Info.kernel_info_begin(),
+      E = Info.kernel_info_end(); I != E; ++I)
+    Modified |= BuildStub(*I->getFunction());
 
   return Modified;
 }
@@ -168,10 +164,7 @@ bool GroupParallelStub::BuildStub(llvm::Function &Kern) {
 
 char GroupParallelStub::ID = 0;
 
-static llvm::RegisterPass<GroupParallelStub> X("cpu-group-parallel-stub",
-                                               "Create kernel stub for "
-                                               "cpu group parallel scheduler");
-
-llvm::Pass *opencrun::CreateGroupParallelStubPass(llvm::StringRef Kernel) {
-  return new GroupParallelStub(Kernel);
+llvm::Pass *opencrun::CreateGroupParallelStubPass(const Device *Dev,
+                                                  llvm::StringRef Kernel) {
+  return new GroupParallelStub(Dev, Kernel);
 }

@@ -519,6 +519,10 @@ private:
       const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("Builtin"));
       Decl = new OCLBuiltinNameDecl(Name, Builtin);
     }
+    else if (R.isSubClassOf("LibM")) {
+      const OCLParam &Param = getParam(*R.getValueAsDef("Param"));
+      Decl = new OCLLibMDecl(Param);
+    }
     else
       llvm::PrintFatalError("Invalid OCLDecl: " + R.getName());
 
