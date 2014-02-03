@@ -31,9 +31,13 @@ clReleaseSampler
 clGetSamplerInfo
 clCreateProgramWithSource
 clCreateProgramWithBinary
+clCreateProgramWithBuiltInKernels
 clRetainProgram
 clReleaseProgram
 clBuildProgram
+clCompileProgram
+clLinkProgram
+clUnloadPlatformCompiler
 clUnloadCompiler
 clGetProgramInfo
 clGetProgramBuildInfo
@@ -43,6 +47,7 @@ clRetainKernel
 clReleaseKernel
 clSetKernelArg
 clGetKernelInfo
+clGetKernelArgInfo
 clGetKernelWorkGroupInfo
 clWaitForEvents
 clGetEventInfo
@@ -78,5 +83,6 @@ clEnqueueMarker
 clEnqueueWaitForEvents
 clEnqueueBarrierWithWaitList
 clEnqueueBarrier
+clGetExtensionFunctionAddressForPlatform
 clGetExtensionFunctionAddress
 clIcdGetPlatformIDsKHR

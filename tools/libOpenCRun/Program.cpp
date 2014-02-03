@@ -39,6 +39,16 @@ clCreateProgramWithBinary(cl_context context,
   return 0;
 }
 
+CL_API_ENTRY cl_program CL_API_CALL
+clCreateProgramWithBuiltInKernels(cl_context context,
+                                  cl_uint num_devices,
+                                  const cl_device_id *device_list,
+                                  const char *kernel_names,
+                                  cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
+}
+
 CL_API_ENTRY cl_int CL_API_CALL
 clRetainProgram(cl_program program) CL_API_SUFFIX__VERSION_1_0 {
   if(!program)
@@ -95,7 +105,41 @@ clBuildProgram(cl_program program,
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
-clUnloadCompiler(void) CL_API_SUFFIX__VERSION_1_0 {
+clCompileProgram(cl_program program,
+                 cl_uint num_devices,
+                 const cl_device_id *device_list,
+                 const char *options, 
+                 cl_uint num_input_headers,
+                 const cl_program *input_headers,
+                 const char **header_include_names,
+                 void (CL_CALLBACK *pfn_notify)(cl_program program, void *user_data),
+                 void *user_data) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return CL_SUCCESS;
+}
+
+CL_API_ENTRY cl_program CL_API_CALL
+clLinkProgram(cl_context context,
+              cl_uint num_devices,
+              const cl_device_id *device_list,
+              const char *options, 
+              cl_uint num_input_programs,
+              const cl_program *input_programs,
+              void (CL_CALLBACK *pfn_notify)(cl_program program, void *user_data),
+              void *user_data,
+              cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return 0;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clUnloadPlatformCompiler(cl_platform_id platform) CL_API_SUFFIX__VERSION_1_2 {
+  llvm_unreachable("Not yet implemented");
+  return CL_SUCCESS;
+}
+
+CL_API_ENTRY CL_EXT_PREFIX__VERSION_1_1_DEPRECATED cl_int CL_API_CALL
+clUnloadCompiler(void) CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED {
   llvm_unreachable("Not yet implemented");
   return CL_SUCCESS;
 }
