@@ -22,15 +22,6 @@ LLVMOptimizerBase::LLVMOptimizerBase(const clang::LangOptions &langopts,
 }
 
 void LLVMOptimizerBase::init() {
-#ifndef NDEBUG
-  llvm::SmallVector<const char *, 16> Args;
-  Args.push_back("opencrun");
-  Args.push_back("-debug-pass");
-  Args.push_back("Structure");
-  Args.push_back(0);
-  llvm::cl::ParseCommandLineOptions(Args.size() - 1, Args.data());
-#endif
-
   // Setup code copied from clang/lib/CodeGen/BackendUtil.cpp
   const clang::CodeGenOptions &CGOpts = Params.CodeGenOpts;
   unsigned OptLevel = CGOpts.OptimizationLevel;
