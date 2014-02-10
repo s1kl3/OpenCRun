@@ -77,7 +77,7 @@ public:
   }
 
   void removeConst() { Mask &= ~Const; }
-  void removeBolatile() { Mask &= ~Volatile; }
+  void removeVolatile() { Mask &= ~Volatile; }
   void removeRestrict() { Mask &= ~Restrict; }
   void removeAddressSpace() { addAddressSpace(AS_Private); }
   void removeImageAccess() { addImageAccess(IA_Invalid); }

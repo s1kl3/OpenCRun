@@ -16,7 +16,7 @@ bool KernelSignature::checkValidity() const {
 }
 
 bool KernelSignature::operator==(const KernelSignature &S) const {
-  if (getNumArguments() == S.getNumArguments())
+  if (getNumArguments() != S.getNumArguments())
     return false;
 
   opencl::TypeComparator C;
@@ -63,7 +63,7 @@ llvm::MDNode *KernelInfo::getKernelArgInfo(llvm::StringRef Name) const {
   assert(MD);
   if (Name.startswith("kernel_arg_"))
     for (unsigned I = 1, E = MD->getNumOperands(); I != E; ++I) {
-      llvm::MDNode *N = llvm::cast<llvm::MDNode>(InfoMD->getOperand(I));
+      llvm::MDNode *N = llvm::cast<llvm::MDNode>(MD->getOperand(I));
       llvm::MDString *S = llvm::cast<llvm::MDString>(N->getOperand(0));
       if (S->getString() == Name)
         return N;
