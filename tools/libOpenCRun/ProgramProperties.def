@@ -4,8 +4,8 @@ PROPERTY(CL_PROGRAM_CONTEXT, GetContext, cl_context, opencrun::Context &)
 // CL_PROGRAM_NUM_DEVICES manually implemented.
 // CL_PROGRAM_DEVICES manually implemented.
 PROPERTY(CL_PROGRAM_SOURCE, GetSource, char, llvm::StringRef)
-// CL_PROGRAM_BINARY_SIZES not yet implemented.
-// CL_PROGRAM_BINARIES not yet implemented.
+// CL_PROGRAM_BINARY_SIZES manually implemented.
+// CL_PROGRAM_BINARIES manually implemented.
 // CL_PROGRAM_NUM_KERNELS manually implemented.
 // CL_PROGRAM_KERNEL_NAMES manually implemented.
 

@@ -190,6 +190,38 @@ clGetProgramInfo(cl_program program,
             param_value_size_ret);
   }
 
+  case CL_PROGRAM_BINARY_SIZES: {
+    llvm::SmallVector<size_t, 4> BinarySizes;
+    
+    for(opencrun::Program::buildinfo_iterator I = Prog.buildinfo_begin(),
+                                              E = Prog.buildinfo_end();
+                                              I != E;
+                                              ++I)
+      BinarySizes.push_back(I->second->GetBinarySize());
+
+    return clFillValue<size_t, llvm::SmallVector<size_t, 4> &>(
+            static_cast<size_t *>(param_value),
+            BinarySizes,
+            param_value_size,
+            param_value_size_ret);
+  }
+
+  case CL_PROGRAM_BINARIES: {
+    llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> Binaries;
+
+    for(opencrun::Program::buildinfo_iterator I = Prog.buildinfo_begin(),
+                                              E = Prog.buildinfo_end();
+                                              I != E;
+                                              ++I)
+      Binaries.push_back(I->second->GetBinary());
+
+    return clFillValue<unsigned char *, llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> &>(
+            static_cast<unsigned char **>(param_value),
+            Binaries,
+            param_value_size,
+            param_value_size_ret);
+  }
+
   case CL_PROGRAM_NUM_KERNELS: {
     if(!Prog.HasAttachedKernels())
       return CL_INVALID_PROGRAM_EXECUTABLE;

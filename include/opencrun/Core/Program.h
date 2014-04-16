@@ -82,12 +82,19 @@ public:
     this->BitCode.reset(BitCode);
   }
 
+  void SetBinary(llvm::SmallVector<char, 1024> &Binary) {
+    this->Binary = Binary;
+  }
+
   void SetBuildOptions(llvm::StringRef Opts) {
     BuildOpts = Opts;
   }
 
 public:
   std::string &GetBuildLog() { return BuildLog; }
+
+  llvm::SmallVector<char, 1024> &GetBinary() { return Binary; }
+  size_t GetBinarySize() const { return Binary.size(); }
 
   llvm::StringRef GetBuildOptions() { return BuildOpts.str(); }
 
@@ -128,6 +135,7 @@ private:
   llvm::SmallString<32> BuildOpts;
 
   llvm::OwningPtr<llvm::Module> BitCode;
+  llvm::SmallVector<char, 1024> Binary;
 };
 
 class Program : public _cl_program, public MTRefCountedBase<Program> {
@@ -138,6 +146,12 @@ public:
   typedef llvm::SmallVector<Device *, 2> DevicesContainer;
   typedef std::map<Device *, BuildInformation *> BuildInformationContainer;
   typedef llvm::SmallPtrSet<Kernel *, 4> AttachedKernelsContainer;
+
+  typedef BuildInformationContainer::iterator buildinfo_iterator;
+
+public:
+  buildinfo_iterator buildinfo_begin() { return BuildInfo.begin(); }
+  buildinfo_iterator buildinfo_end() { return BuildInfo.end(); }
 
 public:
   ~Program() { llvm::DeleteContainerSeconds(BuildInfo); }

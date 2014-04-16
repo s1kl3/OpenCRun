@@ -4,6 +4,8 @@
 #include "opencrun/Core/Device.h"
 #include "opencrun/Core/Kernel.h"
 
+#include "llvm/Bitcode/ReaderWriter.h"
+
 #include "clang/Frontend/ChainedDiagnosticConsumer.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
@@ -240,9 +242,17 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
   llvm::Module *BitCode = NULL;
   bool Success = Dev.TranslateToBitCode(Opts, *Diag, *Src, BitCode);
 
-  if(Success)
+  if(Success) {
+    // TODO: The generated LLVM bitcode is stored as the binary code for every
+    // Device but, in some cases, a Device may require a shared object as a binary.
+    llvm::SmallVector<char, 1024> Binary;
+    llvm::raw_svector_ostream BitCodeOS(Binary);
+    llvm::WriteBitcodeToFile(BitCode, BitCodeOS);
+    BitCodeOS.flush();
+
     Info.SetBitCode(BitCode);
-  else if(BitCode)
+    Info.SetBinary(Binary);
+  } else if(BitCode)
     delete BitCode;
 
   Info.SetBuildOptions(Opts);
