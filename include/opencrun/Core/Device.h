@@ -461,6 +461,9 @@ private:
                                clang::CompilerInvocation &Invocation,
                                clang::DiagnosticsEngine &Diags);
 
+public:
+  llvm::LLVMContext &GetContext() { return LLVMCtx; }
+
 protected:
   llvm::sys::Mutex ThisLock;
 

@@ -82,19 +82,16 @@ public:
     this->BitCode.reset(BitCode);
   }
 
-  void SetBinary(llvm::SmallVector<char, 1024> &Binary) {
-    this->Binary = Binary;
-  }
-
   void SetBuildOptions(llvm::StringRef Opts) {
     BuildOpts = Opts;
   }
 
+  void SetBinary(llvm::MemoryBuffer *Binary) {
+    this->Binary.reset(Binary);
+  }
+
 public:
   std::string &GetBuildLog() { return BuildLog; }
-
-  llvm::SmallVector<char, 1024> &GetBinary() { return Binary; }
-  size_t GetBinarySize() const { return Binary.size(); }
 
   llvm::StringRef GetBuildOptions() { return BuildOpts.str(); }
 
@@ -120,6 +117,10 @@ public:
     return I != Info.kernel_info_end() ? I->getSignature() : NULL;
   }
 
+  llvm::StringRef GetBinary() { return Binary->getBuffer(); }
+
+  size_t GetBinarySize() { return Binary->getBufferSize(); }
+
 public:
   bool IsBuilt() const { return BuildStatus == CL_BUILD_SUCCESS; }
   bool BuildInProgress() const { return BuildStatus == CL_BUILD_IN_PROGRESS; }
@@ -135,7 +136,7 @@ private:
   llvm::SmallString<32> BuildOpts;
 
   llvm::OwningPtr<llvm::Module> BitCode;
-  llvm::SmallVector<char, 1024> Binary;
+  llvm::OwningPtr<llvm::MemoryBuffer> Binary;
 };
 
 class Program : public _cl_program, public MTRefCountedBase<Program> {
@@ -145,20 +146,31 @@ public:
 public:
   typedef llvm::SmallVector<Device *, 2> DevicesContainer;
   typedef std::map<Device *, BuildInformation *> BuildInformationContainer;
+  typedef std::map<Device *, llvm::MemoryBuffer *> BinariesContainer;
   typedef llvm::SmallPtrSet<Kernel *, 4> AttachedKernelsContainer;
 
+  typedef DevicesContainer::iterator device_iterator;
   typedef BuildInformationContainer::iterator buildinfo_iterator;
+  typedef BinariesContainer::iterator binary_iterator;
+  typedef AttachedKernelsContainer::iterator kernel_iterator;
 
 public:
+  device_iterator device_begin() { return Devices.begin(); }
+  device_iterator device_end() { return Devices.end(); }
+
   buildinfo_iterator buildinfo_begin() { return BuildInfo.begin(); }
   buildinfo_iterator buildinfo_end() { return BuildInfo.end(); }
+
+public:
+  DevicesContainer::size_type devices_size() const { return Devices.size(); }
+  BuildInformationContainer::size_type buildinfo_size() const { return BuildInfo.size(); }
 
 public:
   ~Program() { llvm::DeleteContainerSeconds(BuildInfo); }
 
 private:
-  Program(Context &Ctx, llvm::MemoryBuffer &Src) : Ctx(&Ctx),
-                                                   Src(&Src) { }
+  Program(Context &Ctx, llvm::MemoryBuffer &Src);
+  Program(Context &Ctx, BinariesContainer &Binaries);
 
 public:
   cl_int Build(DevicesContainer &Devs,
@@ -171,26 +183,33 @@ public:
                                 cl_kernel *Kernels, 
                                 cl_uint *NumKernelsRet);
 
+public:
   Context &GetContext() { return *Ctx; }
-
-  BuildInformation &GetBuildInformation(Device &Dev) { return *BuildInfo[&Dev]; }
 
   llvm::StringRef GetSource() { return Src->getBuffer(); }
 
+  BuildInformation &GetBuildInformation(Device &Dev) { return *BuildInfo[&Dev]; }
+
   AttachedKernelsContainer &GetAttachedKernels() { return AttachedKernels; }
-  
+
+public:
+  bool IsAssociatedWith(Device &Dev) {
+    return std::count(Devices.begin(), Devices.end(), &Dev);
+  }
+
+  bool IsBuiltFor(Device &Dev) {
+    llvm::sys::ScopedLock Lock(ThisLock);
+
+    return BuildInfo[&Dev]->IsBuilt();
+  }
+
   bool HasAttachedKernels() {
     llvm::sys::ScopedLock Lock(ThisLock);
 
     return !AttachedKernels.empty();
   }
 
-  bool IsBuiltFor(Device &Dev) {
-    llvm::sys::ScopedLock Lock(ThisLock);
-
-    return BuildInfo.count(&Dev);
-  }
-
+public:
   void RegisterKernel(Kernel &Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);
 
@@ -216,6 +235,7 @@ private:
   // memory buffer.
   clang::DiagnosticOptions DiagOptions;
 
+  DevicesContainer Devices;
   BuildInformationContainer BuildInfo;
   AttachedKernelsContainer AttachedKernels;
 
@@ -231,6 +251,12 @@ public:
                              const char *Srcs[],
                              const size_t Lengths[] = NULL);
 
+  ProgramBuilder &SetBinaries(const cl_device_id *DevList,
+                              unsigned NumDevs,
+                              const unsigned char **Binaries,
+                              const size_t *Lengths,
+                              cl_int *BinStatus);
+
   Program *Create(cl_int *ErrCode);
 
 private:
@@ -239,6 +265,7 @@ private:
 private:
   Context &Ctx;
   llvm::MemoryBuffer *Srcs;
+  Program::BinariesContainer Binaries;
 
   cl_int ErrCode;
 };

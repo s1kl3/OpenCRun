@@ -120,9 +120,9 @@ cl_int clFillValue<size_t, llvm::SmallVector<size_t, 4> &>(
 }
 
 template <> inline
-cl_int clFillValue<unsigned char *, llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> &>(
+cl_int clFillValue<unsigned char *, llvm::SmallVector<llvm::StringRef, 4> &>(
   unsigned char **Dst,
-  llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> &Src,
+  llvm::SmallVector<llvm::StringRef, 4> &Src,
   size_t DstSize,
   size_t *RightSizeRet) {
   size_t RightSize = sizeof(unsigned char *) * Src.size();
@@ -134,8 +134,10 @@ cl_int clFillValue<unsigned char *, llvm::SmallVector<llvm::SmallVector<char, 10
     if(DstSize < RightSize)
       return CL_INVALID_VALUE;
 
-    for(unsigned I = 0; I < Src.size(); ++I)
+    for(unsigned I = 0; I < Src.size(); ++I) {
+      if(Src[I].size() == 0) Dst[I] = NULL;
       std::copy(Src[I].begin(), Src[I].end(), Dst[I]);
+    }
   }
 
   return CL_SUCCESS;

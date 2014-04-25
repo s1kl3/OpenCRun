@@ -5,6 +5,7 @@
 #include "opencrun/Core/Kernel.h"
 
 #include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Support/SourceMgr.h"
 
 #include "clang/Frontend/ChainedDiagnosticConsumer.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
@@ -31,6 +32,40 @@ void CompilerCallbackClojure::CompilerDone(Program &Prog) {
   return ERR;                       \
   }
 
+Program::Program(Context &Ctx, llvm::MemoryBuffer &Src) : Ctx(&Ctx),
+                                                          Src(&Src) {
+  Devices.resize(Ctx.devices_size());
+  std::copy(Ctx.device_begin(), Ctx.device_end(), Devices.begin());
+}
+
+Program::Program(Context &Ctx, BinariesContainer &Binaries) : Ctx(&Ctx) {
+  for(binary_iterator I = Binaries.begin(), E = Binaries.end(); I!= E; ++I) {
+    Device &Dev = *I->first;
+    llvm::MemoryBuffer *Binary = I->second;
+
+    Devices.push_back(&Dev);
+
+    BuildInfo[&Dev] = new BuildInformation();
+    BuildInformation &Info = *BuildInfo[&Dev];
+
+    Info.SetBinary(Binary);
+
+    llvm::LLVMContext &LLVMCtx = Dev.GetContext();
+
+    if (llvm::isBitcode((const unsigned char *)Binary->getBufferStart(),
+                        (const unsigned char *)Binary->getBufferEnd())) {
+
+      // Parse the LLVM bitcode image and return an llvm::Module for it.
+      llvm::Module *BitCode = llvm::ParseBitcodeFile(Binary, LLVMCtx);
+
+      if(BitCode) {
+        Info.SetBitCode(BitCode);
+        Info.RegisterBuildDone(true);
+      }
+    }
+  }
+}
+
 cl_int Program::Build(DevicesContainer &Devs,
                       llvm::StringRef Opts,
                       CompilerCallbackClojure &CompilerNotify) {
@@ -38,11 +73,11 @@ cl_int Program::Build(DevicesContainer &Devs,
     RETURN_WITH_ERROR(CL_INVALID_OPERATION,
                       "cannot build a program with attached kernel[s]");
 
-  DevicesContainer::iterator I, E;
+  device_iterator I, E;
 
   if(Devs.empty()) {
-    I = Ctx->device_begin();
-    E = Ctx->device_end();
+    I = device_begin();
+    E = device_end();
   } else {
     I = Devs.begin();
     E = Devs.end();
@@ -79,8 +114,8 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
                       CL_INVALID_PROGRAM_EXECUTABLE,
                       "no program has been built");
 
-  BuildInformationContainer::iterator I = BuildInfo.begin(),
-                                      E = BuildInfo.end();
+  buildinfo_iterator I = BuildInfo.begin(),
+                     E = BuildInfo.end();
 
   for(; I != E; ++I) {
     BuildInformation &Fst = *I->second;
@@ -97,7 +132,7 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
   Kernel::CodesContainer Codes;
   Codes[I->first] = Fst.GetKernel(KernName);
 
-  for(BuildInformationContainer::iterator J = ++I; J != E; ++J) {
+  for(buildinfo_iterator J = ++I; J != E; ++J) {
     Device &Dev = *J->first;
     BuildInformation &Cur = *J->second;
 
@@ -136,8 +171,8 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
       
   SignaturesMap SignMap;
 
-  BuildInformationContainer::iterator BI = BuildInfo.begin(),
-                                      BE = BuildInfo.end();
+  buildinfo_iterator BI = BuildInfo.begin(),
+                     BE = BuildInfo.end();
 
   for(; BI != BE; ++BI) {
     Device &Dev = *BI->first;
@@ -205,9 +240,9 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
 
   BuildInformation &Info = *BuildInfo[&Dev];
 
-  if(!Ctx->IsAssociatedWith(Dev))
+  if(!IsAssociatedWith(Dev))
     RETURN_WITH_ERROR(CL_INVALID_DEVICE,
-                      "device not associated with build context");
+                      "device not associated with program");
 
   if(!Src) {
     // No bit-code available, cannot build anything.
@@ -244,11 +279,13 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
 
   if(Success) {
     // TODO: The generated LLVM bitcode is stored as the binary code for every
-    // Device but, in some cases, a Device may require a shared object as a binary.
-    llvm::SmallVector<char, 1024> Binary;
-    llvm::raw_svector_ostream BitCodeOS(Binary);
+    // device but, in some cases, a device may require a shared object as a binary.
+    std::string BitCodeDump;
+    llvm::raw_string_ostream BitCodeOS(BitCodeDump);
     llvm::WriteBitcodeToFile(BitCode, BitCodeOS);
     BitCodeOS.flush();
+
+    llvm::MemoryBuffer *Binary = llvm::MemoryBuffer::getMemBufferCopy(BitCodeDump);
 
     Info.SetBitCode(BitCode);
     Info.SetBinary(Binary);
@@ -312,12 +349,51 @@ ProgramBuilder &ProgramBuilder::SetSources(unsigned Count,
   return *this;
 }
 
+ProgramBuilder &ProgramBuilder::SetBinaries(const cl_device_id *DevList,
+                                            unsigned NumDevs,
+                                            const unsigned char** Binaries,
+                                            const size_t *Lengths,
+                                            cl_int *BinStatus) {
+  for(unsigned I = 0; I < NumDevs; ++I) {
+    if(!DevList[I])
+      return NotifyError(CL_INVALID_DEVICE, "null device given");
+
+    Device *Dev = llvm::cast<Device>(DevList[I]);
+    if(!Ctx.IsAssociatedWith(*Dev))
+      return NotifyError(CL_INVALID_DEVICE, "device not associated with contex");
+
+    if(!Binaries[I]) {
+      if(BinStatus) BinStatus[I] = CL_INVALID_VALUE;
+      return NotifyError(CL_INVALID_VALUE, "null binary given");
+    }
+
+    if(!Lengths[I]) {
+      if(BinStatus) BinStatus[I] = CL_INVALID_VALUE;
+      return NotifyError(CL_INVALID_VALUE, "null length given");
+    }
+
+    // TODO: Check if the program binary is valid for the device,
+    // otherwise return CL_INVALID_BINARY.
+
+    this->Binaries[Dev] =
+      llvm::MemoryBuffer::getMemBufferCopy(
+          llvm::StringRef(reinterpret_cast<const char *>(Binaries[I]), Lengths[I]));
+
+    BinStatus[I] = CL_SUCCESS;
+  }
+
+  return *this;
+}
+
 Program *ProgramBuilder::Create(cl_int *ErrCode) {
   if(this->ErrCode != CL_SUCCESS)
     RETURN_WITH_ERROR(ErrCode);
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
+
+  if(!Binaries.empty())
+    return new Program(Ctx, Binaries);
 
   return new Program(Ctx, *Srcs);
 }

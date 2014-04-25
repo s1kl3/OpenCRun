@@ -35,8 +35,22 @@ clCreateProgramWithBinary(cl_context context,
                           const unsigned char **binaries,
                           cl_int *binary_status,
                           cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_0 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+  if(!context)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_CONTEXT);
+
+  if(!device_list || !num_devices || !lengths || !binaries)
+    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
+
+  opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
+
+  opencrun::ProgramBuilder Bld(Ctx);
+  opencrun::Program *Prog = Bld.SetBinaries(device_list, num_devices, binaries, lengths, binary_status)
+                               .Create(errcode_ret);
+
+  if(Prog)
+    Prog->Retain();
+
+  return Prog;
 }
 
 CL_API_ENTRY cl_program CL_API_CALL
@@ -169,35 +183,27 @@ clGetProgramInfo(cl_program program,
   #undef PROPERTY
   #undef DS_PROPERTY
 
-  case CL_PROGRAM_NUM_DEVICES: {
-    opencrun::Context &Ctx = Prog.GetContext();
-
-    return clFillValue<cl_uint, opencrun::Context::DevicesContainer::size_type>(
-            static_cast<cl_uint *>(param_value),
-            Ctx.devices_size(),
-            param_value_size,
-            param_value_size_ret);
-  }
-
-  case CL_PROGRAM_DEVICES: {
-    opencrun::Context &Ctx = Prog.GetContext();
-    
-    return clFillValue<cl_device_id, opencrun::Context::device_iterator>(
+  case CL_PROGRAM_DEVICES:
+    return clFillValue<cl_device_id, opencrun::Program::device_iterator>(
             static_cast<cl_device_id *>(param_value),
-            Ctx.device_begin(),
-            Ctx.device_end(),
+            Prog.device_begin(),
+            Prog.device_end(),
             param_value_size,
             param_value_size_ret);
-  }
 
   case CL_PROGRAM_BINARY_SIZES: {
     llvm::SmallVector<size_t, 4> BinarySizes;
     
-    for(opencrun::Program::buildinfo_iterator I = Prog.buildinfo_begin(),
-                                              E = Prog.buildinfo_end();
-                                              I != E;
-                                              ++I)
-      BinarySizes.push_back(I->second->GetBinarySize());
+    for(opencrun::Program::device_iterator I = Prog.device_begin(),
+                                           E = Prog.device_end();
+                                           I != E;
+                                           ++I) {
+      if(Prog.IsBuiltFor(**I)) {
+        opencrun::BuildInformation &BuildInfo = Prog.GetBuildInformation(**I);
+        BinarySizes.push_back(BuildInfo.GetBinarySize());
+      } else
+        BinarySizes.push_back(0);
+    }
 
     return clFillValue<size_t, llvm::SmallVector<size_t, 4> &>(
             static_cast<size_t *>(param_value),
@@ -207,15 +213,20 @@ clGetProgramInfo(cl_program program,
   }
 
   case CL_PROGRAM_BINARIES: {
-    llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> Binaries;
+    llvm::SmallVector<llvm::StringRef, 4> Binaries;
 
-    for(opencrun::Program::buildinfo_iterator I = Prog.buildinfo_begin(),
-                                              E = Prog.buildinfo_end();
-                                              I != E;
-                                              ++I)
-      Binaries.push_back(I->second->GetBinary());
+    for(opencrun::Program::device_iterator I = Prog.device_begin(),
+                                           E = Prog.device_end();
+                                           I != E;
+                                           ++I) {
+      if(Prog.IsBuiltFor(**I)) {
+        opencrun::BuildInformation &BuildInfo = Prog.GetBuildInformation(**I);
+        Binaries.push_back(BuildInfo.GetBinary());
+      } else
+        Binaries.push_back(llvm::StringRef());
+    }
 
-    return clFillValue<unsigned char *, llvm::SmallVector<llvm::SmallVector<char, 1024>, 4> &>(
+    return clFillValue<unsigned char *, llvm::SmallVector<llvm::StringRef, 4> &>(
             static_cast<unsigned char **>(param_value),
             Binaries,
             param_value_size,
