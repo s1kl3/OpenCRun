@@ -286,8 +286,8 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
 
     const clang::ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
 
-    uint64_t Size = ASTCtx.toBits(Layout.getAlignment());
-    uint64_t Alignment = ASTCtx.toBits(Layout.getSize());
+    uint64_t Size = ASTCtx.toBits(Layout.getSize());
+    uint64_t Alignment = ASTCtx.toBits(Layout.getAlignment());
     bool Packed = RD->hasAttr<clang::PackedAttr>();
 
     llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
@@ -434,7 +434,7 @@ bool TypeComparator::match(Type T1, Type T2, std::set<MatchedTypes> &Visited) {
   if (T1 == T2)
     return true;
 
-  if (&T1.MD->getContext() == &T1.MD->getContext())
+  if (&T1.MD->getContext() == &T2.MD->getContext())
     return false;
 
   if (T1.getQualifiers() != T2.getQualifiers())
