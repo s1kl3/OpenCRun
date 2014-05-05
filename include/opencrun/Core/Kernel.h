@@ -211,6 +211,8 @@ public:
     return GetSignature().getNumArguments();
   }
 
+  llvm::StringRef GetArgName(unsigned I) const;
+
   llvm::Module *GetModule(Device &Dev) const {
     CodesContainer::const_iterator I = Codes.find(&Dev);
     return (I != Codes.end()) ? I->second->getParent() : NULL;
@@ -240,8 +242,18 @@ public:
   void RegisterToDevices();
   void UnregisterFromDevices();
 
+public:
+  cl_kernel_arg_address_qualifier GetArgAddressQualifier(unsigned I) const;
+
+  cl_kernel_arg_access_qualifier GetArgAccessQualifier(unsigned I) const;
+
+  llvm::StringRef GetArgTypeName(unsigned I) const;
+
+  cl_kernel_arg_type_qualifier GetArgTypeQualifier(unsigned I) const;
+
 private:
   KernelSignature GetSignature() const;
+  KernelInfo GetInfo() const;
 
   cl_int SetBufferArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetImageArg(unsigned I, size_t Size, const void *Arg);

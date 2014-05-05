@@ -54,6 +54,10 @@ Kernel::~Kernel() {
   llvm::DeleteContainerPointers(Arguments);
 }
 
+llvm::StringRef Kernel::GetArgName(unsigned I) const {
+  return GetInfo().getArgsName().getArgumentAs<llvm::MDString>(I)->getString();
+}
+
 void Kernel::RegisterToDevices() {
   for (CodesContainer::const_iterator I = Codes.begin(),
        E = Codes.end(); I != E; ++I)
@@ -64,6 +68,60 @@ void Kernel::UnregisterFromDevices() {
   for (CodesContainer::const_iterator I = Codes.begin(),
        E = Codes.end(); I != E; ++I)
     I->first->UnregisterKernel(*this);
+}
+
+cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const {
+  opencl::AddressSpace AS;
+
+  AS = static_cast<opencl::AddressSpace>(
+      GetInfo().getArgsAddrSpace().getArgumentAs<llvm::ConstantInt>(I)->getZExtValue());
+
+  switch(AS) {
+  case opencl::AS_Global:
+    return CL_KERNEL_ARG_ADDRESS_GLOBAL;
+  case opencl::AS_Constant:
+    return CL_KERNEL_ARG_ADDRESS_CONSTANT;
+  case opencl::AS_Local:
+    return CL_KERNEL_ARG_ADDRESS_LOCAL;
+  case opencl::AS_Private:
+  case opencl::AS_Invalid:
+  default:
+    return CL_KERNEL_ARG_ADDRESS_PRIVATE;
+  }
+}
+
+cl_kernel_arg_access_qualifier Kernel::GetArgAccessQualifier(unsigned I) const {
+  cl_kernel_arg_access_qualifier ArgAccQls;
+  llvm::StringRef ArgAccStr;
+
+  ArgAccStr = GetInfo().getArgsAccessQual().getArgumentAs<llvm::MDString>(I)->getString();
+  ArgAccQls = llvm::StringSwitch<cl_kernel_arg_access_qualifier>(ArgAccStr)
+    .Case("read_only", CL_KERNEL_ARG_ACCESS_READ_ONLY)
+    .Case("write_only", CL_KERNEL_ARG_ACCESS_WRITE_ONLY)
+    .Case("none", CL_KERNEL_ARG_ACCESS_NONE)
+    .Default(CL_KERNEL_ARG_ACCESS_NONE);
+
+  return ArgAccQls;
+}
+
+llvm::StringRef Kernel::GetArgTypeName(unsigned I) const {
+  return GetInfo().getArgsType().getArgumentAs<llvm::MDString>(I)->getString();
+}
+
+cl_kernel_arg_type_qualifier Kernel::GetArgTypeQualifier(unsigned I) const {
+  cl_kernel_arg_type_qualifier TyQls = CL_KERNEL_ARG_TYPE_NONE;
+  llvm::StringRef TyQlsStr;
+  
+  TyQlsStr = GetInfo().getArgsTypeQual().getArgumentAs<llvm::MDString>(I)->getString();
+
+  if(TyQlsStr.find("const") != llvm::StringRef::npos)
+    TyQls |= CL_KERNEL_ARG_TYPE_CONST;
+  else if(TyQlsStr.find("restrict") != llvm::StringRef::npos)
+    TyQls |= CL_KERNEL_ARG_TYPE_RESTRICT;
+  else if(TyQlsStr.find("volatile") != llvm::StringRef::npos)
+    TyQls |= CL_KERNEL_ARG_TYPE_VOLATILE;
+
+  return TyQls;
 }
 
 static bool isBufferArg(opencl::Type Ty) {
@@ -256,4 +314,14 @@ KernelSignature Kernel::GetSignature() const {
   llvm::Module &Mod = *Kern.getParent();
 
   return ModuleInfo(Mod).getKernelInfo(Kern.getName()).getSignature();
+}
+
+KernelInfo Kernel::GetInfo() const {
+  // All stored functions share the same signature, use the first.
+  CodesContainer::const_iterator J = Codes.begin();
+  assert(J != Codes.end());
+  llvm::Function &Kern = *J->second;
+  llvm::Module &Mod = *Kern.getParent();
+
+  return ModuleInfo(Mod).getKernelInfo(Kern.getName());
 }

@@ -100,9 +100,11 @@ clGetKernelInfo(cl_kernel kernel,
              param_value_size,                     \
              param_value_size_ret);
   #define DS_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
+  #define KA_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
   #include "KernelProperties.def"
   #undef PROPERTY
   #undef DS_PROPERTY
+  #undef KA_PROPERTY
 
   default:
     return CL_INVALID_VALUE;
@@ -116,8 +118,28 @@ clGetKernelArgInfo(cl_kernel kernel,
                    size_t param_value_size,
                    void *param_value,
                    size_t *param_value_size_ret) CL_API_SUFFIX__VERSION_1_2 {
-  llvm_unreachable("Not yet implemented");
-  return 0;
+  if(!kernel)
+    return CL_INVALID_KERNEL;
+
+  opencrun::Kernel &Kern = *llvm::cast<opencrun::Kernel>(kernel);
+  switch(param_name) {
+  #define KA_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY) \
+  case PARAM:                                       \
+    return clFillValue<PARAM_TY, FUN_TY>(           \
+             static_cast<PARAM_TY *>(param_value),  \
+             Kern.FUN(arg_indx),                    \
+             param_value_size,                      \
+             param_value_size_ret);
+  #define PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
+  #define DS_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
+  #include "KernelProperties.def"
+  #undef KA_PROPERTY
+  #undef PROPERTY
+  #undef DS_PROPERTY
+
+  default:
+    return CL_INVALID_VALUE;
+  }
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -148,9 +170,11 @@ CL_API_SUFFIX__VERSION_1_0 {
                param_value_size_ret);                \
   }
   #define PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
+  #define KA_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)
   #include "KernelProperties.def"
   #undef DS_PROPERTY
   #undef PROPERTY
+  #undef KA_PROPERTY
 
   // This property does not depended on the device, however we must ensure that
   // the device is associated with the kernel.

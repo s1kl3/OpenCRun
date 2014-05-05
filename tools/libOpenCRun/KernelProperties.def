@@ -13,3 +13,18 @@ DS_PROPERTY(CL_KERNEL_PRIVATE_MEM_SIZE,
             GetMinPrivateMemoryUsage,
             cl_ulong,
             size_t)
+
+KA_PROPERTY(CL_KERNEL_ARG_ADDRESS_QUALIFIER,
+            GetArgAddressQualifier,
+            cl_kernel_arg_address_qualifier,
+            cl_kernel_arg_address_qualifier)
+KA_PROPERTY(CL_KERNEL_ARG_ACCESS_QUALIFIER,
+            GetArgAccessQualifier,
+            cl_kernel_arg_access_qualifier,
+            cl_kernel_arg_access_qualifier)
+KA_PROPERTY(CL_KERNEL_ARG_TYPE_NAME, GetArgTypeName, char, llvm::StringRef)
+KA_PROPERTY(CL_KERNEL_ARG_TYPE_QUALIFIER,
+            GetArgTypeQualifier,
+            cl_kernel_arg_type_qualifier,
+            cl_kernel_arg_type_qualifier)
+KA_PROPERTY(CL_KERNEL_ARG_NAME, GetArgName, char, llvm::StringRef) 
