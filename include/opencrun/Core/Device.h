@@ -6,6 +6,7 @@
 #include "opencrun/Core/Profiler.h"
 #include "opencrun/System/Env.h"
 #include "opencrun/Util/Footprint.h"
+#include "opencrun/Util/MTRefCounted.h"
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LangOptions.h"
@@ -403,7 +404,9 @@ protected:
   size_t PreferredWorkGroupSizeMultiple;
 };
 
-class Device : public _cl_device_id, public DeviceInfo {
+class Device : public _cl_device_id,
+               public DeviceInfo,
+               public MTRefCountedBaseVPTR<Device> {
 public:
   typedef llvm::SmallVector<size_t, 4> WorkSizes;
 
@@ -414,6 +417,9 @@ protected:
   Device(llvm::StringRef Name, llvm::StringRef Triple);
 
   virtual ~Device() { }
+
+public:
+  bool IsSubDevice() const { return Parent.getPtr(); }
 
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW, 
@@ -475,6 +481,8 @@ private:
 
   std::string Triple;
   std::string SystemResourcePath;
+
+  llvm::IntrusiveRefCntPtr<Device> Parent;
 
   friend class LLVMOptimizerInterfaceTraits<Device>;
   friend class DeviceBuiltinInfo;

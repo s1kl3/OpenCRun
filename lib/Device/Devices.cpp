@@ -23,8 +23,16 @@ public:
     for(sys::Hardware::node_iterator I = HW.node_begin(),
                                      E = HW.node_end();
                                      I != E;
-                                     ++I)
-      CPUs.insert(new CPUDevice(*I));
+                                     ++I) {
+      CPUDevice *CPU = new CPUDevice(*I);
+
+      // Each CPUDevice associated with a NUMA node will be a
+      // root device, thus its reference count will always be
+      // equal to 1 and it's never released.
+      CPU->Retain();
+
+      CPUs.insert(CPU);
+    }
   }
 
   ~CPUContainer() { llvm::DeleteContainerPointers(CPUs); }

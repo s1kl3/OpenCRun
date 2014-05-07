@@ -134,7 +134,7 @@ clGetDeviceInfo(cl_device_id device,
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
-clCreateSubDevices(cl_device_id device,                        
+clCreateSubDevices(cl_device_id in_device,                        
                    const cl_device_partition_property *properties,
                    cl_uint num_devices,
                    cl_device_id *out_devices,               
@@ -145,12 +145,30 @@ clCreateSubDevices(cl_device_id device,
 
 CL_API_ENTRY cl_int CL_API_CALL
 clRetainDevice(cl_device_id device) CL_API_SUFFIX__VERSION_1_2 {
-  // FIXME: currently there is no support for sub-devices.
+  if(!device)
+    return CL_INVALID_DEVICE;
+
+  opencrun::Device &Dev = *llvm::cast<opencrun::Device>(device);
+
+  // The reference count is incremented only if the device has been
+  // created with a call to clCreateSubDevices().
+  if(Dev.IsSubDevice())
+    Dev.Retain();
+
   return CL_SUCCESS;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL
 clReleaseDevice(cl_device_id device) CL_API_SUFFIX__VERSION_1_2 {
-  // FIXME: currently there is no support for sub-devices.
+  if(!device)
+    return CL_INVALID_DEVICE;
+
+  opencrun::Device &Dev = *llvm::cast<opencrun::Device>(device);
+  
+  // The reference count is decremented only if the device has been
+  // created with a call to clCreateSubDevices().
+  if(Dev.IsSubDevice())
+    Dev.Release();
+
   return CL_SUCCESS;
 }
