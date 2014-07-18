@@ -6,6 +6,7 @@
 #include "clang/Basic/Version.h"
 #include "clang/Parse/ParseAST.h"
 #include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/system_error.h"
 
