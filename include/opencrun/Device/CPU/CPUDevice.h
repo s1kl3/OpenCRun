@@ -30,7 +30,7 @@ public:
   typedef llvm::SmallPtrSet<Multiprocessor *, 4> MultiprocessorsContainer;
 
 public:
-  CPUDevice(sys::HardwareNode &Node);
+  CPUDevice(sys::HardwareMachine &Machine);
   ~CPUDevice();
 
 public:
@@ -66,9 +66,9 @@ protected:
                               LLVMOptimizerParams &Params) const LLVM_OVERRIDE;
 
 private:
-  void InitDeviceInfo(sys::HardwareNode &Node);
+  void InitDeviceInfo(sys::HardwareMachine &Machine);
   void InitJIT();
-  void InitMultiprocessors(sys::HardwareNode &Node);
+  void InitMultiprocessors(sys::HardwareMachine &Machine);
 
   void DestroyJIT();
   void DestroyMultiprocessors();

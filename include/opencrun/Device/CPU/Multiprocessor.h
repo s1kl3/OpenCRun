@@ -20,7 +20,7 @@ public:
   typedef llvm::SmallPtrSet<CPUThread *, 4> CPUThreadsContainer;
 
 public:
-  Multiprocessor(CPUDevice &Dev, const sys::HardwareCache &LLC);
+  Multiprocessor(CPUDevice &Dev, const sys::HardwareSocket &Socket);
   ~Multiprocessor();
 
   Multiprocessor(const Multiprocessor &That); // Do not implement.

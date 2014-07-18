@@ -1,499 +1,452 @@
 
 #include "opencrun/System/Hardware.h"
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/OwningPtr.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/system_error.h"
 
-#include <fstream>
-#include <string>
 #include <unistd.h>
 
 using namespace opencrun::sys;
 
-namespace {
-
-llvm::error_code getFileSafe(llvm::StringRef Filename, std::string &result) {
-  std::ifstream fs(Filename.str().c_str(), std::fstream::in);
-  if (!fs.is_open()) return llvm::make_error_code(llvm::errc::io_error);
-
-
-  std::string cnt((std::istreambuf_iterator<char>(fs)), 
-                      std::istreambuf_iterator<char>());
-
-  fs.close();
-
-  result.swap(cnt);
-
-  return llvm::error_code::success();
-}
-
-class LinuxHardwareParser {
-public:
-  typedef llvm::SmallPtrSet<HardwareCache *, 4> CacheContainer;
-  typedef llvm::DenseMap<unsigned, CacheContainer> CacheByLevelIndex;
-
-public:
-  LinuxHardwareParser(Hardware::CPUComponents &CPUs,
-                      Hardware::CacheComponents &Caches,
-                      Hardware::NodeComponents &Nodes) : CPUs(CPUs),
-                                                         Caches(Caches),
-                                                         Nodes(Nodes) { }
-
-  void operator()() {
-
-    llvm::Twine CPUsRoot = "/sys/devices/system/cpu";
-    llvm::error_code ErrCode;
-
-    llvm::sys::fs::directory_iterator I(CPUsRoot, ErrCode),
-                                      E;
-    do {
-      if(ErrCode)
-        llvm::report_fatal_error("Cannot read CPUs info");
-
-      ParseCPU(I->path());
-
-      I.increment(ErrCode);
-    } while(I != E);
-  }
-
-private:
-  HardwareCPU *ParseCPU(llvm::StringRef Path) {
-    llvm::FoldingSetNodeID ID;
-    void *InsertPoint;
-    llvm::error_code ErrCode;
-
-    // Must start with "cpu".
-    llvm::StringRef Name = llvm::sys::path::filename(Path);
-    if(!Name.startswith("cpu"))
-      return NULL;
-
-    // Must end with the CPU identifier.
-    unsigned CoreID;
-    if(Name.substr(3).getAsInteger(0, CoreID))
-      return NULL;
-
-    // Try looking if CPU has already been added.
-    ID.AddInteger(CoreID);
-    HardwareCPU *CPU = CPUs.FindNodeOrInsertPos(ID, InsertPoint);
-
-    // CPU not yet built.
-    if(!CPU) {
-      CPU = new HardwareCPU(CoreID);
-      CPUs.InsertNode(CPU, InsertPoint);
-    }
-
-    llvm::SmallString<32> CachesRoot;
-
-    llvm::sys::path::append(CachesRoot, Path, "cache");
-    llvm::sys::fs::directory_iterator I(CachesRoot.str(), ErrCode),
-                                      E;
-
-    // Look at cache hierarchy.
-    CacheByLevelIndex CacheLevelIndex;
-    do {
-      if(ErrCode)
-        llvm::report_fatal_error("Cannot read CPU info");
-
-      if(HardwareCache *Cache = ParseCache(I->path())) {
-        unsigned Level = Cache->GetLevel();
-
-        CacheLevelIndex[Level].insert(Cache);
-
-        // First level cache directly connected to the CPU.
-        if(Cache->IsFirstLevelCache()) {
-          CPU->AddLink(Cache);
-          Cache->AddLink(CPU);
-
-        // Link all previous level caches to this cache.
-        } else if(CacheLevelIndex.count(Level - 1)) {
-          CacheContainer &PrevLevel = CacheLevelIndex[Level - 1];
-          for(CacheContainer::iterator I = PrevLevel.begin(),
-                                       E = PrevLevel.end();
-                                       I != E;
-                                       ++I) {
-            (*I)->AddLink(Cache);
-            Cache->AddLink(*I);
-          }
-        }
-      }
-
-      I.increment(ErrCode);
-    } while(I != E);
-
-    llvm::SmallString<32> NodeRoot;
-    bool SysFsInfoAvailable;
-
-    HardwareNode *Node;
-
-    llvm::sys::path::append(NodeRoot, Path, "node");
-
-    // The sys fs does not export info about NUMA nodes: fall-back to proc fs.
-    if(llvm::sys::fs::is_directory(NodeRoot.str(), SysFsInfoAvailable) ||
-       !SysFsInfoAvailable)
-       Node = ParseProcFsNode("/proc");
-
-    // We can gather NUMA information from the sys fs.
-    else
-      Node = ParseSysFsNode(NodeRoot);
-
-    unsigned LastLevel = CacheLevelIndex.size();
-
-    if(!CacheLevelIndex.count(LastLevel))
-      llvm::report_fatal_error("Cache-less architectures not yet supported");
-
-    // Each CPU has only a last level cache.
-    HardwareCache *LLC = *CacheLevelIndex[LastLevel].begin();
-
-    // Link node with the LLC.
-    LLC->AddLink(Node);
-    Node->AddLink(LLC);
-
-    return CPU;
-  }
-
-  HardwareCache *ParseCache(llvm::StringRef Path) {
-    llvm::FoldingSetNodeID ID;
-    void *InsertPoint;
-
-    // Must start with "index".
-    llvm::StringRef Name = llvm::sys::path::filename(Path);
-    if(!Name.startswith("index"))
-      return NULL;
-
-    // Must end with the cache index for the current architecture.
-    unsigned Index;
-    if(Name.substr(5).getAsInteger(0, Index))
-      return NULL;
-
-    unsigned Level;
-    HardwareCache::Kind Kind;
-    HardwareComponent::LinksContainer SharedCPUs;
-
-    // Get info about the cache.
-    ParseCacheLevel(Path, Level);
-    ParseCacheKind(Path, Kind);
-    ParseCacheSharedCPUs(Path, SharedCPUs);
-
-    // Check if the cache has already been built.
-    ID.AddInteger(Level);
-    ID.AddInteger(Kind);
-    for(HardwareComponent::LinksContainer::iterator I = SharedCPUs.begin(),
-                                                    E = SharedCPUs.end();
-                                                    I != E;
-                                                    ++I)
-      ID.AddPointer(*I);
-    HardwareCache *Cache = Caches.FindNodeOrInsertPos(ID, InsertPoint);
-
-    // Cache not yet built.
-    if(!Cache) {
-      Cache = new HardwareCache(Level, Kind, SharedCPUs);
-      Caches.InsertNode(Cache, InsertPoint);
-
-      size_t Size, LineSize;
-
-      ParseCacheSize(Path, Size);
-      ParseCacheLineSize(Path, LineSize);
-
-      Cache->SetSize(Size);
-      Cache->SetLineSize(LineSize);
-    }
-
-    return Cache;
-  }
-
-  HardwareNode *ParseProcFsNode(llvm::StringRef Path) {
-    llvm::FoldingSetNodeID ID;
-    void *InsertPoint;
-
-    llvm::SmallString<32> MemInfoPath;
-    llvm::sys::path::append(MemInfoPath, Path, "meminfo");
-
-    std::string Buf;
-
-    if(getFileSafe(MemInfoPath, Buf))
-      llvm::report_fatal_error("Cannot read meminfo file");
-
-    // Check if node has already been built.
-    ID.AddInteger(0);
-    HardwareNode *Node = Nodes.FindNodeOrInsertPos(ID, InsertPoint);
-
-    // Node not yet built.
-    if(!Node) {
-      Node = new HardwareNode(0);
-      Nodes.InsertNode(Node, InsertPoint);
-
-      llvm::StringRef Input(Buf);
-
-      llvm::SmallVector<llvm::StringRef, 64> Lines;
-      Input.split(Lines, "\n");
-
-      for(llvm::SmallVector<llvm::StringRef, 64>::iterator I = Lines.begin(),
-                                                           E = Lines.end();
-                                                           I != E;
-                                                           ++I) {
-
-        if(I->startswith("MemTotal")) {
-          unsigned long long Size;
-          const char *K = NULL, *J, *T;
-
-          T = I->end();
-
-          // Look for first digit.
-          for(J = I->begin(); J != T && !K; ++J)
-            if(std::isdigit(*J))
-              K = J;
-
-          if(!K)
-            llvm::report_fatal_error("Corrupted meminfo file");
-
-          // Look for the last digit.
-          for(J = K; J != T && std::isdigit(*J); ++J) { }
-          llvm::StringRef RawSize(K, J - K);
-
-          // Look for the multiplier.
-          if(++J >= T)
-            llvm::report_fatal_error("Corrupted meminfo file");
-
-          llvm::StringRef Multiplier(J, T - J);
-
-          // Cannot fail, already parsed.
-          RawSize.getAsInteger(0, Size);
-
-          // Add multiplier.
-          Size *= llvm::StringSwitch<unsigned long long>(Multiplier)
-                    .Case("kB", 1024)
-                    .Default(0);
-
-          if(!Size)
-            llvm::report_fatal_error("Cannot parse memory size");
-
-          Node->SetMemorySize(Size);
-        }
-      }
-    }
-
-    return Node;
-  }
-
-  HardwareNode *ParseSysFsNode(llvm::StringRef Path) {
-    llvm_unreachable("Not yet implemented");
-  }
-
-  void ParseCacheLevel(llvm::StringRef CachePath, unsigned &Level) {
-    llvm::SmallString<32> LevelPath;
-    llvm::sys::path::append(LevelPath, CachePath, "level");
-
-    std::string Buf;
-
-    if(getFileSafe(LevelPath, Buf))
-      llvm::report_fatal_error("Cannot read cache level file");
-
-    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
-
-    if(Input.getAsInteger(0, Level))
-      llvm::report_fatal_error("Cannot parse cache level file");
-  }
-
-  void ParseCacheKind(llvm::StringRef CachePath, HardwareCache::Kind &Kind) {
-    llvm::SmallString<32> TypePath;
-    llvm::sys::path::append(TypePath, CachePath, "type");
-
-    std::string Buf;
-
-    if(getFileSafe(TypePath, Buf))
-      llvm::report_fatal_error("Cannot read cache type file");
-
-    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
-
-    Kind = llvm::StringSwitch<HardwareCache::Kind>(Input)
-           .Case("Instruction", HardwareCache::Instruction)
-           .Case("Data", HardwareCache::Data)
-           .Case("Unified", HardwareCache::Unified)
-           .Default(HardwareCache::Invalid);
-  }
-
-  void ParseCacheSharedCPUs(llvm::StringRef CachePath,
-                            HardwareComponent::LinksContainer &SharedCPUs) {
-    llvm::SmallString<32> SharedCPUPath;
-    llvm::sys::path::append(SharedCPUPath, CachePath, "shared_cpu_list");
-
-    std::string Buf;
-
-    if(getFileSafe(SharedCPUPath, Buf))
-      llvm::report_fatal_error("Cannot read cache shared CPUs file");
-
-    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
-
-    llvm::SmallVector<llvm::StringRef, 4> SharedIDs;
-    if(Input.find(',') != llvm::StringRef::npos)
-      Input.split(SharedIDs, ",");
-    else if(Input.find('-') != llvm::StringRef::npos)
-      Input.split(SharedIDs, "-");
-    else
-      SharedIDs.assign(1, Input);
-
-    if (SharedIDs.back().size() == 0) SharedIDs.pop_back();
-
-    for(llvm::SmallVector<llvm::StringRef, 4>::iterator I = SharedIDs.begin(),
-                                                        E = SharedIDs.end();
-                                                        I != E;
-                                                        ++I) {
-      llvm::SmallVector<llvm::StringRef, 2> RangeIDs;
-      I->split(RangeIDs, "-");
-      if (RangeIDs.back().size() == 0) RangeIDs.pop_back();
-
-      assert(RangeIDs.size() <= 2 && !RangeIDs.empty());
-
-      unsigned BeginCoreID, EndCoreID;
-      if(RangeIDs.front().getAsInteger(0, BeginCoreID))
-        llvm::report_fatal_error("Cannot parse cache shared CPUs file");
-      if(RangeIDs.back().getAsInteger(0, EndCoreID))
-        llvm::report_fatal_error("Cannot parse cache shared CPUs file");
-
-      for (unsigned CoreID = BeginCoreID; CoreID <= EndCoreID; ++CoreID) {
-        llvm::FoldingSetNodeID ID;
-        void *InsertPoint;
-
-        ID.AddInteger(CoreID);
-        HardwareCPU *CPU = CPUs.FindNodeOrInsertPos(ID, InsertPoint);
-
-        if(!CPU) {
-          CPU = new HardwareCPU(CoreID);
-          CPUs.InsertNode(CPU, InsertPoint);
-        }
-
-        SharedCPUs.insert(CPU);
-      }
-    }
-  }
-
-  void ParseCacheSize(llvm::StringRef CachePath, size_t &Size) {
-    unsigned long long N;
-
-    llvm::SmallString<32> SizePath;
-    llvm::sys::path::append(SizePath, CachePath, "size");
-
-    std::string Buf;
-
-    if(getFileSafe(SizePath, Buf))
-      llvm::report_fatal_error("Cannot read cache size file");
-
-    const char *S = Buf.data(),
-               *E = Buf.data() + Buf.size(),
-               *J;
-
-    // Look for multiplier start.
-    for(J = S; J != E && std::isdigit(*J); ++J) { }
-
-    llvm::StringRef RawN(S, J - S);
-    llvm::StringRef Multiplier(J, E - 1 - J);
-
-    if(RawN.getAsInteger(0, N))
-      llvm::report_fatal_error("Cannot parse cache size file");
-
-    N *= llvm::StringSwitch<unsigned long long>(Multiplier)
-           .Case("K", 1024)
-           .Default(0);
-
-    if(!N)
-      llvm::report_fatal_error("Cannot parse cache size file");
-
-    Size = N;
-  }
-
-  void ParseCacheLineSize(llvm::StringRef CachePath, size_t &Size) {
-    unsigned long long N;
-
-    llvm::SmallString<32> LineSizePath;
-    llvm::sys::path::append(LineSizePath, CachePath, "coherency_line_size");
-
-    std::string Buf;
-
-    if(getFileSafe(LineSizePath, Buf))
-      llvm::report_fatal_error("Cannot read cache line size file");
-
-    llvm::StringRef Input(Buf.data(), Buf.size() - 1);
-
-    if(Input.getAsInteger(0, N))
-      llvm::report_fatal_error("Cannot parse cache line size file");
-
-    Size = N;
-  }
-
-private:
-  Hardware::CPUComponents &CPUs;
-  Hardware::CacheComponents &Caches;
-  Hardware::NodeComponents &Nodes;
-};
-
-} // End anonymous namespace.
-
-//
+//===----------------------------------------------------------------------===//
 // HardwareComponent implementation.
-//
+//===----------------------------------------------------------------------===//
 
-HardwareComponent *HardwareComponent::GetAncestor() {
-  HardwareComponent *Comp, *Anc;
+template <typename Ty, typename Ty_iterator, HardwareComponent::Type HWCompTy>
+Ty_iterator HardwareComponent::begin() const {
+  Hardware &HW = GetHardware();
+  int nb_objs = hwloc_get_nbobjs_inside_cpuset_by_type(HW.GetHardwareTopology(),
+      GetCPUSet(),
+      hwloc_obj_type_t(HWCompTy));
 
-  for(Comp = this, Anc = NULL; Comp; Comp = Comp->GetParent())
-    Anc = Comp;
+  assert(nb_objs != -1 && "Multiple levels with the specified hardware object type!");
+  if(!nb_objs)
+    return Ty_iterator(this);
 
-  return Anc;
+  // Get the first object of the type specified included in the same CPU set as the current
+  // object.
+  HardwareObject HWObj = hwloc_get_obj_inside_cpuset_by_type(
+      HW.GetHardwareTopology(),
+      GetCPUSet(),
+      hwloc_obj_type_t(HWCompTy),
+      0);
+  HardwareComponent *HWComp = HW.GetHardwareComponent(HWObj);
+  assert(HWComp && "Lacking hardware component!");
+
+  return Ty_iterator(this, static_cast<Ty *>(HWComp));
 }
 
-//
-// HardwareCPU implementation.
-//
-
-HardwareComponent *HardwareCPU::GetParent() {
-  return GetFirstLevelCache();
+template <typename Ty_iterator>
+Ty_iterator HardwareComponent::end() const {
+  return Ty_iterator(this);
 }
 
-HardwareCache *HardwareCPU::GetFirstLevelCache() const {
-  for(HardwareComponent::iterator I = begin(), E = end(); I != E; ++I) {
-    HardwareComponent *Comp = *I;
+template <unsigned CacheLevel, HardwareComponent::CacheType CacheTy>
+HardwareComponent::const_cache_iterator HardwareComponent::cache_begin() const {
+  Hardware &HW = GetHardware();
+  int cache_depth = hwloc_get_cache_type_depth(HW.GetHardwareTopology(),
+                                               CacheLevel,
+                                               hwloc_obj_cache_type_t(CacheTy));
+  assert((cache_depth != HWLOC_TYPE_DEPTH_MULTIPLE) &&
+         "Multiple levels with the specified cache object type!");
 
-    if(HardwareCache *Cache = llvm::dyn_cast<HardwareCache>(Comp))
-      return Cache;
+  // No cache of the given level/type.
+  if(cache_depth == HWLOC_TYPE_DEPTH_UNKNOWN)
+    return const_cache_iterator(this,
+                                CacheLevel,
+                                CacheTy);
+
+  HardwareObject HWObj = hwloc_get_obj_inside_cpuset_by_depth(HW.GetHardwareTopology(),
+                                                              GetCPUSet(),
+                                                              cache_depth,
+                                                              0);
+  HardwareComponent *HWComp = HW.GetHardwareComponent(HWObj);
+  assert(HWComp && "Lacking hardware component!");
+
+  return const_cache_iterator(this,
+                              CacheLevel,
+                              CacheTy,
+                              static_cast<const HardwareCache *>(HWComp));
+}
+
+template <unsigned CacheLevel, HardwareComponent::CacheType CacheTy>
+HardwareComponent::const_cache_iterator HardwareComponent::cache_end() const {
+  return const_cache_iterator(this, CacheLevel, CacheTy);
+}
+
+template <typename Ty>
+void HardwareComponent::ConstFilteredIterator<Ty>::Advance() {
+  Hardware &HW = GetHardware();
+
+  // The following doesn't work if objects at the given depth do not have CPU sets
+  // or if the topology is made of different machines.
+  HardwareObject HWObj = hwloc_get_next_obj_inside_cpuset_by_depth(HW.GetHardwareTopology(),
+                                                                   HWCompRoot->GetCPUSet(),
+                                                                   HWComp->GetDepth(),
+                                                                   HWComp->GetHardwareObject());
+  if(!HWObj) {
+    HWComp = NULL;
+    return;
+  }
+    
+  HardwareComponent *HWNext = HW.GetHardwareComponent(HWObj);
+  assert(HWNext && "Lacking hardware component!");
+
+  HWComp = static_cast<Ty *>(HWNext);
+}
+
+HardwareComponent::HardwareComponentsContainer
+HardwareComponent::GetChildren() const {
+  Hardware &HW = GetHardware();
+  HardwareComponentsContainer Children;
+
+  for(unsigned I = 0; I < GetChildrenNum(); ++I) {
+    // Get the corresponding HardwareComponent from Hardware's containers.
+    HardwareComponent *HWComp = HW.GetHardwareComponent(HWObj->children[I]);
+    assert(HWComp && "Lacking hardware component!");
+    Children.push_back(HWComp);
   }
 
-  return NULL;
+  return Children;
 }
 
-//
-// HardwareCache implementation.
-//
+HardwareComponent *HardwareComponent::GetChild(unsigned I) const {
+  Hardware &HW = GetHardware();
 
-HardwareComponent *HardwareCache::GetNextLevelMemory() {
-  for(HardwareComponent::iterator I = begin(), E = end(); I != E; ++I) {
-    if(HardwareNode *Node = llvm::dyn_cast<HardwareNode>(*I))
-      return Node;
-
-    if(HardwareCache *Cache = llvm::dyn_cast<HardwareCache>(*I))
-      if(Cache->GetLevel() > Level)
-        return Cache;
-  }
-
-  return NULL;
+  assert(I < GetChildrenNum() && "Index out of range!");
+  HardwareComponent *HWComp = HW.GetHardwareComponent(HWObj->children[I]);
+  assert(HWComp && "Lacking hardware component!");
+  return HWComp;
 }
 
-//
+HardwareComponent *HardwareComponent::GetParent() const {
+  Hardware &HW = GetHardware();
+  HardwareObject ParentObj = HWObj->parent;
+
+  // HWObj is the root object.
+  if(!ParentObj)
+    return NULL;
+
+  HardwareComponent *Parent = HW.GetHardwareComponent(ParentObj);
+  assert(Parent && "Lacking hardware component!");
+  return Parent;
+}
+
+HardwareComponent *HardwareComponent::GetFirstChild() const {
+  Hardware &HW = GetHardware();
+
+  // HWObj has no children.
+  if(!GetChildrenNum())
+    return NULL;
+
+  HardwareObject FstChldObj = HWObj->first_child;
+  HardwareComponent *FstChld = HW.GetHardwareComponent(FstChldObj);
+  assert(FstChld && "Lacking hardware component!");
+  return FstChld;
+}
+
+HardwareComponent *HardwareComponent::GetLastChild() const {
+  Hardware &HW = GetHardware();
+
+  // HWObj has no children.
+  if(!GetChildrenNum())
+    return NULL;
+
+  HardwareObject LstChldObj = HWObj->last_child;
+  HardwareComponent *LstChld = HW.GetHardwareComponent(LstChldObj);
+  assert(LstChld && "Lacking hardware component!");
+  return LstChld;
+}
+
+HardwareComponent *HardwareComponent::GetNextSibling() const {
+  Hardware &HW = GetHardware();
+
+  // HWObj is the last sibling or it has no siblings.
+  if(!HWObj->next_sibling)
+    return NULL;
+
+  HardwareObject NxtSblObj = HWObj->next_sibling;
+  HardwareComponent *NxtSbl = HW.GetHardwareComponent(NxtSblObj);
+  assert(NxtSblObj && "Lacking hardware component!");
+  return NxtSbl;
+}
+
+HardwareComponent *HardwareComponent::GetPrevSibling() const {
+  Hardware &HW = GetHardware();
+
+  // HWObj is the first sibling or it has no siblings.
+  if(!HWObj->prev_sibling)
+    return NULL;
+
+  HardwareObject PrvSblObj = HWObj->prev_sibling;
+  HardwareComponent *PrvSbl = HW.GetHardwareComponent(PrvSblObj);
+  assert(PrvSblObj && "Lacking hardware component!");
+  return PrvSbl;
+}
+
+HardwareComponent *HardwareComponent::GetNextCousin() const {
+  Hardware &HW = GetHardware();
+  
+  // HWObj is the last cousin or it has no cousins.
+  if(!HWObj->next_cousin)
+    return NULL;
+
+  HardwareObject NxtCousObj = HWObj->next_cousin;
+  HardwareComponent *NxtCous = HW.GetHardwareComponent(NxtCousObj);
+  assert(NxtCousObj && "Lacking hardware component!");
+  return NxtCous;
+}
+
+HardwareComponent *HardwareComponent::GetPrevCousin() const {
+  Hardware &HW = GetHardware();
+
+  // HWObj is the first cousin or it has no cousins.
+  if(!HWObj->prev_cousin)
+    return NULL;
+
+  HardwareObject PrvCousObj = HWObj->prev_cousin;
+  HardwareComponent *PrvCous = HW.GetHardwareComponent(PrvCousObj);
+  assert(PrvCousObj && "Lacking hardware component!");
+  return PrvCous;
+}
+
+//===----------------------------------------------------------------------===//
+// HardwareMachine implementation.
+//===----------------------------------------------------------------------===//
+
+HardwareMachine::const_node_iterator HardwareMachine::node_begin() const {
+  return begin<const HardwareNode, const_node_iterator, HardwareComponent::Node>();
+}
+
+HardwareMachine::const_node_iterator HardwareMachine::node_end() const {
+  return end<const_node_iterator>();
+}
+
+HardwareMachine::const_socket_iterator HardwareMachine::socket_begin() const {
+  return begin<const HardwareSocket, const_socket_iterator, HardwareComponent::Socket>();
+}
+
+HardwareMachine::const_socket_iterator HardwareMachine::socket_end() const {
+  return end<const_socket_iterator>();
+}
+
+const HardwareNode &HardwareMachine::node_front() const {
+  return *node_begin();
+}
+
+const HardwareNode &HardwareMachine::node_back() const {
+  const_node_iterator I = node_begin(),
+                      E = node_end(),
+                      J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+const HardwareSocket &HardwareMachine::socket_front() const {
+  return *socket_begin();
+}
+
+const HardwareSocket &HardwareMachine::socket_back() const {
+  const_socket_iterator I = socket_begin(),
+                        E = socket_end(),
+                        J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+//===----------------------------------------------------------------------===//
 // HardwareNode implementation.
-//
+//===----------------------------------------------------------------------===//
 
-const HardwareCPU &HardwareNode::cpu_front() const {
+HardwareNode::const_socket_iterator HardwareNode::socket_begin() const {
+  return begin<const HardwareSocket, const_socket_iterator, HardwareComponent::Socket>();
+}
+
+HardwareNode::const_socket_iterator HardwareNode::socket_end() const {
+  return end<const_socket_iterator>();
+}
+
+const HardwareSocket &HardwareNode::socket_front() const {
+  return *socket_begin();
+}
+
+const HardwareSocket &HardwareNode::socket_back() const {
+  const_socket_iterator I = socket_begin(),
+                        E = socket_end(),
+                        J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+//===----------------------------------------------------------------------===//
+// HardwareSocket implementation.
+//===----------------------------------------------------------------------===//
+
+const HardwareCache *HardwareSocket::GetLastCache() const {
+  const HardwareComponent *HWComp = this;
+  const HardwareCache *HWCache = NULL;
+  
+  for(; HWComp; HWComp = HWComp->GetFirstChild())
+    if(HWComp->GetType() == HardwareComponent::Cache) {
+      HWCache = static_cast<const HardwareCache *>(HWComp);
+      break;
+    }
+
+  return HWCache;
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::llc_begin() const {
+  const HardwareCache *HWCache = GetLastCache();
+  assert(HWCache && "No hardware cache present!");
+
+  return const_cache_iterator(this,
+      HWCache->GetLevel(),
+      HWCache->GetCacheType(),
+      HWCache);
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::llc_end() const {
+  const HardwareCache *HWCache = GetLastCache();
+
+  return const_cache_iterator(this,
+                              HWCache->GetLevel(),
+                              HWCache->GetCacheType());
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::l1ic_begin() const {
+  return cache_begin<1, HardwareComponent::Instruction>();
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::l1ic_end() const {
+  return cache_end<1, HardwareComponent::Instruction>();
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::l1dc_begin() const {
+  return cache_begin<1, HardwareComponent::Data>();
+}
+
+HardwareSocket::const_cache_iterator HardwareSocket::l1dc_end() const {
+  return cache_end<1, HardwareComponent::Data>();
+}
+
+HardwareSocket::const_cpu_iterator HardwareSocket::cpu_begin() const {
+  return begin<const HardwareCPU, const_cpu_iterator, HardwareComponent::CPU>();
+}
+
+HardwareSocket::const_cpu_iterator HardwareSocket::cpu_end() const {
+  return end<const_cpu_iterator>();
+}
+
+const HardwareCache &HardwareSocket::llc_front() const {
+  return *llc_begin();
+}
+
+const HardwareCache &HardwareSocket::llc_back() const {
+  const_cache_iterator I = llc_begin(),
+                       E = llc_end(),
+                       J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+const HardwareCache &HardwareSocket::l1ic_front() const {
+  return *l1ic_begin();
+}
+
+const HardwareCache &HardwareSocket::l1ic_back() const {
+  const_cache_iterator I = l1ic_begin(),
+                       E = l1ic_end(),
+                       J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+const HardwareCache &HardwareSocket::l1dc_front() const {
+  return *l1dc_begin();
+}
+
+const HardwareCache &HardwareSocket::l1dc_back() const {
+  const_cache_iterator I = l1dc_begin(),
+                       E = l1dc_end(),
+                       J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+unsigned HardwareSocket::GetLastCacheLevel() const {
+  const HardwareCache *HWCache = GetLastCache();
+  assert(HWCache && "No hardware cache present!");
+  return HWCache->GetLevel();
+}
+
+HardwareCache::CacheType HardwareSocket::GetLastCacheType() const {
+  const HardwareCache *HWCache = GetLastCache();
+  assert(HWCache && "No hardware cache present!");
+  return HWCache->GetCacheType();
+}
+
+//===----------------------------------------------------------------------===//
+// HardwareCache implementation.
+//===----------------------------------------------------------------------===//
+
+HardwareCache::const_smtcpu_iterator HardwareCache::smtcpu_begin() const {
+  return begin<const HardwareSMTCPU, const_smtcpu_iterator, HardwareComponent::SMTCPU>();
+}
+
+HardwareCache::const_smtcpu_iterator HardwareCache::smtcpu_end() const {
+  return end<const_smtcpu_iterator>();
+}
+
+const HardwareSMTCPU &HardwareCache::smtcpu_front() const {
+  return *smtcpu_begin();
+}
+
+const HardwareSMTCPU &HardwareCache::smtcpu_back() const {
+  const_smtcpu_iterator I = smtcpu_begin(),
+                        E = smtcpu_end(),
+                        J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+//===----------------------------------------------------------------------===//
+// HardwareSMTCPU implementation.
+//===----------------------------------------------------------------------===//
+
+HardwareSMTCPU::const_cpu_iterator HardwareSMTCPU::cpu_begin() const {
+  return begin<const HardwareCPU, const_cpu_iterator, HardwareComponent::CPU>();
+}
+
+HardwareSMTCPU::const_cpu_iterator HardwareSMTCPU::cpu_end() const {
+  return end<const_cpu_iterator>();
+}
+
+const HardwareCPU &HardwareSMTCPU::cpu_front() const {
   return *cpu_begin();
 }
 
-const HardwareCPU &HardwareNode::cpu_back() const {
+const HardwareCPU &HardwareSMTCPU::cpu_back() const {
   const_cpu_iterator I = cpu_begin(),
                      E = cpu_end(),
                      J = I;
@@ -504,45 +457,29 @@ const HardwareCPU &HardwareNode::cpu_back() const {
   return *J;
 }
 
-const HardwareCache &HardwareNode::llc_front() const {
-  return *llc_begin();
+//===----------------------------------------------------------------------===//
+// HardwareCPU implementation.
+//===----------------------------------------------------------------------===//
+
+HardwareCache *HardwareCPU::GetFirstLevelCache() const {
+  HardwareComponent *Comp = GetParent();
+
+  // Comp is NULL when the root of the hardware topology is reached.
+  while(Comp) {
+    // LLC is the first found cache-type hardware component above the
+    // CPU-type component.
+    if(HardwareCache *Cache = llvm::dyn_cast<HardwareCache>(Comp))
+      return Cache;
+
+    Comp = Comp->GetParent();
+  }
+
+  return NULL;
 }
 
-const HardwareCache &HardwareNode::llc_back() const {
-  const_llc_iterator I = llc_begin(),
-                     E = llc_end(),
-                     J = I;
-
-  for(; I != E; ++I)
-    J = I;
-
-  return *J;
-}
-
-const HardwareCache &HardwareNode::l1c_front() const {
-  HardwareCPU &CPU = const_cast<HardwareCPU &>(cpu_front());
-
-  return *llvm::cast<HardwareCache>(CPU.GetParent());
-}
-
-const HardwareCache &HardwareNode::l1c_back() const {
-  HardwareCPU &CPU = const_cast<HardwareCPU &>(cpu_back());
-
-  return *llvm::cast<HardwareCache>(CPU.GetParent());
-}
-
-unsigned HardwareNode::CPUsCount() const {
-  unsigned N = 0;
-
-  for(const_cpu_iterator I = cpu_begin(), E = cpu_end(); I != E; ++I)
-    N++;
-
-  return N;
-}
-
-//
+//===----------------------------------------------------------------------===//
 // Hardware implementation.
-//
+//===----------------------------------------------------------------------===//
 
 size_t Hardware::GetPageSize() {
   return getpagesize();
@@ -569,33 +506,82 @@ size_t Hardware::GetMaxNaturalAlignment() {
 }
 
 Hardware::Hardware() {
-  Hardware::CPUComponents CPUs;
-  Hardware::CacheComponents Caches;
-  Hardware::NodeComponents Nodes;
+  // Topology allocation and initialization.
+  hwloc_topology_init(&HWTop);
 
-  LinuxHardwareParser Parser(CPUs, Caches, Nodes);
+  // Topology detection.
+  hwloc_topology_load(HWTop);
 
-  Parser();
-  
-  for(Hardware::CPUComponents::iterator I = CPUs.begin(),
-                                        E = CPUs.end();
-                                        I != E;
-                                        ++I)
-    Components.insert(&*I);
-  for(Hardware::CacheComponents::iterator I = Caches.begin(),
-                                          E = Caches.end();
-                                          I != E;
-                                          ++I)
-    Components.insert(&*I);
-  for(Hardware::NodeComponents::iterator I = Nodes.begin(),
-                                         E = Nodes.end();
-                                         I != E;
-                                         ++I)
-    Components.insert(&*I);
+  // Walk the topology and build an HardwareComponent for
+  // each node.
+  unsigned max_depth = hwloc_topology_get_depth(HWTop);
+  for(unsigned depth = 0; depth < max_depth; depth++) {
+    for (unsigned i = 0; i < hwloc_get_nbobjs_by_depth(HWTop, depth); i++) {
+      HardwareComponent::HardwareObject HWObj = hwloc_get_obj_by_depth(HWTop, depth, i);
+      HardwareComponent *HWComp =
+        BuildHardwareComponent(HWObj);
+      
+      // TODO: Handle NULL HWComp (unknown hardware component
+      
+      HWMap[HWObj] = HWComp;
+      HWComps.insert(HWComp);
+    }
+  }
 }
 
 Hardware::~Hardware() {
-  llvm::DeleteContainerPointers(Components);
+  // Delete all created HardwareComponent objects. 
+  llvm::DeleteContainerPointers(HWComps);
+
+  // Topology destruction.
+  hwloc_topology_destroy(HWTop);
+}
+
+HardwareComponent *Hardware::GetRootHardwareComponent() {
+  HardwareComponent::HardwareObject HWObj = hwloc_get_root_obj(HWTop);
+
+  return GetHardwareComponent(HWObj);
+}
+
+HardwareComponent *Hardware::GetHardwareComponent(HardwareComponent::HardwareObject HWObj) {
+  if(HWMap.count(HWObj))
+    return HWMap[HWObj];
+
+  return NULL;
+}
+
+HardwareComponent *Hardware::BuildHardwareComponent(HardwareComponent::HardwareObject HWObj) {
+  switch(HWObj->type) {
+    case HardwareComponent::System:
+      return new HardwareSystem(HWObj);
+    case HardwareComponent::Machine:
+      return new HardwareMachine(HWObj);
+    case HardwareComponent::Node:
+      return new HardwareNode(HWObj);
+    case HardwareComponent::Socket:
+      return new HardwareSocket(HWObj);
+    case HardwareComponent::Cache:
+      return new HardwareCache(HWObj);
+    case HardwareComponent::SMTCPU:
+      return new HardwareSMTCPU(HWObj);
+    case HardwareComponent::CPU:
+      return new HardwareCPU(HWObj);
+    case HardwareComponent::Group:
+      return new HardwareGroup(HWObj);
+    case HardwareComponent::Misc:
+      return new HardwareMisc(HWObj);
+    case HardwareComponent::Bridge:
+      return new HardwareBridge(HWObj);
+    case HardwareComponent::PCIDevice:
+      return new HardwarePCIDevice(HWObj);
+    case HardwareComponent::OSDevice:
+      return new HardwareOSDevice(HWObj);
+
+    // Wrong component type.
+    case HardwareComponent::TypeMax:
+    default:
+      return NULL;
+  }
 }
 
 llvm::ManagedStatic<Hardware> HW;

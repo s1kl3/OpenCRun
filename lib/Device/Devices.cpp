@@ -19,16 +19,15 @@ public:
   CPUContainer() {
     sys::Hardware &HW = sys::GetHardware();
 
-    // A device for each NUMA node.
-    for(sys::Hardware::node_iterator I = HW.node_begin(),
-                                     E = HW.node_end();
-                                     I != E;
-                                     ++I) {
+    // A device for each Machine in the System (it may be a cluster system).
+    for(sys::Hardware::machine_iterator I = HW.machine_begin(),
+                                        E = HW.machine_end();
+                                        I != E;
+                                        ++I) {
       CPUDevice *CPU = new CPUDevice(*I);
 
-      // Each CPUDevice associated with a NUMA node will be a
-      // root device, thus its reference count will always be
-      // equal to 1 and it's never released.
+      // The reference count is always equal to 1 for 
+      // root devices and it's never released.
       CPU->Retain();
 
       CPUs.insert(CPU);

@@ -19,4 +19,4 @@ USEDLIBS = opencrunCore.a opencrunDevice.a opencrunCPUDevice.a \
 
 include $(LEVEL)/Makefile.common
 
-LIBS += -lrt
+LIBS += -lrt `pkg-config --libs hwloc`

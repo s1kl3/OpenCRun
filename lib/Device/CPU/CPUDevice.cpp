@@ -115,11 +115,11 @@ static const cl_image_format CPUImgFmts[] = {
 // CPUDevice implementation.
 //
 
-CPUDevice::CPUDevice(sys::HardwareNode &Node) :
+CPUDevice::CPUDevice(sys::HardwareMachine &Machine) :
   Device("CPU", llvm::sys::getDefaultTargetTriple()),
-  Global(Node.GetMemorySize()) {
-  InitDeviceInfo(Node);
-  InitMultiprocessors(Node);
+  Global(Machine.GetTotalMemorySize()) {
+  InitDeviceInfo(Machine);
+  InitMultiprocessors(Machine);
   InitJIT();
 }
 
@@ -340,15 +340,15 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   delete Cmd;
 }
 
-void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
+void CPUDevice::InitDeviceInfo(sys::HardwareMachine &Machine) {
   // Assuming symmetric systems.
-  const sys::HardwareCache &L1Cache = Node.l1c_front();
-  const sys::HardwareCache &LLCache = Node.llc_front();
+  const sys::HardwareCache &L1Cache = Machine.socket_front().l1dc_front();
+  const sys::HardwareCache &LLCache = Machine.socket_front().llc_front();
 
   // TODO: define device geometry and set all properties!
 
   VendorID = 0;
-  MaxComputeUnits = Node.CPUsCount();
+  MaxComputeUnits = Machine.GetNumCoveredCPUs();
   MaxWorkItemDimensions = 3;
   MaxWorkItemSizes.assign(3, 1024);
   MaxWorkGroupSize = 1024;
@@ -430,7 +430,7 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
 
   // TODO: set MaxClockFrequency.
 
-  MaxMemoryAllocSize = Node.GetMemorySize();
+  MaxMemoryAllocSize = Machine.GetTotalMemorySize();
 
   // Image properties set to the minimum values for CPU target.
   SupportImages = true;
@@ -478,7 +478,7 @@ void CPUDevice::InitDeviceInfo(sys::HardwareNode &Node) {
   GlobalMemoryCachelineSize = LLCache.GetLineSize();
   GlobalMemoryCacheSize = LLCache.GetSize();
 
-  GlobalMemorySize = Node.GetMemorySize();
+  GlobalMemorySize = Machine.GetTotalMemorySize();
 
   // TODO: set MaxConstantBufferSize.
   // TODO: set MaxConstantArguments.
@@ -534,11 +534,11 @@ void CPUDevice::InitJIT() {
   JIT.reset(Engine);
 }
 
-void CPUDevice::InitMultiprocessors(sys::HardwareNode &Node) {
-  for(sys::HardwareNode::const_llc_iterator I = Node.llc_begin(),
-                                            E = Node.llc_end();
-                                            I != E;
-                                            ++I)
+void CPUDevice::InitMultiprocessors(sys::HardwareMachine &Machine) {
+  for(sys::HardwareMachine::const_socket_iterator I = Machine.socket_begin(),
+                                                  E = Machine.socket_end();
+                                                  I != E;
+                                                  ++I)
     Multiprocessors.insert(new Multiprocessor(*this, *I));
 }
 

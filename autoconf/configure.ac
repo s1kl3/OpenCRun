@@ -86,6 +86,9 @@ dnl=== SECTION 5: Check for libraries
 dnl===
 dnl===-----------------------------------------------------------------------===
 
+dnl Check for Portable Hardware Locality (hwloc) library.
+PKG_CHECK_MODULES(HWLOC, hwloc)
+
 dnl===-----------------------------------------------------------------------===
 dnl===
 dnl=== SECTION 6: Check for header files

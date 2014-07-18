@@ -12,12 +12,12 @@ using namespace opencrun::cpu;
 // Multiprocessor implementation.
 //
 
-Multiprocessor::Multiprocessor(CPUDevice &Dev, const sys::HardwareCache &LLC)
+Multiprocessor::Multiprocessor(CPUDevice &Dev, const sys::HardwareSocket &Socket)
   : Dev(Dev) {
-  for(sys::HardwareCache::const_cpu_iterator I = LLC.cpu_begin(),
-                                             E = LLC.cpu_end();
-                                             I != E;
-                                             ++I)
+  for(sys::HardwareSocket::const_cpu_iterator I = Socket.cpu_begin(),
+                                              E = Socket.cpu_end();
+                                              I != E;
+                                              ++I)
     Threads.insert(new CPUThread(*this, *I));
 }
 

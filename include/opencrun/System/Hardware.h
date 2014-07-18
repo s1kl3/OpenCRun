@@ -3,67 +3,76 @@
 #define OPENCRUN_SYSTEM_HARDWARE_H
 
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/DOTGraphTraits.h"
-#include "llvm/Support/GraphWriter.h"
-#include "llvm/Support/Path.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/GraphTraits.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringRef.h"
 
+#include <vector>
+#include <map>
 #include <set>
-#include <stack>
+
+#include <hwloc.h>
 
 namespace opencrun {
 namespace sys {
 
+//===----------------------------------------------------------------------===//
+// Hardware object adaptors hierarchy.
+//===----------------------------------------------------------------------===//
+
+class HardwareNode;
+class HardwareSocket;
+class HardwareCache;
+class HardwareSMTCPU;
+class HardwareCPU;
+
 class HardwareComponent {
 public:
   enum Type {
-    CPU,
-    Cache,
-    Node
+    System = HWLOC_OBJ_SYSTEM,
+    Machine = HWLOC_OBJ_MACHINE,
+    Node = HWLOC_OBJ_NODE,
+
+    Socket = HWLOC_OBJ_SOCKET,
+
+    Cache = HWLOC_OBJ_CACHE,
+
+    SMTCPU = HWLOC_OBJ_CORE,
+    CPU = HWLOC_OBJ_PU,
+
+    Group = HWLOC_OBJ_GROUP,
+    Misc = HWLOC_OBJ_MISC,
+
+    Bridge = HWLOC_OBJ_BRIDGE,
+    PCIDevice = HWLOC_OBJ_PCI_DEVICE,
+    OSDevice = HWLOC_OBJ_OS_DEVICE,
+
+    TypeMax = HWLOC_OBJ_TYPE_MAX
+  };
+
+  enum CacheType {
+    Unified = HWLOC_OBJ_CACHE_UNIFIED,
+    Data = HWLOC_OBJ_CACHE_DATA,
+    Instruction = HWLOC_OBJ_CACHE_INSTRUCTION
   };
 
 public:
-  typedef llvm::SmallPtrSet<HardwareComponent *, 4> LinksContainer;
-
-  typedef LinksContainer::iterator iterator;
-  typedef LinksContainer::const_iterator const_iterator;
-
-public:
-  iterator begin() { return Links.begin(); }
-  iterator end() { return Links.end(); }
-
-  const_iterator begin() const { return Links.begin(); }
-  const_iterator end() const { return Links.end(); }
+  typedef hwloc_obj_t HardwareObject;
+  typedef hwloc_cpuset_t CPUSet;
+  typedef hwloc_nodeset_t NodeSet;
+  typedef std::vector<HardwareComponent *> HardwareComponentsContainer;
 
 public:
   template <typename Ty>
   class ConstFilteredIterator {
   public:
-    // Start constructor. Push all nodes to visit over the stack. Visit cannot
-    // pass Bound.
-    template <typename Iter>
-    ConstFilteredIterator(Iter I, Iter E, const HardwareComponent *Bound) {
-      // Initialize visit stack.
-      for(; I != E; ++I)
-        ToVisit.push(*I);
+    ConstFilteredIterator(const HardwareComponent *HWCompRoot, Ty *HWComp = NULL) : HWCompRoot(HWCompRoot),
+                                                                                    HWComp(HWComp) { }
 
-      // Mark Bound visited, in order to avoid visiting behind nodes.
-      Visited.insert(Bound);
-
-      // Force visiting in order to reach the first valid element.
-      if(!ToVisit.empty() && !llvm::isa<Ty>(ToVisit.top()))
-        Advance();
-    }
-    
-    // End constructor. ToVisit stack is empty.
-    ConstFilteredIterator() {}
+    ~ConstFilteredIterator() { }
 
   public:
     bool operator==(const ConstFilteredIterator &That) const {
-      return ToVisit == That.ToVisit;
+      return (HWCompRoot == That.HWCompRoot) &&
+             (HWComp == That.HWComp);
     }
 
     bool operator!=(const ConstFilteredIterator &That) const {
@@ -71,11 +80,11 @@ public:
     }
 
     const Ty &operator*() const {
-      return *(const Ty *) ToVisit.top();
+      return *HWComp;    
     }
 
     const Ty *operator->() const {
-      return (const Ty *) ToVisit.top();
+      return HWComp; 
     }
 
     // Pre-increment.
@@ -89,274 +98,361 @@ public:
     }
 
   private:
-    void Advance() {
-      if(ToVisit.empty())
-        return;
-
-      do {
-        const HardwareComponent *Cur = ToVisit.top();
-        Visited.insert(Cur);
-        ToVisit.pop();
-
-        for(HardwareComponent::iterator I = Cur->begin(),
-                                        E = Cur->end();
-                                        I != E;
-                                        ++I)
-          if(!Visited.count(*I))
-            ToVisit.push(*I);
-      } while(!ToVisit.empty() && 
-              (!llvm::isa<Ty>(ToVisit.top()) || Visited.count(ToVisit.top())));
-    }
+    void Advance();
 
   private:
-    std::stack<const HardwareComponent *> ToVisit;
-    std::set<const HardwareComponent *> Visited;
+    const HardwareComponent *HWCompRoot;
+    Ty *HWComp;
   };
 
-  template <typename Ty>
-  class ConstFilteredLinkIterator {
+  class ConstCacheIterator : public ConstFilteredIterator<const HardwareCache> {
   public:
-    ConstFilteredLinkIterator(iterator I, iterator E) : I(I), E(E) {
-      // Find first valid position.
-      if(I != E && !llvm::isa<Ty>(*this->I))
-        Advance();
-    }
+    ConstCacheIterator(const HardwareComponent *HWCompRoot,
+                       unsigned CacheLevel,
+                       CacheType CacheTy,
+                       const HardwareCache *HWCache = NULL) :
+      ConstFilteredIterator<const HardwareCache>(HWCompRoot, HWCache),
+      CacheLevel(CacheLevel),
+      CacheTy(CacheTy) { }
 
   public:
-    bool operator==(const ConstFilteredLinkIterator &That) const {
-      return I == That.I && E == That.E;
+    bool operator==(const ConstCacheIterator &That) {
+      return ConstFilteredIterator<const HardwareCache>::operator==(That) &&
+             (CacheLevel == That.CacheLevel) &&
+             (CacheTy == That.CacheTy);
     }
-
-    bool operator!=(const ConstFilteredLinkIterator &That) const {
-      return !(*this == That);
-    }
-
-    const Ty &operator*() const { return static_cast<Ty &>(*I.operator*()); }
-    const Ty *operator->() const { return static_cast<Ty *>(&*I.operator*()); }
-
-    // Pre-increment.
-    ConstFilteredLinkIterator<Ty> &operator++() {
-      Advance(); return *this;
-    }
-
-    // Post-increment.
-    ConstFilteredLinkIterator<Ty> operator++(int Ign) {
-      ConstFilteredLinkIterator<Ty> That = *this; ++*this; return That;
-    }
-
+    
   private:
-    void Advance() {
-      if(I == E)
-        return;
-
-      do { ++I; } while(I != E && !llvm::isa<Ty>(*I));
-    }
-
-  private:
-    iterator I;
-    iterator E;
+    // Cache level and type to seek for.
+    unsigned CacheLevel;
+    CacheType CacheTy;
   };
-
-protected:
-  HardwareComponent(Type Ty) : ComponentTy(Ty) { }
 
 public:
-  virtual ~HardwareComponent() { }
+  typedef ConstFilteredIterator<const HardwareNode> const_node_iterator;
+  typedef ConstFilteredIterator<const HardwareSocket> const_socket_iterator;
+  typedef ConstFilteredIterator<const HardwareSMTCPU> const_smtcpu_iterator;
+  typedef ConstFilteredIterator<const HardwareCPU> const_cpu_iterator;
 
+  typedef ConstCacheIterator const_cache_iterator;
+
+public:
+  template <typename Ty, typename Ty_iterator, Type HWCompTy> Ty_iterator begin() const;
+  template <typename Ty_iterator> Ty_iterator end() const;
+
+  template <unsigned CacheLevel, CacheType CacheTy> const_cache_iterator cache_begin() const;
+  template <unsigned CacheLevel, CacheType CacheTy> const_cache_iterator cache_end() const;
+
+protected:
+  HardwareComponent(HardwareObject HWObj, Type Ty) : HWObj(HWObj),
+                                                     ComponentTy(Ty) { }
+
+public:
   Type GetType() const { return ComponentTy; }
 
-  void AddLink(HardwareComponent *Comp) { Links.insert(Comp); }
+  HardwareObject GetHardwareObject() const { return HWObj; }
 
-  virtual HardwareComponent *GetParent() = 0;
-  HardwareComponent *GetAncestor();
+  llvm::StringRef GetName() const { return llvm::StringRef(HWObj->name); }
+
+  unsigned GetNumCoveredCPUs() const { return hwloc_bitmap_weight(HWObj->cpuset); }
+
+  unsigned GetDepth() const { return HWObj->depth; }
+  unsigned GetOSIndex() const { return HWObj->os_index; }
+  unsigned GetLogicalIndex() const { return HWObj->logical_index; }
+  unsigned GetSiblingIndex() const { return HWObj->sibling_rank; }
+  unsigned GetChildrenNum() const { return HWObj->arity; }
+
+  CPUSet GetCPUSet() const { return HWObj->cpuset; }
+  NodeSet GetNodeSet() const { return HWObj->nodeset; }
+
+  unsigned long GetTotalMemorySize() const { return HWObj->memory.total_memory; }
+  unsigned long GetLocalMemorySize() const { return HWObj->memory.local_memory; }
+
+  HardwareComponentsContainer GetChildren() const;
+  HardwareComponent *GetChild(unsigned I) const; 
+
+  HardwareComponent *GetParent() const;
+  HardwareComponent *GetFirstChild() const;
+  HardwareComponent *GetLastChild() const;
+  HardwareComponent *GetNextSibling() const;
+  HardwareComponent *GetPrevSibling() const;
+  HardwareComponent *GetNextCousin() const;
+  HardwareComponent *GetPrevCousin() const;
+
+protected:
+  HardwareObject HWObj;
 
 private:
   Type ComponentTy;
-
-  LinksContainer Links;
 };
 
-class HardwareCache;
-class HardwareNode;
+//
+// System - The whole system that is accessible to hwloc and that may be a cluster
+// of machines.
+//
 
-class HardwareCPU : public HardwareComponent, public llvm::FoldingSetNode {
+class HardwareSystem : public HardwareComponent {
 public:
   static bool classof(const HardwareComponent *Comp) {
-    return Comp->GetType() == HardwareComponent::CPU;
+    return Comp->GetType() == HardwareComponent::System;
   }
 
 public:
-  typedef llvm::SmallVector<unsigned, 4> CPUIDContainer;
-
-  typedef HardwareComponent::LinksContainer CPUContainer;
-
-public:
-  HardwareCPU(unsigned CoreID) : HardwareComponent(HardwareComponent::CPU),
-                                 CoreID(CoreID) { }
-
-public:
-  void Profile(llvm::FoldingSetNodeID &ID) const { ID.AddInteger(CoreID); }
-
-  virtual HardwareComponent *GetParent();
-
-  unsigned GetCoreID() const { return CoreID; }
-
-  HardwareCache *GetFirstLevelCache() const ;
-  HardwareComponent *GetLastLevelMemory() { return GetAncestor(); }
-
-private:
-  unsigned CoreID;
+  HardwareSystem(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::System) { }
 };
 
-class HardwareCache : public HardwareComponent, public llvm::FoldingSetNode {
+//
+// Machine - The typical root object of the hardware topology tree. A set of processors
+// and memory with cache coherency.
+//
+
+class HardwareMachine : public HardwareComponent {
 public:
   static bool classof(const HardwareComponent *Comp) {
-    return Comp->GetType() == HardwareComponent::Cache;
+    return Comp->GetType() == HardwareComponent::Machine;
   }
 
 public:
-  enum Kind {
-    Instruction = 1 << 0,
-    Data        = 1 << 1,
-    Unified     = Instruction | Data,
-    Invalid     = ~(Unified)
-  };
+  typedef HardwareComponent::const_node_iterator const_node_iterator;
+  typedef HardwareComponent::const_socket_iterator const_socket_iterator;
 
 public:
-  typedef HardwareComponent::ConstFilteredIterator<const HardwareCPU>
-          const_cpu_iterator;
+
+  const_node_iterator node_begin() const;
+  const_node_iterator node_end() const;
+
+  const_socket_iterator socket_begin() const;
+  const_socket_iterator socket_end() const;
+
+  const HardwareNode &node_front() const;
+  const HardwareNode &node_back() const;
+
+  const HardwareSocket &socket_front() const;
+  const HardwareSocket &socket_back() const;
 
 public:
-  const_cpu_iterator cpu_begin() const {
-    llvm::SmallVector<HardwareComponent *, 4> Comps;
-
-    for(iterator I = begin(), E = end(); I != E; ++I) {
-      HardwareComponent *Comp = *I;
-
-      if(!llvm::isa<HardwareNode>(Comp))
-        Comps.push_back(Comp);
-    }
-
-    return const_cpu_iterator(Comps.begin(), Comps.end(), this);
-  }
-
-  const_cpu_iterator cpu_end() const {
-    return const_cpu_iterator();
-  }
-
-public:
-  HardwareCache(unsigned Level,
-                Kind CacheKind,
-                HardwareComponent::LinksContainer &CPUs)
-    : HardwareComponent(HardwareComponent::Cache),
-      Level(Level),
-      CacheKind(CacheKind),
-      CPUs(CPUs) { }
-
-public:
-  void Profile(llvm::FoldingSetNodeID &ID) const {
-    ID.AddInteger(Level);
-    ID.AddInteger(CacheKind);
-
-    for(HardwareComponent::iterator I = CPUs.begin(),
-                                    E = CPUs.end();
-                                    I != E;
-                                    ++I)
-      ID.AddPointer(*I);
-  }
-
-  virtual HardwareComponent *GetParent() { return GetNextLevelMemory(); }
-
-  unsigned GetLevel() const { return Level; }
-  Kind GetKind() const { return CacheKind; }
-
-  void SetSize(size_t Size) { this->Size = Size; }
-  size_t GetSize() const { return Size; }
-
-  void SetLineSize(size_t LineSize) { this->LineSize = LineSize; }
-  size_t GetLineSize() const { return LineSize; }
-
-  HardwareComponent *GetNextLevelMemory();
-
-  bool IsFirstLevelCache() const { return Level == 1; }
-
-private:
-  unsigned Level;
-  Kind CacheKind;
-  HardwareComponent::LinksContainer CPUs;
-
-  size_t Size;
-  size_t LineSize;
+  HardwareMachine(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Machine) { }
 };
 
-class HardwareNode : public HardwareComponent, public llvm::FoldingSetNode {
+//
+// NUMA node - A set of processors around memory which the processor can directly
+// access.
+//
+
+class HardwareNode : public HardwareComponent {
 public:
   static bool classof(const HardwareComponent *Comp) {
     return Comp->GetType() == HardwareComponent::Node;
   }
 
 public:
-  typedef HardwareComponent::ConstFilteredIterator<const HardwareCPU>
-          const_cpu_iterator;
-
-  typedef HardwareComponent::ConstFilteredLinkIterator<HardwareCache>
-          const_llc_iterator;
+  typedef HardwareComponent::const_socket_iterator const_socket_iterator;
 
 public:
-  const_cpu_iterator cpu_begin() const {
-    llvm::SmallVector<HardwareComponent *, 2> Comps;
+  const_socket_iterator socket_begin() const;
+  const_socket_iterator socket_end() const;
 
-    for(iterator I = begin(), E = end(); I != E; ++I) {
-      HardwareComponent *Comp = *I;
+  const HardwareSocket &socket_front() const;
+  const HardwareSocket &socket_back() const;
 
-      if(!llvm::isa<HardwareNode>(Comp))
-        Comps.push_back(Comp);
-    }
+public:
+  HardwareNode(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Node) { }
 
-    return const_cpu_iterator(begin(), end(), this);
+public:
+  unsigned GetNodeID() const { return GetLogicalIndex(); }
+};
+
+//
+// Socket - The physical package or chip that can be removed physically.
+//
+
+class HardwareSocket : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::Socket;
   }
 
-  const_cpu_iterator cpu_end() const {
-    return const_cpu_iterator();
+public:
+  typedef HardwareComponent::const_cache_iterator const_cache_iterator;
+  typedef HardwareComponent::const_cpu_iterator const_cpu_iterator;
+
+public:
+  const_cache_iterator llc_begin() const;
+  const_cache_iterator llc_end() const;
+
+  const_cache_iterator l1ic_begin() const;
+  const_cache_iterator l1ic_end() const;
+
+  const_cache_iterator l1dc_begin() const;
+  const_cache_iterator l1dc_end() const;
+
+  const_cpu_iterator cpu_begin() const;
+  const_cpu_iterator cpu_end() const;
+
+public:
+  const HardwareCache &llc_front() const;
+  const HardwareCache &llc_back() const;
+
+  const HardwareCache &l1ic_front() const;
+  const HardwareCache &l1ic_back() const;
+
+  const HardwareCache &l1dc_front() const;
+  const HardwareCache &l1dc_back() const;
+
+public:
+  HardwareSocket(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Socket) { }
+
+public:
+  const HardwareCache *GetLastCache() const;
+  unsigned GetLastCacheLevel() const;
+  CacheType GetLastCacheType() const; 
+};
+
+//
+// Cache - Can be cache L1i, L1d, L2, L3, ...
+//
+
+class HardwareCache : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::Cache;
   }
 
-  const_llc_iterator llc_begin() const {
-    return const_llc_iterator(begin(), end());
+public:
+  typedef HardwareComponent::const_smtcpu_iterator const_smtcpu_iterator;
+
+public:
+  const_smtcpu_iterator smtcpu_begin() const;
+  const_smtcpu_iterator smtcpu_end() const;
+
+  const HardwareSMTCPU &smtcpu_front() const;
+  const HardwareSMTCPU &smtcpu_back() const;
+
+public:
+  HardwareCache(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Cache) { }
+
+public:
+  unsigned GetLevel() const { return HWObj->attr->cache.depth; }
+  bool IsFirstLevel() const { return (HWObj->attr->cache.depth) == 1; }
+  size_t GetSize() const { return HWObj->attr->cache.size; }
+  size_t GetLineSize() const { return HWObj->attr->cache.linesize; }
+  bool IsFullyAssociative() const { return (HWObj->attr->cache.associativity) == -1; }
+  CacheType GetCacheType() const { return CacheType(HWObj->attr->cache.type); }
+};
+
+//
+// SMTCPU - A physical core that, in case of SMT, is shared by several logical processors. In the
+// hwloc terminology is referred to as a core.
+//
+
+class HardwareSMTCPU : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::SMTCPU;
   }
 
-  const_llc_iterator llc_end() const {
-    return const_llc_iterator(end(), end());
-  }
+public:
+  typedef HardwareComponent::const_cpu_iterator const_cpu_iterator;
+
+public:
+  const_cpu_iterator cpu_begin() const;
+  const_cpu_iterator cpu_end() const;
 
   const HardwareCPU &cpu_front() const;
   const HardwareCPU &cpu_back() const;
 
-  const HardwareCache &llc_front() const;
-  const HardwareCache &llc_back() const;
-
-  const HardwareCache &l1c_front() const;
-  const HardwareCache &l1c_back() const;
-
 public:
-  HardwareNode(unsigned NodeID) : HardwareComponent(HardwareComponent::Node),
-                                  NodeID(NodeID) { }
-
-public:
-  void Profile(llvm::FoldingSetNodeID &ID) const { ID.AddInteger(NodeID); }
-
-  virtual HardwareComponent *GetParent() { return NULL; }
-
-  unsigned GetNodeID() const { return NodeID; }
-
-  void SetMemorySize(size_t Size) { MemorySize = Size; }
-  size_t GetMemorySize() const { return MemorySize; }
-
-  unsigned CPUsCount() const;
-
-private:
-  unsigned NodeID;
-  size_t MemorySize;
+  HardwareSMTCPU(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::SMTCPU) { }
 };
+
+//
+// CPU - A Processing Unit (PU) or logical core. It may share a physical core with other
+// logical cores).
+//
+
+class HardwareCPU : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::CPU;
+  }
+
+public:
+  HardwareCPU(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::CPU) { }
+
+public:
+  unsigned GetCoreID() const { return GetLogicalIndex(); }
+  HardwareCache *GetFirstLevelCache() const ;
+};
+
+//
+// Others - Hardware components that may be used in the future.
+//
+
+class HardwareGroup : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::Group;
+  }
+
+public:
+  HardwareGroup(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Group) { }
+};
+
+class HardwareMisc : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::Misc;
+  }
+
+public:
+  HardwareMisc(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Misc) { }
+};
+
+class HardwareBridge : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::Bridge;
+  }
+
+public:
+  HardwareBridge(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::Bridge) { }
+};
+
+class HardwarePCIDevice : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::PCIDevice;
+  }
+
+public:
+  HardwarePCIDevice(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::PCIDevice) { }
+};
+
+class HardwareOSDevice : public HardwareComponent {
+public:
+  static bool classof(const HardwareComponent *Comp) {
+    return Comp->GetType() == HardwareComponent::OSDevice;
+  }
+
+public:
+  HardwareOSDevice(HardwareObject HWObj)
+    : HardwareComponent(HWObj, HardwareComponent::OSDevice) { }
+};
+
+//===----------------------------------------------------------------------===//
+// Hardware topology adaptor.
+//===----------------------------------------------------------------------===//
 
 class Hardware {
 public:
@@ -365,31 +461,23 @@ public:
   static size_t GetMaxNaturalAlignment();
 
 public:
-  typedef std::set<HardwareComponent *> ComponentContainer;
+  typedef hwloc_topology_t HardwareTopology;
+  typedef std::map<HardwareComponent::HardwareObject, HardwareComponent *> HardwareObjToCompMap;
+  typedef std::set<HardwareComponent *> HardwareComponentsContainer;
 
-  typedef ComponentContainer::iterator component_iterator;
-  typedef ComponentContainer::const_iterator const_component_iterator;
-
-  typedef llvm::FoldingSet<HardwareCPU> CPUComponents;
-  typedef llvm::FoldingSet<HardwareCache> CacheComponents;
-  typedef llvm::FoldingSet<HardwareNode> NodeComponents;
+  typedef HardwareComponentsContainer::iterator component_iterator;
+  typedef HardwareComponentsContainer::const_iterator const_component_iterator;
 
 public:
-  component_iterator component_begin() { return Components.begin(); }
-  component_iterator component_end() { return Components.end(); }
+  component_iterator component_begin() { return HWComps.begin(); }
+  component_iterator component_end() { return HWComps.end(); }
 
-  const_component_iterator component_begin() const { return Components.begin(); }
-  const_component_iterator component_end() const { return Components.end(); }
+  const_component_iterator component_begin() const { return HWComps.begin(); }
+  const_component_iterator component_end() const { return HWComps.end(); }
 
 public:
   Hardware();
   ~Hardware();
-
-public:
-  void View() { llvm::ViewGraph(*this, "hardware-graph"); }
-
-private:
-  ComponentContainer Components;
 
 public:
   template <typename Ty>
@@ -438,16 +526,36 @@ public:
   };
 
 public:
+  typedef FilteredComponentIterator<HardwareMachine> machine_iterator;
   typedef FilteredComponentIterator<HardwareNode> node_iterator;
+  typedef FilteredComponentIterator<HardwareNode> socket_iterator;
   typedef FilteredComponentIterator<HardwareCache> cache_iterator;
+  typedef FilteredComponentIterator<HardwareSMTCPU> smtcpu_iterator;
   typedef FilteredComponentIterator<HardwareCPU> cpu_iterator;
 
+  // More iterators could be added for the remaining specific hardware
+  // components.
+
 public:
+  machine_iterator machine_begin() {
+    return machine_iterator(component_begin(), component_end());
+  }
+  machine_iterator machine_end() {
+    return machine_iterator(component_end(), component_end());
+  }
+
   node_iterator node_begin() {
     return node_iterator(component_begin(), component_end());
   }
   node_iterator node_end() {
     return node_iterator(component_end(), component_end());
+  }
+
+  socket_iterator socket_begin() {
+    return socket_iterator(component_begin(), component_end());
+  }
+  socket_iterator socket_end() {
+    return socket_iterator(component_end(), component_end());
   }
 
   cache_iterator cache_begin() {
@@ -457,70 +565,39 @@ public:
     return cache_iterator(component_end(), component_end());
   }
 
+  smtcpu_iterator smtcpu_begin() {
+    return smtcpu_iterator(component_begin(), component_end());
+  }
+  smtcpu_iterator smtcpu_end() {
+    return smtcpu_iterator(component_end(), component_end());
+  }
+
   cpu_iterator cpu_begin() {
     return cpu_iterator(component_begin(), component_end());
   }
   cpu_iterator cpu_end() {
     return cpu_iterator(component_end(), component_end());
   }
+
+public:
+  HardwareTopology &GetHardwareTopology() { return HWTop; }
+
+public:
+  HardwareComponent *GetRootHardwareComponent();
+  HardwareComponent *GetHardwareComponent(HardwareComponent::HardwareObject HWObj);
+
+private:
+  HardwareComponent *BuildHardwareComponent(HardwareComponent::HardwareObject HWObj);
+
+private:
+  HardwareTopology HWTop;
+  HardwareObjToCompMap HWMap;
+  HardwareComponentsContainer HWComps;
 };
 
 Hardware &GetHardware();
 
 } // End namespace sys.
 } // End namespace opencrun.
-
-// *GraphTraits must be specialized into llvm namespace.
-namespace llvm {
-
-using namespace opencrun::sys;
-
-template <>
-struct GraphTraits<Hardware> {
-public:
-  typedef HardwareComponent NodeType;
-
-  typedef Hardware::const_component_iterator nodes_iterator;
-
-  typedef HardwareComponent::iterator ChildIteratorType;
-
-public:
-  static nodes_iterator nodes_begin(const Hardware &HW) {
-    return HW.component_begin();
-  }
-  static nodes_iterator nodes_end(const Hardware &HW) {
-    return HW.component_end();
-  }
-
-  static ChildIteratorType child_begin(HardwareComponent *Comp) {
-    return Comp->begin();
-  }
-  static ChildIteratorType child_end(HardwareComponent *Comp) {
-    return Comp->end();
-  }
-};
-
-template <>
-struct DOTGraphTraits<Hardware> : public DefaultDOTGraphTraits {
-public:
-  DOTGraphTraits(bool Simple = false) : DefaultDOTGraphTraits(Simple) { }
-
-public:
-  std::string getGraphName(const Hardware &HW) { return "Hardware Topology"; }
-
-  std::string getNodeLabel(HardwareComponent *Node, const Hardware &HW) {
-    if(HardwareCPU *HWCPU = llvm::dyn_cast<HardwareCPU>(Node))
-      return "CPU-" + llvm::utostr(HWCPU->GetCoreID());
-    else if(HardwareCache *HWCache = llvm::dyn_cast<HardwareCache>(Node))
-      return "L" + llvm::utostr(HWCache->GetLevel()) + "-Cache";
-    else if(HardwareNode *HWNode = llvm::dyn_cast<HardwareNode>(Node)) {
-      return "Node-" + llvm::utostr(HWNode->GetNodeID());
-    }
-
-    return "";
-  }
-};
-
-} // End namespace llvm.
 
 #endif // OPENCRUN_SYSTEM_HARDWARE_H

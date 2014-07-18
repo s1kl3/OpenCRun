@@ -10,6 +10,6 @@ LEVEL = ..
 #
 DIRS = libOpenCRun \
        OpenCRunPasses OpenCRunCPUPasses \
-       platform-query hardware-viewer
+       platform-query
 
 include $(LEVEL)/Makefile.common
