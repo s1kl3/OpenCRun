@@ -36,7 +36,12 @@ public:
 
 }
 
+//
+// Device implementation.
+//
+
 Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
+  Parent(NULL),
   BitCodeLibrary(NULL),
   EnvCompilerOpts(sys::GetEnv("OPENCRUN_COMPILER_OPTIONS")),
   Triple(Triple.str()) {
@@ -47,6 +52,18 @@ Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
   // Initialize the device.
   InitLibrary();
   InitCompiler();
+}
+
+Device::Device(Device &Parent, const PartitionPropertiesContainer &PartProps) :
+  Parent(&Parent),
+  PartProps(const_cast<PartitionPropertiesContainer &>(PartProps)),
+  BitCodeLibrary(NULL),
+  EnvCompilerOpts(Parent.GetEnvCompilerOpts()),
+  Triple(Parent.GetTriple()) {
+    this->Name = Parent.GetName();  
+    
+    InitLibrary();
+    InitCompiler();
 }
 
 bool Device::TranslateToBitCode(llvm::StringRef Opts,
@@ -188,4 +205,16 @@ sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
     return ProfilerTraits<CPUDevice>::ReadTime(*CPU);
 
   llvm_unreachable("Unknown device type");
+}
+
+//
+// SubDevicesBuilder implementation.
+//
+
+unsigned SubDevicesBuilder::Create(SubDevicesContainer *SubDevs, cl_int &ErrCode) {
+  // As default device partitioning is not supported and no sub-device is
+  // created.
+  ErrCode = CL_INVALID_VALUE;
+
+  return 0;
 }

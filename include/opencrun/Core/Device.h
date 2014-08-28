@@ -36,6 +36,8 @@ class DeviceInfo {
 public:
   typedef llvm::SmallVector<size_t, 4> MaxWorkItemSizesContainer;
 
+  typedef llvm::SmallVector<cl_device_partition_property, 8> PartitionPropertiesContainer;
+
   enum {
     FPDenormalization = CL_FP_DENORM,
     FPInfNaN = CL_FP_INF_NAN,
@@ -66,6 +68,24 @@ public:
   enum {
     OutOfOrderExecMode = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
     ProfilingEnabled = CL_QUEUE_PROFILING_ENABLE
+  };
+
+  enum {
+    PartitionEqually = CL_DEVICE_PARTITION_EQUALLY,
+    PartitionByCounts = CL_DEVICE_PARTITION_BY_COUNTS,
+    PartitionByCountsListEnd = CL_DEVICE_PARTITION_BY_COUNTS_LIST_END,
+    PartitionByAffinityDomain = CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN,
+
+    PartitionTerminator = 0
+  };
+
+  enum {
+    AffinityDomainNUMA = CL_DEVICE_AFFINITY_DOMAIN_NUMA,
+    AffinityDomainL4Cache = CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE,
+    AffinityDomainL3Cache = CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE,
+    AffinityDomainL2Cache = CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE,
+    AffinityDomainL1Cache = CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE,
+    AffinityDomainNext = CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE
   };
 
 public:
@@ -138,6 +158,9 @@ public:
                  ExecutionCapabilities(CanExecKernel),
 
                  QueueProperties(ProfilingEnabled),
+                  
+                 MaxSubDevices(0),
+                 AffinityDomains(0),
 
                  Vendor(""),
                  Name(""),
@@ -282,6 +305,11 @@ public:
 
   unsigned GetQueueProperties() const { return QueueProperties; }
 
+  unsigned GetMaxSubDevices() const { return MaxSubDevices; }
+  PartitionPropertiesContainer GetSupportedPartitionTypes() const { return PartTys; }
+
+  unsigned GetSupportedAffinityDomains() const { return AffinityDomains; }
+
   llvm::StringRef GetVendor() const { return Vendor; }
   llvm::StringRef GetName() const { return Name; }
   llvm::StringRef GetVersion() const { return Version; }
@@ -379,14 +407,18 @@ protected:
   unsigned long ProfilingTimerResolution;
 
   bool LittleEndian;
+  
   // Available is a virtual property.
-
   bool CompilerAvailable;
   bool LinkerAvailable;
 
   unsigned ExecutionCapabilities;
 
   unsigned QueueProperties;
+
+  unsigned MaxSubDevices;
+  PartitionPropertiesContainer PartTys;
+  unsigned AffinityDomains;
 
   llvm::StringRef Vendor;
   llvm::StringRef Name;
@@ -415,11 +447,18 @@ public:
 
 protected:
   Device(llvm::StringRef Name, llvm::StringRef Triple);
+  Device(Device &Parent, const PartitionPropertiesContainer &PartProps); 
 
   virtual ~Device() { }
 
 public:
-  bool IsSubDevice() const { return Parent.getPtr(); }
+  bool IsSubDevice() const { return Parent; }
+  Device *GetParent() const { return Parent; }
+  PartitionPropertiesContainer GetPartitionType() const { return PartProps; }
+
+protected:
+  virtual bool IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
+                                          cl_int &ErrCode) const = 0;
 
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW, 
@@ -469,9 +508,14 @@ private:
 
 public:
   llvm::LLVMContext &GetContext() { return LLVMCtx; }
+  llvm::StringRef GetTriple() const { return Triple; }
+  llvm::StringRef GetEnvCompilerOpts() const { return EnvCompilerOpts; }
 
 protected:
   llvm::sys::Mutex ThisLock;
+
+  Device *Parent;
+  PartitionPropertiesContainer PartProps;
 
   llvm::LLVMContext LLVMCtx;
   llvm::OwningPtr<llvm::Module> BitCodeLibrary;
@@ -482,7 +526,6 @@ private:
   std::string Triple;
   std::string SystemResourcePath;
 
-  llvm::IntrusiveRefCntPtr<Device> Parent;
 
   friend class LLVMOptimizerInterfaceTraits<Device>;
   friend class DeviceBuiltinInfo;
@@ -496,6 +539,40 @@ public:
 class AcceleratorDevice : public Device {
 public:
   static bool classof(const Device *Dev) { return true; }
+};
+
+class SubDevicesBuilder {
+public:
+  enum Type {
+    CPUSubDevicesBuilder,
+    GPUSubDevicesBuilder,
+    AcceleratorSubDevicesBuilder
+  };
+
+public:
+  typedef llvm::SmallPtrSet<Device *, 8> SubDevicesContainer;
+
+protected:
+  SubDevicesBuilder(Type BldTy,
+                    Device &Parent,
+                    const DeviceInfo::PartitionPropertiesContainer &PartProps) :
+    BldTy(BldTy),
+    Parent(Parent),
+    PartProps(PartProps) { }
+
+public:
+  virtual ~SubDevicesBuilder() { }
+
+public:
+  Type GetType() const { return BldTy; }
+
+  virtual unsigned Create(SubDevicesContainer *SubDevs, cl_int &ErrCode);
+
+protected:
+  Type BldTy;
+
+  Device &Parent;
+  const DeviceInfo::PartitionPropertiesContainer &PartProps;
 };
 
 template <>

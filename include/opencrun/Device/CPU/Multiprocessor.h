@@ -18,9 +18,11 @@ namespace cpu {
 class Multiprocessor {
 public:
   typedef llvm::SmallPtrSet<CPUThread *, 4> CPUThreadsContainer;
+  typedef llvm::SmallPtrSet<const sys::HardwareCPU *, 16> HardwareCPUsContainer;
 
 public:
   Multiprocessor(CPUDevice &Dev, const sys::HardwareSocket &Socket);
+  Multiprocessor(CPUDevice &Dev, const HardwareCPUsContainer &CPUs);
   ~Multiprocessor();
 
   Multiprocessor(const Multiprocessor &That); // Do not implement.
@@ -48,6 +50,8 @@ public:
 
   void NotifyDone(CPUServiceCommand *Cmd);
   void NotifyDone(CPUExecCommand *Cmd, int ExitStatus);
+
+  void GetPinnedCPUs(HardwareCPUsContainer &CPUs) const;
 
 private:
   CPUThread &GetLesserLoadedThread();

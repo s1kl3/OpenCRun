@@ -26,12 +26,20 @@ public:
 
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
 
-public:
   typedef llvm::SmallPtrSet<Multiprocessor *, 4> MultiprocessorsContainer;
+  typedef llvm::SmallPtrSet<const sys::HardwareCPU *, 16> HardwareCPUsContainer;
+  typedef std::map<cl_device_affinity_domain, llvm::SmallVector<HardwareCPUsContainer, 4> > PartitionsContainer;
 
 public:
-  CPUDevice(sys::HardwareMachine &Machine);
+  CPUDevice(const sys::HardwareMachine &Machine);
+  CPUDevice(CPUDevice &Parent,
+            const PartitionPropertiesContainer &PartProps,
+            const HardwareCPUsContainer &CPUs);
   ~CPUDevice();
+
+protected:
+  virtual bool IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
+                                          cl_int &ErrCode) const;
 
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -66,12 +74,17 @@ protected:
                               LLVMOptimizerParams &Params) const LLVM_OVERRIDE;
 
 private:
-  void InitDeviceInfo(sys::HardwareMachine &Machine);
+  void InitDeviceInfo(const sys::HardwareMachine &Machine,
+                      const HardwareCPUsContainer *CPUs = NULL);
   void InitJIT();
-  void InitMultiprocessors(sys::HardwareMachine &Machine);
+  void InitMultiprocessors(const sys::HardwareMachine &Machine);
+  void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
 
   void DestroyJIT();
   void DestroyMultiprocessors();
+
+  const sys::HardwareMachine &GetHardwareMachine() const { return Machine; }
+  void GetPinnedCPUs(HardwareCPUsContainer &CPUs) const;
 
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
@@ -112,6 +125,9 @@ private:
   }
 
 private:
+  // A CPUDevice is associated to an hardware machine (i.e. a single node in
+  // a cluster system). In general it uses a subset of its logical cores.
+  const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
   GlobalMemory Global;
 
@@ -121,7 +137,27 @@ private:
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
   FootprintsContainer KernelFootprints;
 
+  PartitionsContainer Partitions;
+
   friend void *LibLinker(const std::string &);
+  friend class CPUSubDevicesBuilder;
+};
+
+class CPUSubDevicesBuilder : public SubDevicesBuilder {
+public:
+  static bool classof(const SubDevicesBuilder *Bld) {
+    return Bld->GetType() == SubDevicesBuilder::CPUSubDevicesBuilder;
+  }
+
+public:
+  CPUSubDevicesBuilder(CPUDevice &Parent,
+                       const DeviceInfo::PartitionPropertiesContainer &PartProps) :
+    SubDevicesBuilder(SubDevicesBuilder::CPUSubDevicesBuilder, Parent, PartProps) { }
+
+  virtual ~CPUSubDevicesBuilder() { }
+
+public:
+  virtual unsigned Create(SubDevicesContainer *SubDevs, cl_int &ErrCode);
 };
 
 void *LibLinker(const std::string &Name);

@@ -21,6 +21,15 @@ Multiprocessor::Multiprocessor(CPUDevice &Dev, const sys::HardwareSocket &Socket
     Threads.insert(new CPUThread(*this, *I));
 }
 
+Multiprocessor::Multiprocessor(CPUDevice &Dev, const HardwareCPUsContainer &CPUs)
+  : Dev(Dev) {
+  for(HardwareCPUsContainer::iterator I = CPUs.begin(),
+                                      E = CPUs.end();
+                                      I != E;
+                                      ++I)
+    Threads.insert(new CPUThread(*this, **I));
+}
+
 Multiprocessor::~Multiprocessor() {
   llvm::DeleteContainerPointers(Threads);
 }
@@ -156,6 +165,14 @@ void Multiprocessor::NotifyDone(CPUServiceCommand *Cmd) {
 
 void Multiprocessor::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   Dev.NotifyDone(Cmd, ExitStatus);
+}
+
+void Multiprocessor::GetPinnedCPUs(CPUDevice::HardwareCPUsContainer &CPUs) const {
+  for(CPUThreadsContainer::iterator I = Threads.begin(),
+                                    E = Threads.end();
+                                    I != E;
+                                    ++I)
+    CPUs.insert((*I)->GetPinnedToCPU());
 }
 
 CPUThread &Multiprocessor::GetLesserLoadedThread() {

@@ -181,6 +181,21 @@ PROPERTY(CL_DEVICE_QUEUE_PROPERTIES,
 
 // CL_PLATFORM manually implemented.
 
+PROPERTY(CL_DEVICE_PARENT_DEVICE, GetParent, cl_device_id, opencrun::Device *)
+PROPERTY(CL_DEVICE_PARTITION_MAX_SUB_DEVICES, GetMaxSubDevices, cl_uint, unsigned)
+PROPERTY(CL_DEVICE_PARTITION_PROPERTIES,
+         GetSupportedPartitionTypes,
+         cl_device_partition_property,
+         opencrun::DeviceInfo::PartitionPropertiesContainer)
+PROPERTY(CL_DEVICE_PARTITION_AFFINITY_DOMAIN,
+         GetSupportedAffinityDomains,
+         cl_device_affinity_domain,
+         unsigned)
+PROPERTY(CL_DEVICE_PARTITION_TYPE,
+         GetPartitionType,
+         cl_device_partition_property,
+         opencrun::DeviceInfo::PartitionPropertiesContainer)
+
 PROPERTY(CL_DEVICE_VENDOR, GetVendor, char, llvm::StringRef)
 PROPERTY(CL_DEVICE_NAME, GetName, char, llvm::StringRef)
 PROPERTY(CL_DEVICE_VERSION, GetVersion, char, llvm::StringRef)

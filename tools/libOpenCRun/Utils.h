@@ -143,6 +143,30 @@ cl_int clFillValue<unsigned char *, llvm::SmallVector<llvm::StringRef, 4> &>(
   return CL_SUCCESS;
 }
 
+template <> inline
+cl_int clFillValue<cl_device_partition_property, llvm::SmallVector<cl_device_partition_property, 8> >(
+  cl_device_partition_property *Dst,
+  llvm::SmallVector<cl_device_partition_property, 8> Src,
+  size_t DstSize,
+  size_t *RightSizeRet) {
+  size_t RightSize = sizeof(cl_device_partition_property) * Src.size();
+
+  if(RightSizeRet)
+    *RightSizeRet = RightSize;
+
+  if(Dst) {
+    if(DstSize < RightSize)
+      return CL_INVALID_VALUE;
+
+    if(RightSize == 0)
+      *Dst = 0;
+
+    std::copy(Src.begin(), Src.end(), Dst);
+  }
+
+  return CL_SUCCESS;
+}
+
 template <typename ParamTy, typename Iter>
 cl_int clFillValue(ParamTy *Dst,
                    Iter I,

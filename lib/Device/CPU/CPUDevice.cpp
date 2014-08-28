@@ -115,17 +115,73 @@ static const cl_image_format CPUImgFmts[] = {
 // CPUDevice implementation.
 //
 
-CPUDevice::CPUDevice(sys::HardwareMachine &Machine) :
+CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
   Device("CPU", llvm::sys::getDefaultTargetTriple()),
+  Machine(Machine),
   Global(Machine.GetTotalMemorySize()) {
   InitDeviceInfo(Machine);
   InitMultiprocessors(Machine);
   InitJIT();
 }
 
+CPUDevice::CPUDevice(CPUDevice &Parent,
+                     const PartitionPropertiesContainer &PartProps,
+                     const HardwareCPUsContainer &CPUs) :
+  Device(Parent, PartProps),
+  Machine(Parent.GetHardwareMachine()),
+  Global(Parent.GetHardwareMachine().GetTotalMemorySize()) {
+    InitDeviceInfo(Parent.GetHardwareMachine(), &CPUs);
+    InitMultiprocessors(CPUs);
+    InitJIT();
+}
+
 CPUDevice::~CPUDevice() {
   DestroyMultiprocessors();
   DestroyJIT();
+}
+
+bool CPUDevice::IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
+                                           cl_int &ErrCode) const {
+  // Check for partitioning type support.
+  if(!std::count(PartTys.begin(), PartTys.end(), PartProps[0])) {
+    ErrCode = CL_INVALID_VALUE;
+    return false;
+  }
+
+  // Check for affinity domain support.
+  if(PartProps[0] == DeviceInfo::PartitionByAffinityDomain) {
+    if(!(AffinityDomains & static_cast<cl_device_affinity_domain>(PartProps[1]))) {
+      ErrCode = CL_INVALID_VALUE;
+      return false;
+    }
+  }
+
+  // For partitioning by counts check the number of sub-devices and compute units
+  // requestes.
+  if(PartProps[0] == CL_DEVICE_PARTITION_BY_COUNTS) {
+    // Number of sub-devices requested.
+    unsigned NumSubDevs = 0;
+    // Number of CUs requested.
+    unsigned NumCUs = 0;
+    for(unsigned i = 1; PartProps[i] != DeviceInfo::PartitionByCountsListEnd; ++i) {
+      if(PartProps[i] < 0) {
+        ErrCode = CL_INVALID_DEVICE_PARTITION_COUNT;
+        return 0;
+      }
+
+      ++NumSubDevs;
+      NumCUs += PartProps[i];
+    }
+
+    if(NumSubDevs > GetMaxSubDevices() ||
+       NumCUs > GetMaxComputeUnits()) {
+      ErrCode = CL_INVALID_DEVICE_PARTITION_COUNT;
+      return false;
+    }
+
+  }
+
+  return true;
 }
 
 bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -340,7 +396,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   delete Cmd;
 }
 
-void CPUDevice::InitDeviceInfo(sys::HardwareMachine &Machine) {
+void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const HardwareCPUsContainer *CPUs) {
   // Assuming symmetric systems.
   const sys::HardwareCache &L1Cache = Machine.socket_front().l1dc_front();
   const sys::HardwareCache &LLCache = Machine.socket_front().llc_front();
@@ -348,7 +404,6 @@ void CPUDevice::InitDeviceInfo(sys::HardwareMachine &Machine) {
   // TODO: define device geometry and set all properties!
 
   VendorID = 0;
-  MaxComputeUnits = Machine.GetNumCoveredCPUs();
   MaxWorkItemDimensions = 3;
   MaxWorkItemSizes.assign(3, 1024);
   MaxWorkGroupSize = 1024;
@@ -458,20 +513,20 @@ void CPUDevice::InitDeviceInfo(sys::HardwareMachine &Machine) {
 
   // TODO: set MinimumDataTypeAlignment (Deprecated in OpenCL 1.2).
 
-  SinglePrecisionFPCapabilities = Device::FPDenormalization | 
-                                  Device::FPInfNaN |
-                                  Device::FPRoundToNearest |
-                                  Device::FPRoundToZero |
-                                  Device::FPRoundToInf |
-                                  Device::FPFusedMultiplyAdd |
-                                  FPCorrectlyRoundedDivideSqrt;
+  SinglePrecisionFPCapabilities = DeviceInfo::FPDenormalization | 
+                                  DeviceInfo::FPInfNaN |
+                                  DeviceInfo::FPRoundToNearest |
+                                  DeviceInfo::FPRoundToZero |
+                                  DeviceInfo::FPRoundToInf |
+                                  DeviceInfo::FPFusedMultiplyAdd |
+                                  DeviceInfo::FPCorrectlyRoundedDivideSqrt;
 
-  DoublePrecisionFPCapabilities = Device::FPDenormalization | 
-                                  Device::FPInfNaN |
-                                  Device::FPRoundToNearest |
-                                  Device::FPRoundToZero |
-                                  Device::FPRoundToInf |
-                                  Device::FPFusedMultiplyAdd;
+  DoublePrecisionFPCapabilities = DeviceInfo::FPDenormalization | 
+                                  DeviceInfo::FPInfNaN |
+                                  DeviceInfo::FPRoundToNearest |
+                                  DeviceInfo::FPRoundToZero |
+                                  DeviceInfo::FPRoundToInf |
+                                  DeviceInfo::FPFusedMultiplyAdd;
 
   GlobalMemoryCacheType = DeviceInfo::ReadWriteCache;
 
@@ -502,6 +557,84 @@ void CPUDevice::InitDeviceInfo(sys::HardwareMachine &Machine) {
 
   // TODO: set SizeTypeMax, by the compiler?
   PrivateMemorySize = LocalMemorySize;
+
+  // Pointers to HardwareCPUs which are part of the current device (root/sub-device)
+  // are copied inside the following container.
+  HardwareCPUsContainer DevCPUs;
+  if(Parent && CPUs) {
+    MaxComputeUnits = CPUs->size();
+    DevCPUs = *CPUs;
+  } else {
+    MaxComputeUnits = Machine.GetNumCoveredCPUs();
+    // The CPU iterators from sys::HardwareMachine class are preferred over the
+    // GetPinnedCPUs method in order to avoid dependency from the InitMultiprocessors
+    // method.
+    for(sys::HardwareMachine::const_cpu_iterator I = Machine.cpu_begin(),
+                                                 E = Machine.cpu_end();
+                                                 I != E;
+                                                 ++I)
+      DevCPUs.insert(&(*I));
+  }
+
+  MaxSubDevices = MaxComputeUnits;
+
+  // Partitioning makes sense only if the current device refers to more than one
+  // compute unit.
+  if(MaxComputeUnits > 1) {
+    PartTys.push_back(DeviceInfo::PartitionEqually); 
+    PartTys.push_back(DeviceInfo::PartitionByCounts);
+
+    std::map<sys::HardwareComponent *, HardwareCPUsContainer> AffinityPartitions;
+    for(HardwareCPUsContainer::iterator I = DevCPUs.begin(), E = DevCPUs.end(); I != E; ++I) {
+      if(sys::HardwareNode *NUMANode = (*I)->GetNUMANode())
+        AffinityPartitions[NUMANode].insert(*I);
+
+      for(unsigned J = 1; J <= 4; ++J) {
+        if(sys::HardwareCache *Cache = (*I)->GetCache(J))
+          AffinityPartitions[Cache].insert(*I);
+      }
+    }
+  
+    for(std::map<sys::HardwareComponent *, HardwareCPUsContainer>::iterator I = AffinityPartitions.begin(),
+                                                                            E = AffinityPartitions.end();
+                                                                            I != E;
+                                                                            ++I) {
+      if(llvm::isa<sys::HardwareNode>(I->first))
+        Partitions[DeviceInfo::AffinityDomainNUMA].push_back(I->second);
+      else if(sys::HardwareCache *Cache = llvm::dyn_cast<sys::HardwareCache>(I->first)) {
+        switch(Cache->GetLevel()) {
+        case 4:
+          Partitions[DeviceInfo::AffinityDomainL4Cache].push_back(I->second);
+          break;
+        case 3:
+          Partitions[DeviceInfo::AffinityDomainL3Cache].push_back(I->second);
+          break;
+        case 2:
+          Partitions[DeviceInfo::AffinityDomainL2Cache].push_back(I->second);
+          break;
+        case 1:
+          Partitions[DeviceInfo::AffinityDomainL1Cache].push_back(I->second);
+          break;
+        }
+      }
+    }
+
+    for(PartitionsContainer::iterator I = Partitions.begin(),
+                                      E = Partitions.end();
+                                      I != E;
+                                      ++I) {
+      if(I->second.size() > 1) {
+        AffinityDomains |= I->first;
+      }
+    }
+
+    if(AffinityDomains) {
+      AffinityDomains |= DeviceInfo::AffinityDomainNext;
+      PartTys.push_back(DeviceInfo::PartitionByAffinityDomain);
+    }
+
+  }
+
 }
 
 void CPUDevice::InitJIT() {
@@ -534,12 +667,16 @@ void CPUDevice::InitJIT() {
   JIT.reset(Engine);
 }
 
-void CPUDevice::InitMultiprocessors(sys::HardwareMachine &Machine) {
+void CPUDevice::InitMultiprocessors(const sys::HardwareMachine &Machine) {
   for(sys::HardwareMachine::const_socket_iterator I = Machine.socket_begin(),
                                                   E = Machine.socket_end();
                                                   I != E;
                                                   ++I)
     Multiprocessors.insert(new Multiprocessor(*this, *I));
+}
+
+void CPUDevice::InitMultiprocessors(const HardwareCPUsContainer &CPUs) {
+  Multiprocessors.insert(new Multiprocessor(*this, CPUs));
 }
 
 void CPUDevice::DestroyJIT() {
@@ -548,6 +685,14 @@ void CPUDevice::DestroyJIT() {
 
 void CPUDevice::DestroyMultiprocessors() {
   llvm::DeleteContainerPointers(Multiprocessors);
+}
+
+void CPUDevice::GetPinnedCPUs(HardwareCPUsContainer &CPUs) const {
+  for(MultiprocessorsContainer::iterator I = Multiprocessors.begin(),
+                                         E = Multiprocessors.end();
+                                         I != E;
+                                         ++I)
+    (*I)->GetPinnedCPUs(CPUs);
 }
 
 bool CPUDevice::Submit(EnqueueReadBuffer &Cmd) {
@@ -890,7 +1035,120 @@ void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
 }
 
 //
-// LibLinker implementation
+// CPUSubDevicesBuilder implementation.
+//
+
+unsigned CPUSubDevicesBuilder::Create(SubDevicesContainer *SubDevs, cl_int &ErrCode) {
+  CPUDevice::HardwareCPUsContainer CPUs;
+  cl_uint NumSubDevs = 0;
+
+  CPUDevice *ParentCPUDev = llvm::dyn_cast<CPUDevice>(&Parent);
+  if(!ParentCPUDev) {
+    // Parent device is not a CPUDevice.
+    ErrCode = CL_INVALID_DEVICE;
+    return 0;
+  }
+
+  if(!ParentCPUDev->IsSupportedPartitionSchema(PartProps, ErrCode))
+    return 0;
+
+  ParentCPUDev->GetPinnedCPUs(CPUs);
+  
+  switch(PartProps[0]) {
+    case DeviceInfo::PartitionEqually:
+      {
+        CPUDevice::HardwareCPUsContainer SubDevCPUs;
+        unsigned K = 1; 
+        for(CPUDevice::HardwareCPUsContainer::iterator I = CPUs.begin(),
+                                                       E = CPUs.end();
+                                                       I != E;
+                                                       ++I) {
+          SubDevCPUs.insert(*I);
+          if(K == static_cast<unsigned>(PartProps[1])) {
+            if(SubDevs)
+              SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, SubDevCPUs));
+
+            SubDevCPUs.clear();
+            ++NumSubDevs;
+            K = 1;
+          } else
+            ++K;
+        }
+
+        break;
+      }
+
+    case DeviceInfo::PartitionByCounts:
+      {
+        CPUDevice::HardwareCPUsContainer SubDevCPUs;
+        CPUDevice::HardwareCPUsContainer::iterator I = CPUs.begin(),
+                                                   E = CPUs.end();
+
+        for(unsigned J = 1; static_cast<unsigned>(PartProps[J]) != DeviceInfo::PartitionByCountsListEnd; ++J) {
+          unsigned K = 1;
+          for(; I != E && K <= static_cast<unsigned>(PartProps[J]); ++I, ++K) {
+            SubDevCPUs.insert(*I);
+            if(K == static_cast<unsigned>(PartProps[J])) {
+              if(SubDevs)
+                SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, SubDevCPUs));
+              SubDevCPUs.clear();
+              ++NumSubDevs;
+            }
+          }
+        }
+
+        break;
+      }
+
+    case DeviceInfo::PartitionByAffinityDomain:
+      {
+        cl_device_affinity_domain AffinityTy;
+
+        if(static_cast<cl_device_affinity_domain>(PartProps[1]) == DeviceInfo::AffinityDomainNext) {
+          // Split the CPUDevice along the first available partitionable affinity domain, in the order
+          // NUMA, L4, L3, L2, L1.
+          if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainNUMA)
+            AffinityTy = DeviceInfo::AffinityDomainNUMA;
+          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL4Cache)
+            AffinityTy = DeviceInfo::AffinityDomainL4Cache;
+          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL3Cache)
+            AffinityTy = DeviceInfo::AffinityDomainL3Cache;
+          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL2Cache)
+            AffinityTy = DeviceInfo::AffinityDomainL2Cache;
+          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL1Cache)
+            AffinityTy = DeviceInfo::AffinityDomainL1Cache;
+          else {
+            ErrCode = CL_INVALID_VALUE;
+            return 0;
+          }
+        } else
+          AffinityTy = static_cast<cl_device_affinity_domain>(PartProps[1]);
+
+        if(!ParentCPUDev->Partitions.count(AffinityTy)) {
+          // Marked as supported by the CPUDevice but no partition is found inside
+          // the Partitions container.
+          ErrCode = CL_INVALID_VALUE;
+          return 0;
+        }
+
+        // Get the reference to the pre-calculated partition.
+        llvm::SmallVector<CPUDevice::HardwareCPUsContainer, 4> &Partition = ParentCPUDev->Partitions[AffinityTy];
+        for(unsigned J = 0; J < Partition.size(); ++J) {
+          if(SubDevs)
+            SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, Partition[J]));
+          ++NumSubDevs;
+        }
+
+        break;
+      }
+  }
+
+  ErrCode = CL_SUCCESS;
+  return NumSubDevs;
+}
+
+//
+// LibLinker implementation.
 //
 
 namespace {
