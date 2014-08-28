@@ -230,6 +230,13 @@ HardwareMachine::const_socket_iterator HardwareMachine::socket_end() const {
   return end<const_socket_iterator>();
 }
 
+HardwareMachine::const_cpu_iterator HardwareMachine::cpu_begin() const {
+  return begin<const HardwareCPU, const_cpu_iterator, HardwareComponent::CPU>();
+}
+
+HardwareMachine::const_cpu_iterator HardwareMachine::cpu_end() const {
+  return end<const_cpu_iterator>();
+}
 const HardwareNode &HardwareMachine::node_front() const {
   return *node_begin();
 }
@@ -253,6 +260,21 @@ const HardwareSocket &HardwareMachine::socket_back() const {
   const_socket_iterator I = socket_begin(),
                         E = socket_end(),
                         J = I;
+
+  for(; I != E; ++I)
+    J = I;
+
+  return *J;
+}
+
+const HardwareCPU &HardwareMachine::cpu_front() const {
+  return *cpu_begin();
+}
+
+const HardwareCPU &HardwareMachine::cpu_back() const {
+  const_cpu_iterator I = cpu_begin(),
+                     E = cpu_end(),
+                     J = I;
 
   for(; I != E; ++I)
     J = I;
@@ -462,14 +484,35 @@ const HardwareCPU &HardwareSMTCPU::cpu_back() const {
 //===----------------------------------------------------------------------===//
 
 HardwareCache *HardwareCPU::GetFirstLevelCache() const {
+  return GetCache(1);
+}
+
+HardwareCache *HardwareCPU::GetCache(unsigned Level) const {
   HardwareComponent *Comp = GetParent();
 
   // Comp is NULL when the root of the hardware topology is reached.
   while(Comp) {
-    // LLC is the first found cache-type hardware component above the
-    // CPU-type component.
-    if(HardwareCache *Cache = llvm::dyn_cast<HardwareCache>(Comp))
-      return Cache;
+    // Check if the current component is a cache memory of the given
+    // level.
+    if(HardwareCache *Cache = llvm::dyn_cast<HardwareCache>(Comp)) {
+      if(Cache->GetLevel() == Level) 
+        return Cache;
+    }
+
+    Comp = Comp->GetParent();
+  }
+
+  return NULL;
+}
+
+HardwareNode *HardwareCPU::GetNUMANode() const {
+  HardwareComponent *Comp = GetParent();
+
+  // Comp is NULL when the root of the hardware topology is reached.
+  while(Comp) {
+    // Check if the current component is a NUMA node.
+    if(HardwareNode *Node = llvm::dyn_cast<HardwareNode>(Comp))
+      return Node;
 
     Comp = Comp->GetParent();
   }

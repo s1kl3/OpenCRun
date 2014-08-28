@@ -216,6 +216,7 @@ public:
 public:
   typedef HardwareComponent::const_node_iterator const_node_iterator;
   typedef HardwareComponent::const_socket_iterator const_socket_iterator;
+  typedef HardwareComponent::const_cpu_iterator const_cpu_iterator;
 
 public:
 
@@ -225,11 +226,17 @@ public:
   const_socket_iterator socket_begin() const;
   const_socket_iterator socket_end() const;
 
+  const_cpu_iterator cpu_begin() const;
+  const_cpu_iterator cpu_end() const;
+
   const HardwareNode &node_front() const;
   const HardwareNode &node_back() const;
 
   const HardwareSocket &socket_front() const;
   const HardwareSocket &socket_back() const;
+
+  const HardwareCPU &cpu_front() const;
+  const HardwareCPU &cpu_back() const;
 
 public:
   HardwareMachine(HardwareObject HWObj)
@@ -388,7 +395,9 @@ public:
 
 public:
   unsigned GetCoreID() const { return GetLogicalIndex(); }
-  HardwareCache *GetFirstLevelCache() const ;
+  HardwareCache *GetFirstLevelCache() const;
+  HardwareCache *GetCache(unsigned Level) const;
+  HardwareNode *GetNUMANode() const;
 };
 
 //
