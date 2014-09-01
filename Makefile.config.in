@@ -23,3 +23,7 @@ PROJ_INSTALL_ROOT := @prefix@
 LLVMCC_OPTION := clang
 LLVMCC_EMITIR_FLAG := -emit-llvm
 CLANGPATH := clang
+
+# Add hwloc headers and library to preprocessor and linker search paths.
+CPPFLAGS += @HWLOC_CFLAGS@
+LDFLAGS += @HWLOC_LIBS@

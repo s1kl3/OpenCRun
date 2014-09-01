@@ -87,7 +87,7 @@ dnl===
 dnl===-----------------------------------------------------------------------===
 
 dnl Check for Portable Hardware Locality (hwloc) library.
-PKG_CHECK_MODULES(HWLOC, hwloc)
+PKG_CHECK_MODULES([HWLOC], [hwloc >= 1.9])
 
 dnl===-----------------------------------------------------------------------===
 dnl===
