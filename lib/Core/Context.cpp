@@ -35,6 +35,18 @@ Context::Context(Platform &Plat,
     DiagIDs = new clang::DiagnosticIDs();
     Diag.reset(new clang::DiagnosticsEngine(DiagIDs, &DiagOptions, DiagClient));
   }
+
+  // Implicit retain on each associated sub-device.
+  for(device_iterator I = device_begin(), E = device_end(); I != E; ++I)
+    if((*I)->IsSubDevice())
+      (*I)->Retain();
+}
+
+Context::~Context() {
+  // Implicit release on each associated sub-device.
+  for(device_iterator I = device_begin(), E = device_end(); I != E; ++I)
+    if((*I)->IsSubDevice())
+      (*I)->Release();
 }
 
 CommandQueue *Context::GetQueueForDevice(Device &Dev,

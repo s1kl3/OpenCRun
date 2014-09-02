@@ -66,6 +66,14 @@ Device::Device(Device &Parent, const PartitionPropertiesContainer &PartProps) :
     InitCompiler();
 }
 
+Device::~Device() {
+  if(IsSubDevice()) {
+    Device *Parent = GetParent();
+    if(Parent->IsSubDevice())
+      Parent->Release();
+  }
+}
+
 bool Device::TranslateToBitCode(llvm::StringRef Opts,
                                 clang::DiagnosticConsumer &Diag,
                                 llvm::MemoryBuffer &Src,

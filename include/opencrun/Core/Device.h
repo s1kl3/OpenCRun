@@ -449,7 +449,7 @@ protected:
   Device(llvm::StringRef Name, llvm::StringRef Triple);
   Device(Device &Parent, const PartitionPropertiesContainer &PartProps); 
 
-  virtual ~Device() { }
+  virtual ~Device();
 
 public:
   bool IsSubDevice() const { return Parent; }

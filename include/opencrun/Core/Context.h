@@ -67,6 +67,8 @@ public:
           DevicesContainer &Devs,
           ContextErrCallbackClojure &ErrNotify);
 
+  ~Context();
+
 public:
   CommandQueue *GetQueueForDevice(Device &Dev,
                                   bool OutOfOrder,

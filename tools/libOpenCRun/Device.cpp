@@ -267,21 +267,10 @@ clReleaseDevice(cl_device_id device) CL_API_SUFFIX__VERSION_1_2 {
 
   opencrun::Device &Dev = *llvm::cast<opencrun::Device>(device);
   
-  // The reference count is decremented only if the device has been
-  // created with a call to clCreateSubDevices().
-  if(Dev.IsSubDevice()) {
-    // If the call to the Release method will lead to device destruction,
-    // then parent's reference caount will be decremented too.
-    bool ReleaseParent = false;
-    if(Dev.GetReferenceCount() == 1)
-      ReleaseParent = true;
-
+  // The reference count is decremented only if the device was created
+  // by clCreateSubDevices().
+  if(Dev.IsSubDevice())
     Dev.Release();
-
-    // Parent's release happens here to force correct destruction order.
-    if(ReleaseParent)
-      Err =clReleaseDevice(static_cast<cl_device_id>(Dev.GetParent()));
-  }
 
   return Err;
 }
