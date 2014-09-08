@@ -510,6 +510,7 @@ public:
   llvm::LLVMContext &GetContext() { return LLVMCtx; }
   llvm::StringRef GetTriple() const { return Triple; }
   llvm::StringRef GetEnvCompilerOpts() const { return EnvCompilerOpts; }
+  llvm::Module *GetBitCodeLibrary() const { return BitCodeLibrary.get(); }
 
 protected:
   llvm::sys::Mutex ThisLock;
