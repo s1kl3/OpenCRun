@@ -416,20 +416,20 @@ void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const Hardwa
   // Extensions should be set accordingly.
 #if defined(__x86_64__)
   AddressBits = 64;
-  Extensions = "cl_khr_fp64"
-               "cl_khr_global_int32_base_atomics"
-               "cl_khr_global_int32_extended_atomics"
-               "cl_khr_local_int32_base_atomics"
-               "cl_khr_local_int32_extended_atomics"
-               "cl_khr_int64_base_atomics"
-               "cl_khr_int64_extended_atomics"
+  Extensions = "cl_khr_fp64 "
+               "cl_khr_global_int32_base_atomics "
+               "cl_khr_global_int32_extended_atomics "
+               "cl_khr_local_int32_base_atomics "
+               "cl_khr_local_int32_extended_atomics "
+               "cl_khr_int64_base_atomics "
+               "cl_khr_int64_extended_atomics "
                "cl_khr_3d_image_writes";
 #else
   AddressBits = 32;
-  Extensions = "cl_khr_global_int32_base_atomics"
-               "cl_khr_global_int32_extended_atomics"
-               "cl_khr_local_int32_base_atomics"
-               "cl_khr_local_int32_extended_atomics"
+  Extensions = "cl_khr_global_int32_base_atomics "
+               "cl_khr_global_int32_extended_atomics "
+               "cl_khr_local_int32_base_atomics "
+               "cl_khr_local_int32_extended_atomics "
                "cl_khr_3d_image_writes";
 #endif
 
