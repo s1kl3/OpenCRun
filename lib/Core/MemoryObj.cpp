@@ -75,6 +75,8 @@ bool MemoryObj::AddNewMapping(void *MapBuf, const MemoryObj::MappingInfo &MapInf
 
       for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
         if(I->second.CheckOverlap(MapInfo)) return false;
+
+      Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
     }
 
   } else if(Image *Img = llvm::dyn_cast<Image>(this)) {
