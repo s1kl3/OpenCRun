@@ -49,6 +49,82 @@ private:
   GlobalsFieldMapping GV2FieldMap;
 };
 
+class ConstantUseIterator {
+public:
+  explicit ConstantUseIterator(llvm::Function &F, llvm::Constant *C,
+                               bool End = false)
+   : It(End ? C->use_end() : C->use_begin()), ItEnd(C->use_end()), Fn(F) {
+    while (It != ItEnd && !llvm::isa<llvm::Instruction>(*It))
+      step();
+  }
+
+  ConstantUseIterator(const ConstantUseIterator &I)
+   : It(I.It), ItEnd(I.ItEnd), Stack(I.Stack), ExprPath(I.ExprPath), Fn(I.Fn) {}
+
+  ConstantUseIterator &operator++() {
+    bool End = false;
+    do {
+      step();
+      End = It == ItEnd;
+      if (!End)
+        if (llvm::Instruction *I = llvm::dyn_cast<llvm::Instruction>(*It))
+          End = I->getParent()->getParent() == &Fn;
+    } while (!End);
+    return *this;
+  }
+
+  bool operator==(const ConstantUseIterator I) const {
+    return &Fn == &I.Fn && It == I.It && ItEnd == I.ItEnd &&
+           ExprPath == I.ExprPath && Stack == I.Stack;
+  }
+
+  bool operator!=(const ConstantUseIterator I) const {
+    return !(*this == I);
+  }
+
+  llvm::Instruction *getUser() const {
+    return llvm::cast<llvm::Instruction>(*It);
+  }
+
+  llvm::ConstantExpr *getExprPathElem(unsigned i) const {
+    return ExprPath[i];
+  }
+
+  unsigned getExprPathSize() const {
+    return ExprPath.size();
+  }
+
+private:
+  typedef llvm::Value::use_iterator BaseIter;
+  typedef std::pair<BaseIter, BaseIter> StackElem;
+
+private:
+  void step() {
+    if (!llvm::isa<llvm::Instruction>(*It) &&
+        It->use_begin() != It->use_end()) {
+      Stack.push_back(StackElem(llvm::next(It), ItEnd));
+      ExprPath.push_back(llvm::cast<llvm::ConstantExpr>(*It));
+      ItEnd = It->use_end();
+      It = It->use_begin();
+    } else {
+      ++It;
+      while (It == ItEnd && !Stack.empty()) {
+        It = Stack.back().first;
+        ItEnd = Stack.back().second;
+        ExprPath.pop_back();
+        Stack.pop_back();
+      }
+    }
+  }
+
+private:
+  BaseIter It;
+  BaseIter ItEnd;
+  llvm::SmallVector<StackElem, 8> Stack;
+  llvm::SmallVector<llvm::ConstantExpr*, 8> ExprPath;
+  llvm::Function &Fn;
+};
+
 class AutomaticLocalVariables : public llvm::ModulePass {
 public:
   static char ID;
@@ -66,6 +142,8 @@ public:
 private:
   bool prepareKernelForLocals(llvm::Function &F);
   void replaceKernel(llvm::Function *Old, llvm::Function *New);
+  void replaceKernelLocalUses(llvm::Function &F, llvm::GlobalVariable *V,
+                              llvm::Value *Ptr, unsigned FieldOffset) const;
 
 private:
   llvm::DenseMap<llvm::Function*, llvm::Function*> ModifiedKernels;
@@ -100,6 +178,37 @@ KernelLocals::KernelLocals(llvm::Function &F) {
   StructTy = llvm::StructType::get(M.getContext(), Fields);
 }
 
+void
+AutomaticLocalVariables::replaceKernelLocalUses(llvm::Function &F,
+                                                llvm::GlobalVariable *V,
+                                                llvm::Value *Ptr,
+                                                unsigned FieldOffset) const {
+  using namespace llvm;
+
+
+  ConstantUseIterator UI(F, V);
+  ConstantUseIterator UE(F, V, true);
+
+  while (UI != UE) {
+    Instruction *CurI = UI.getUser();
+    IRBuilder<> B(CurI);
+
+    Constant *Old = V;
+    Value *New = B.CreateStructGEP(Ptr, FieldOffset);
+    for (unsigned i = 0, e = UI.getExprPathSize(); i != e; ++i) {
+      Instruction *I = UI.getExprPathElem(i)->getAsInstruction();
+      B.Insert(I);
+      I->replaceUsesOfWith(Old, New);
+      Old = UI.getExprPathElem(i);
+      New = I;
+    }
+
+    // Increment the iterator before replace the expr in the instruction.
+    ++UI;
+
+    CurI->replaceUsesOfWith(Old, New);
+  }
+}
 
 bool AutomaticLocalVariables::prepareKernelForLocals(llvm::Function &F) {
   using namespace llvm;
@@ -152,38 +261,7 @@ bool AutomaticLocalVariables::prepareKernelForLocals(llvm::Function &F) {
   Value *PtrLocals = &*DestI;
   for (KernelLocals::iterator I = Locals.begin(),
        E = Locals.end(); I != E; ++I)
-    for (Value::use_iterator UI = I->first->use_begin(),
-         UE = I->first->use_end(); UI != UE; ) {
-      // We are modifing the use, so compute the next use.
-      User *CurUser = *UI++;
-
-      // Users should be only instructions...
-      Instruction *CurI = cast<Instruction>(CurUser);
-
-      // ... in the kernel itself!
-      assert(CurI->getParent()->getParent() == NF &&
-             "Use outside the kernel!");
-
-      IRBuilder<> B(CurI);
-
-      if (GetElementPtrInst *OldGEP = dyn_cast<GetElementPtrInst>(CurI)) {
-        SmallVector<Value*, 4> Indices;
-        Indices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), 0));
-        Indices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), I->second));
-        for (GetElementPtrInst::op_iterator
-             II = llvm::next(OldGEP->idx_begin()),
-             IE = OldGEP->idx_end(); II != IE; ++II)
-          Indices.push_back(II->get());
-        Value *NewGEP = OldGEP->isInBounds()
-                          ? B.CreateInBoundsGEP(PtrLocals, Indices)
-                          : B.CreateGEP(PtrLocals, Indices);
-        OldGEP->replaceAllUsesWith(NewGEP);
-        OldGEP->eraseFromParent();
-      } else {
-        Value *GEP = B.CreateStructGEP(PtrLocals, I->second);
-        CurI->replaceUsesOfWith(I->first, GEP);
-      }
-    }
+    replaceKernelLocalUses(*NF, I->first, PtrLocals, I->second);
 
   ModifiedKernels[&F] = NF;
 
