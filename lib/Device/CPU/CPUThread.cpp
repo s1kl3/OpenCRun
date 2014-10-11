@@ -57,6 +57,9 @@ ExecutionStack::ExecutionStack(const sys::HardwareCache &Cache) {
 }
 
 ExecutionStack::~ExecutionStack() {
+  #ifndef NDEBUG
+  sys::MarkPagesReadWrite(Stack, StackSize);
+  #endif
   sys::Free(Stack);
 }
 
@@ -67,6 +70,9 @@ void ExecutionStack::Reset(EntryPoint Entry, void **Args, unsigned N) {
 
   // Stack too small, expand it.
   if(StackSize < RequiredStackSize) {
+    #ifndef NDEBUG
+    sys::MarkPagesReadWrite(Stack, StackSize);
+    #endif
     sys::Free(Stack);
     Stack = sys::PageAlignedAlloc(RequiredStackSize);
     StackSize = RequiredStackSize;
@@ -80,6 +86,7 @@ void ExecutionStack::Reset(EntryPoint Entry, void **Args, unsigned N) {
 
   // If needed, redo memory allocation, in order to get space for guard page.
   if(StackSize < DebugStackSize) {
+    sys::MarkPagesReadWrite(Stack, StackSize);
     sys::Free(Stack);
     Stack = sys::PageAlignedAlloc(DebugStackSize);
     StackSize = DebugStackSize;
