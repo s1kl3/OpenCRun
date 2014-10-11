@@ -919,7 +919,7 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // Link opencrunCPULib.bc with kernel module.
   llvm::Linker::LinkModules(&Mod,
                             &(*BitCodeLibrary),
-                            0,
+                            llvm::Linker::PreserveSource,
                             NULL);
 
   // Force translation to native code.
