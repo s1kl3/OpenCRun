@@ -179,11 +179,15 @@ CPUThread &Multiprocessor::GetLesserLoadedThread() {
   CPUThreadsContainer::iterator I = Threads.begin(),
                                 E = Threads.end();
   CPUThread *Thr = *I;
-  float MinLoad = FLT_MAX;
+  float CurMinLoad, MinLoad = FLT_MAX;
 
-  for(; I != E; ++I)
-    if((*I)->GetLoadIndicator() < MinLoad)
+  for(; I != E; ++I) {
+    CurMinLoad = (*I)->GetLoadIndicator();
+    if(CurMinLoad < MinLoad) {
       Thr = *I;
+      MinLoad = CurMinLoad;
+    }
+  }
 
   return *Thr;
 }
