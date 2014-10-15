@@ -16,7 +16,16 @@ typedef union {
 } const_gen_ptr_t;
 }]>;
 
-let Requirements = [generic_ptr] in {
+def async_internal : OCLCodeBlock<[{
+event_t __internal_async_work_group_copy(uchar *, const uchar*, size_t,
+                                         event_t, size_t);
+
+event_t __internal_async_work_group_strided_copy(uchar *, const uchar*, size_t,
+                                                 size_t, event_t, size_t, uint);
+void __internal_wait_group_events(int, event_t *);
+}]>;
+
+let Requirements = [generic_ptr, async_internal] in {
 
 def : OCLTargetBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
   gen_ptr_t dest_ptr;
@@ -24,7 +33,7 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
   dest_ptr.g_ptr = param1;
   src_ptr.l_ptr = param2;
 
-  return __builtin_ocl_async_work_group_copy_impl(
+  return __internal_async_work_group_copy(
     dest_ptr.ptr,
     src_ptr.ptr,
     param3,
@@ -39,7 +48,7 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_copy, TemplateStrategy<[{
   dest_ptr.l_ptr = param1;
   src_ptr.g_ptr = param2;
 
-  return __builtin_ocl_async_work_group_copy_impl(
+  return __internal_async_work_group_copy(
     dest_ptr.ptr,
     src_ptr.ptr,
     param3,
@@ -56,7 +65,7 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[
   dest_ptr.l_ptr = param1;
   src_ptr.g_ptr = param2;
 
-  return __builtin_ocl_async_work_group_strided_copy_impl(
+  return __internal_async_work_group_strided_copy(
     dest_ptr.ptr,
     src_ptr.ptr,
     param3,
@@ -73,7 +82,7 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[
   dest_ptr.g_ptr = param1;
   src_ptr.l_ptr = param2;
 
-   return __builtin_ocl_async_work_group_strided_copy_impl(
+   return __internal_async_work_group_strided_copy(
     dest_ptr.ptr,
     src_ptr.ptr,
     param3,
@@ -85,6 +94,12 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[
 }], [TypedefId<"GENTYPE", Pointee<1>>]>, "eP1gP2gzze">;
 
 }
+
+//----------------------------------------------------------------------------//
+
+def : OCLTargetBuiltinImpl<blt_wait_group_events, TemplateStrategy<[{
+  __internal_wait_group_events(param1, param2);
+}]>>;
 
 //----------------------------------------------------------------------------//
 

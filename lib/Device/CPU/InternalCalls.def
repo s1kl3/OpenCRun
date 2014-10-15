@@ -13,8 +13,8 @@ INTERNAL_CALL(get_global_offset, "zi", opencrun::cpu::GetGlobalOffset)
 INTERNAL_CALL(barrier, "vi", opencrun::cpu::Barrier)
 
 // Asynchronous Copy Functions.
-INTERNAL_CALL(async_work_group_copy_impl, "ePcPczez", opencrun::cpu::AsyncWorkGroupCopy)
-INTERNAL_CALL(async_work_group_strided_copy_impl, "ePcPczzezi", opencrun::cpu::AsyncWorkGroupStridedCopy)
+INTERNAL_CALL(async_work_group_copy, "ePcPczez", opencrun::cpu::AsyncWorkGroupCopy)
+INTERNAL_CALL(async_work_group_strided_copy, "ePcPczzezi", opencrun::cpu::AsyncWorkGroupStridedCopy)
 INTERNAL_CALL(wait_group_events, "viPe", opencrun::cpu::WaitGroupEvents)
 
 // Explicit Memory Fence Functions.

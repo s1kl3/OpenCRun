@@ -1,24 +1,8 @@
 
-// Implemented with an internal call.
-// uint __builtin_ocl_get_work_dim();
+//
+// The WorkItem library is auto-generated.
+//
 
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_global_size(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_global_id(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_local_size(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_local_id(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_num_groups(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_group_id(uint dimindx);
-
-// Implemented with an internal call.
-// size_t __builtin_ocl_get_global_offset(uint dimindx);
+#define OPENCRUN_BUILTIN_WORKITEM
+#include "Builtins.CPU.inc"
+#undef OPENCRUN_BUILTIN_WORKITEM

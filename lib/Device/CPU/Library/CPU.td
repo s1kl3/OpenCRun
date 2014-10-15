@@ -7,6 +7,9 @@ include "opencrun/Device/Library/OpenCL.td"
 include "Async.td"
 include "Atomic.td"
 include "Image.td"
+include "Mfence.td"
+include "Synchronization.td"
+include "WorkItem.td"
 
 //===----------------------------------------------------------------------===//
 
