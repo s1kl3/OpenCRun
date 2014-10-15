@@ -14,9 +14,3 @@ static llvm::ManagedStatic<Platform> OpenCRunPlat;
 Platform &opencrun::GetOpenCRunPlatform() {
   return *OpenCRunPlat;
 }
-
-static void __init_runtime(void) __attribute__((constructor));
-
-void __init_runtime(void) {
-  llvm::llvm_start_multithreaded();
-}

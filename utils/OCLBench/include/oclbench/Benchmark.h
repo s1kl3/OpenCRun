@@ -4,7 +4,6 @@
 
 #include "oclbench/BenchmarkPrinter.h"
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -77,7 +76,7 @@ private:
   llvm::StringMap<llvm::MemoryBuffer *> Sources;
 
   ResultsContainer Results;
-  llvm::OwningPtr<BenchmarkPrinter> Printer;
+  std::unique_ptr<BenchmarkPrinter> Printer;
 };
 
 class Error : public std::exception {

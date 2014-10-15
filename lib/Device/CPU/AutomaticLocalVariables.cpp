@@ -100,12 +100,13 @@ private:
 
 private:
   void step() {
-    if (!llvm::isa<llvm::Instruction>(*It) &&
-        It->use_begin() != It->use_end()) {
-      Stack.push_back(StackElem(llvm::next(It), ItEnd));
-      ExprPath.push_back(llvm::cast<llvm::ConstantExpr>(*It));
-      ItEnd = It->use_end();
-      It = It->use_begin();
+    llvm::User *U = It->getUser();
+    if (!llvm::isa<llvm::Instruction>(U) &&
+        U->use_begin() != U->use_end()) {
+      Stack.push_back(StackElem(std::next(It), ItEnd));
+      ExprPath.push_back(llvm::cast<llvm::ConstantExpr>(U));
+      ItEnd = U->use_end();
+      It = U->use_begin();
     } else {
       ++It;
       while (It == ItEnd && !Stack.empty()) {
@@ -131,13 +132,9 @@ public:
 public:
   AutomaticLocalVariables() : llvm::ModulePass(ID) {}
 
-  bool runOnModule(llvm::Module &M) LLVM_OVERRIDE;
+  bool runOnModule(llvm::Module &M) override;
 
   const char *getPassName() const { return "CPU Automatic Locals Transform"; }
-
-  void getAnalysisUsage(llvm::AnalysisUsage &AU) const LLVM_OVERRIDE {
-    AU.addRequired<llvm::DataLayout>();
-  }
 
 private:
   bool prepareKernelForLocals(llvm::Function &F);
@@ -184,7 +181,6 @@ AutomaticLocalVariables::replaceKernelLocalUses(llvm::Function &F,
                                                 llvm::Value *Ptr,
                                                 unsigned FieldOffset) const {
   using namespace llvm;
-
 
   ConstantUseIterator UI(F, V);
   ConstantUseIterator UE(F, V, true);
@@ -267,7 +263,7 @@ bool AutomaticLocalVariables::prepareKernelForLocals(llvm::Function &F) {
 
 
   llvm::Module &M = *F.getParent();
-  llvm::DataLayout &DL = getAnalysis<llvm::DataLayout>();
+  const llvm::DataLayout &DL = *M.getDataLayout();
   llvm::MDNode *InfoMD = ModuleInfo(M).getKernelInfo(F.getName()).getInfo();
 
   llvm::SmallVector<llvm::Value *, 8> Info;

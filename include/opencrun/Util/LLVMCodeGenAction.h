@@ -2,7 +2,6 @@
 #define OPENCRUN_UTIL_LLVMCODEGENACTION_H
 
 #include "clang/Frontend/FrontendAction.h"
-#include "llvm/ADT/OwningPtr.h"
 
 namespace llvm {
 class LLVMContext;
@@ -18,17 +17,17 @@ public:
   LLVMCodeGenAction(llvm::LLVMContext *Ctx = 0);
   ~LLVMCodeGenAction();
 
-  llvm::Module *takeModule() { return TheModule.take(); }
+  llvm::Module *takeModule() { return TheModule.release(); }
 
 protected:
   clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &CI,
-                                        llvm::StringRef InFile) LLVM_OVERRIDE;
+                                        llvm::StringRef InFile) override;
 
-  void EndSourceFileAction() LLVM_OVERRIDE;
+  void EndSourceFileAction() override;
 
 private:
   LLVMCodeGenConsumer *Consumer;
-  llvm::OwningPtr<llvm::Module> TheModule;
+  std::unique_ptr<llvm::Module> TheModule;
   llvm::LLVMContext *Context;
   bool OwnContext;
 };

@@ -519,7 +519,7 @@ protected:
   PartitionPropertiesContainer PartProps;
 
   llvm::LLVMContext LLVMCtx;
-  llvm::OwningPtr<llvm::Module> BitCodeLibrary;
+  std::unique_ptr<llvm::Module> BitCodeLibrary;
 
 private:
   std::string EnvCompilerOpts;

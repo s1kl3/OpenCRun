@@ -28,21 +28,21 @@ public:
                       llvm::LLVMContext &C)
    : Gen(clang::CreateLLVMCodeGen(Diags, InFile, CGOpts, TargetOpts, C)) {}
 
-  llvm::Module *takeModule() { return TheModule.take(); }
+  llvm::Module *takeModule() { return TheModule.release(); }
 
-  void Initialize(clang::ASTContext &Ctx) LLVM_OVERRIDE {
+  void Initialize(clang::ASTContext &Ctx) override {
     Gen->Initialize(Ctx);
     TheModule.reset(Gen->GetModule());
   }
 
-  void HandleTranslationUnit(clang::ASTContext &Ctx) LLVM_OVERRIDE {
+  void HandleTranslationUnit(clang::ASTContext &Ctx) override {
     Gen->HandleTranslationUnit(Ctx);
 
     if (!TheModule) return;
 
     llvm::Module *M = Gen->ReleaseModule();
     if (!M) {
-      TheModule.take();
+      TheModule.release();
       return;
     }
 
@@ -50,11 +50,11 @@ public:
            "Unexpected module change during IR generation");
   }
 
-  void HandleTagDeclDefinition(clang::TagDecl *D) LLVM_OVERRIDE {
+  void HandleTagDeclDefinition(clang::TagDecl *D) override {
     Gen->HandleTagDeclDefinition(D);
   }
 
-  bool HandleTopLevelDecl(clang::DeclGroupRef D) LLVM_OVERRIDE {
+  bool HandleTopLevelDecl(clang::DeclGroupRef D) override {
     Gen->HandleTopLevelDecl(D);
 
     for (clang::DeclGroupRef::iterator I = D.begin(), E = D.end(); I != E; ++I)
@@ -65,29 +65,29 @@ public:
     return true;
   }
 
-  void HandleCXXStaticMemberVarInstantiation(clang::VarDecl *VD) LLVM_OVERRIDE {
+  void HandleCXXStaticMemberVarInstantiation(clang::VarDecl *VD) override {
     Gen->HandleCXXStaticMemberVarInstantiation(VD);
   }
 
-  void CompleteTentativeDefinition(clang::VarDecl *D) LLVM_OVERRIDE {
+  void CompleteTentativeDefinition(clang::VarDecl *D) override {
     Gen->CompleteTentativeDefinition(D);
   }
 
   void HandleVTable(clang::CXXRecordDecl *RD,
-                    bool DefinitionRequired) LLVM_OVERRIDE {
+                    bool DefinitionRequired) override {
     Gen->HandleVTable(RD, DefinitionRequired);
   }
 
-  void HandleLinkerOptionPragma(llvm::StringRef Opts) LLVM_OVERRIDE {
+  void HandleLinkerOptionPragma(llvm::StringRef Opts) override {
     Gen->HandleLinkerOptionPragma(Opts);
   }
 
   void HandleDetectMismatch(llvm::StringRef Name,
-                            llvm::StringRef Value) LLVM_OVERRIDE {
+                            llvm::StringRef Value) override {
     Gen->HandleDetectMismatch(Name, Value);
   }
 
-  void HandleDependentLibrary(llvm::StringRef Opts) LLVM_OVERRIDE {
+  void HandleDependentLibrary(llvm::StringRef Opts) override {
     Gen->HandleDependentLibrary(Opts);
   }
 
@@ -95,8 +95,8 @@ private:
   void regenerateKernelInfo(const clang::FunctionDecl *FD);
 
 private:
-  llvm::OwningPtr<clang::CodeGenerator> Gen;
-  llvm::OwningPtr<llvm::Module> TheModule;
+  std::unique_ptr<clang::CodeGenerator> Gen;
+  std::unique_ptr<llvm::Module> TheModule;
 };
 
 }

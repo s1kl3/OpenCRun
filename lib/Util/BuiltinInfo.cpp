@@ -83,7 +83,7 @@ llvm::Function *DeviceBuiltinInfo::getPrototype(llvm::Module &Mod,
     return F;
 
   llvm::LLVMContext &Ctx = Mod.getContext();
-  llvm::DataLayout DL(Mod.getDataLayout());
+  llvm::DataLayout DL(&Mod);
 
   return llvm::Function::Create(buildFunctionType(Ctx, DL, Format),
                                 llvm::Function::ExternalLinkage, Name, &Mod);

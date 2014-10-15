@@ -47,7 +47,7 @@ private:
   OCLConstantsMap Constants;
 };
 
-llvm::OwningPtr<OCLConstantsTableImpl> OCLConstantsTable::Impl;
+std::unique_ptr<OCLConstantsTableImpl> OCLConstantsTable::Impl;
 
 const OCLConstant &OCLConstantsTable::get(llvm::Record &R) {
   if (!Impl) Impl.reset(new OCLConstantsTableImpl());

@@ -596,7 +596,7 @@ private:
   OCLDeclsMap Decls;
 };
 
-llvm::OwningPtr<OCLBuiltinsTableImpl> OCLBuiltinsTable::Impl;
+std::unique_ptr<OCLBuiltinsTableImpl> OCLBuiltinsTable::Impl;
 
 const OCLBuiltin &OCLBuiltinsTable::getBuiltin(llvm::Record &R) {
   if (!Impl) Impl.reset(new OCLBuiltinsTableImpl());

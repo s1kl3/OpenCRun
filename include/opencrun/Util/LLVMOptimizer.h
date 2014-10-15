@@ -1,7 +1,6 @@
 #ifndef OPENCRUN_UTIL_LLVMOPTIMIZERACTION_H
 #define OPENCRUN_UTIL_LLVMOPTIMIZERACTION_H
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/PassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -42,8 +41,8 @@ public:
 private:
   LLVMOptimizerParams Params;
   llvm::PassManagerBuilder PMBuilder;
-  llvm::OwningPtr<llvm::PassManager> MPM;
-  llvm::OwningPtr<llvm::FunctionPassManager> FPM;
+  std::unique_ptr<llvm::PassManager> MPM;
+  std::unique_ptr<llvm::FunctionPassManager> FPM;
 
   template<class InterfaceTy> friend class LLVMOptimizer;
 };

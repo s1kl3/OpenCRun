@@ -3,6 +3,7 @@
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/SubtargetFeature.h"
@@ -75,25 +76,16 @@ static llvm::TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
 
   if (!TheTarget) return 0;
 
-  llvm::TargetMachine::setAsmVerbosityDefault(P.CodeGenOpts.AsmVerbose);
-
-  llvm::TargetMachine::setFunctionSections(P.CodeGenOpts.FunctionSections);
-  llvm::TargetMachine::setDataSections(P.CodeGenOpts.DataSections);
-
-  // FIXME: Parse this earlier.
-  llvm::CodeModel::Model CM;
-  if (P.CodeGenOpts.CodeModel == "small") {
-    CM = llvm::CodeModel::Small;
-  } else if (P.CodeGenOpts.CodeModel == "kernel") {
-    CM = llvm::CodeModel::Kernel;
-  } else if (P.CodeGenOpts.CodeModel == "medium") {
-    CM = llvm::CodeModel::Medium;
-  } else if (P.CodeGenOpts.CodeModel == "large") {
-    CM = llvm::CodeModel::Large;
-  } else {
-    assert(P.CodeGenOpts.CodeModel.empty() && "Invalid code model!");
-    CM = llvm::CodeModel::Default;
-  }
+  unsigned CodeModel =
+    llvm::StringSwitch<unsigned>(P.CodeGenOpts.CodeModel)
+      .Case("small", llvm::CodeModel::Small)
+      .Case("kernel", llvm::CodeModel::Kernel)
+      .Case("medium", llvm::CodeModel::Medium)
+      .Case("large", llvm::CodeModel::Large)
+      .Case("default", llvm::CodeModel::Default)
+      .Default(~0u);
+  assert(CodeModel != ~0u && "invalid code model!");
+  llvm::CodeModel::Model CM = static_cast<llvm::CodeModel::Model>(CodeModel);
 
   std::string FeaturesStr;
   if (P.TargetOpts.Features.size()) {
@@ -171,22 +163,18 @@ static llvm::TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
   Options.DisableTailCalls = P.CodeGenOpts.DisableTailCalls;
   Options.TrapFuncName = P.CodeGenOpts.TrapFuncName;
   Options.PositionIndependentExecutable = P.LangOpts.PIELevel != 0;
-  Options.EnableSegmentedStacks = P.CodeGenOpts.EnableSegmentedStacks;
+  Options.FunctionSections = P.CodeGenOpts.FunctionSections;
+  Options.DataSections = P.CodeGenOpts.DataSections;
+
+  Options.MCOptions.MCRelaxAll = P.CodeGenOpts.RelaxAll;
+  Options.MCOptions.MCSaveTempLabels = P.CodeGenOpts.SaveTempLabels;
+  Options.MCOptions.MCUseDwarfDirectory = !P.CodeGenOpts.NoDwarfDirectoryAsm;
+  Options.MCOptions.MCNoExecStack = P.CodeGenOpts.NoExecStack;
+  Options.MCOptions.AsmVerbose = P.CodeGenOpts.AsmVerbose;
 
   llvm::TargetMachine *TM =
     TheTarget->createTargetMachine(Triple, P.TargetOpts.CPU, FeaturesStr,
                                    Options, RM, CM, OptLevel);
-
-  if (P.CodeGenOpts.RelaxAll)
-    TM->setMCRelaxAll(true);
-  if (P.CodeGenOpts.SaveTempLabels)
-    TM->setMCSaveTempLabels(true);
-  if (P.CodeGenOpts.NoDwarf2CFIAsm)
-    TM->setMCUseCFI(false);
-  if (!P.CodeGenOpts.NoDwarfDirectoryAsm)
-    TM->setMCUseDwarfDirectory(true);
-  if (P.CodeGenOpts.NoExecStack)
-    TM->setMCNoExecStack(true);
 
   return TM;
 }
@@ -197,12 +185,12 @@ void LLVMOptimizerBase::run(llvm::Module *M) {
   llvm::TargetMachine *TM = createTargetMachine(Params);
 
   FPM.reset(new llvm::FunctionPassManager(M));
-  FPM->add(new llvm::DataLayout(M));
+  FPM->add(new llvm::DataLayoutPass(M));
   if (TM) TM->addAnalysisPasses(*FPM);
   PMBuilder.populateFunctionPassManager(*FPM);
 
   MPM.reset(new llvm::PassManager());
-  MPM->add(new llvm::DataLayout(M));
+  MPM->add(new llvm::DataLayoutPass(M));
   if (TM) TM->addAnalysisPasses(*MPM);
   PMBuilder.populateModulePassManager(*MPM);
 

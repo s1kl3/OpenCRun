@@ -11,7 +11,6 @@
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/Mutex.h"
 
 struct _cl_context { };
@@ -182,7 +181,7 @@ private:
 
   llvm::sys::Mutex DiagLock;
   clang::DiagnosticOptions DiagOptions;
-  llvm::OwningPtr<clang::DiagnosticsEngine> Diag;
+  std::unique_ptr<clang::DiagnosticsEngine> Diag;
 };
 
 } // End namespace opencrun.

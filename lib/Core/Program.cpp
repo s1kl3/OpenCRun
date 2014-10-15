@@ -56,10 +56,10 @@ Program::Program(Context &Ctx, BinariesContainer &Binaries) : Ctx(&Ctx) {
                         (const unsigned char *)Binary->getBufferEnd())) {
 
       // Parse the LLVM bitcode image and return an llvm::Module for it.
-      llvm::Module *BitCode = llvm::ParseBitcodeFile(Binary, LLVMCtx);
+      auto BitCode = llvm::parseBitcodeFile(Binary, LLVMCtx);
 
-      if(BitCode) {
-        Info.SetBitCode(BitCode);
+      if (BitCode) {
+        Info.SetBitCode(BitCode.get());
         Info.RegisterBuildDone(true);
       }
     }

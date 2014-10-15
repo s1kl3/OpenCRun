@@ -1,7 +1,6 @@
 #ifndef  OCLCONSTANT_H
 #define  OCLCONSTANT_H
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TableGen/Record.h"
@@ -47,7 +46,7 @@ public:
   static const OCLConstant &get(llvm::Record &R);
 
 private:
-  static llvm::OwningPtr<OCLConstantsTableImpl> Impl;
+  static std::unique_ptr<OCLConstantsTableImpl> Impl;
 };
 
 }

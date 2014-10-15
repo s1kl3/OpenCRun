@@ -772,7 +772,7 @@ public:
   static const OCLBuiltinImpl &getBuiltinImpl(llvm::Record &R);
 
 private:
-  static llvm::OwningPtr<OCLBuiltinsTableImpl> Impl;
+  static std::unique_ptr<OCLBuiltinsTableImpl> Impl;
 };
 
 //===----------------------------------------------------------------------===//

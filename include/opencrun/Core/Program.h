@@ -124,7 +124,7 @@ public:
 public:
   bool IsBuilt() const { return BuildStatus == CL_BUILD_SUCCESS; }
   bool BuildInProgress() const { return BuildStatus == CL_BUILD_IN_PROGRESS; }
-  bool HasBitCode() const { return BitCode; }
+  bool HasBitCode() const { return bool(BitCode); }
 
   bool DefineKernel(llvm::StringRef KernName) {
     return ModuleInfo(*BitCode).hasKernel(KernName);
@@ -135,8 +135,8 @@ private:
   std::string BuildLog;
   llvm::SmallString<32> BuildOpts;
 
-  llvm::OwningPtr<llvm::Module> BitCode;
-  llvm::OwningPtr<llvm::MemoryBuffer> Binary;
+  std::unique_ptr<llvm::Module> BitCode;
+  std::unique_ptr<llvm::MemoryBuffer> Binary;
 };
 
 class Program : public _cl_program, public MTRefCountedBase<Program> {
@@ -229,7 +229,7 @@ private:
   llvm::sys::Mutex ThisLock;
 
   llvm::IntrusiveRefCntPtr<Context> Ctx;
-  llvm::OwningPtr<llvm::MemoryBuffer> Src;
+  std::unique_ptr<llvm::MemoryBuffer> Src;
 
   // Default diagnostic: don't colorize or format the output, it must write to a
   // memory buffer.

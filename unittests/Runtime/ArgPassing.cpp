@@ -66,10 +66,10 @@ TYPED_TEST_P(ArgPassingTest, ByValue) {
 TYPED_TEST_P(ArgPassingTest, Vector) {
   cl_int3 HostOut, HostIn;
 
-  HostOut.x = HostOut.y = HostOut.z = HostOut.w = 0;
-  HostIn.x = -1;
-  HostIn.y = 0;
-  HostIn.z = +1;
+  HostOut.s[0] = HostOut.s[1] = HostOut.s[2] = HostOut.s[3] = 0;
+  HostIn.s[0] = -1;
+  HostIn.s[1] = 0;
+  HostIn.s[2] = +1;
 
   cl::Buffer Out = this->AllocReturnBuffer(sizeof(cl_int3));
 
@@ -90,9 +90,9 @@ TYPED_TEST_P(ArgPassingTest, Vector) {
                              cl::NDRange(1));
   Queue.enqueueReadBuffer(Out, true, 0, sizeof(cl_int3), &HostOut);
 
-  EXPECT_EQ(-1, HostOut.x);
-  EXPECT_EQ(0, HostOut.y);
-  EXPECT_EQ(+1, HostOut.z);
+  EXPECT_EQ(-1, HostOut.s[0]);
+  EXPECT_EQ(0, HostOut.s[1]);
+  EXPECT_EQ(+1, HostOut.s[2]);
 }
 
 REGISTER_TYPED_TEST_CASE_P(ArgPassingTest, Buffers,

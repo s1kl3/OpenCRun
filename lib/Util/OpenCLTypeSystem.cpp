@@ -2,7 +2,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/RecordLayout.h"
-#include "clang/Basic/OpenCL.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Metadata.h"
@@ -32,12 +31,14 @@ AddressSpace opencrun::opencl::convertAddressSpace(unsigned AS) {
   llvm_unreachable("Illegal address space!");
 }
 
-ImageAccess opencrun::opencl::convertImageAccess(unsigned IA) {
-  switch (IA) {
-  case clang::CLIA_read_only: return IA_ReadOnly;
-  case clang::CLIA_write_only: return IA_WriteOnly;
-  default: break;
-  }
+ImageAccess
+opencrun::opencl::convertImageAccess(const clang::OpenCLImageAccessAttr *CLIA) {
+  if (CLIA->isReadOnly())
+    return IA_ReadOnly;
+
+  if (CLIA->isWriteOnly())
+    return IA_WriteOnly;
+
   llvm_unreachable("Illegal image access qualifier!");
 }
 
@@ -424,8 +425,7 @@ Type TypeGenerator::addQualifiers(clang::Qualifiers Q,
   if (Q.hasVolatile()) Quals.addVolatile();
   if (Q.hasRestrict()) Quals.addRestrict();
   Quals.addAddressSpace(convertAddressSpace(Q.getAddressSpace()));
-  if (CLIA)
-    Quals.addImageAccess(convertImageAccess(CLIA->getAccess()));
+  if (CLIA) Quals.addImageAccess(convertImageAccess(CLIA));
 
   return Quals.empty() ? T : getQualType(Quals.getQualifiersMask(), T);
 }

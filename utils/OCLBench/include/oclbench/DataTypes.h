@@ -2,7 +2,6 @@
 #ifndef OCLBENCH_DATATYPES_H
 #define OCLBENCH_DATATYPES_H
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -126,7 +125,7 @@ public:
 
 private:
   llvm::SmallVector<size_t, 4> Sizes;
-  llvm::OwningArrayPtr<Ty> Mem;
+  std::unique_ptr<Ty[]> Mem;
 };
 
 // Default implementation is a bitwise comparison. Provide specialization for

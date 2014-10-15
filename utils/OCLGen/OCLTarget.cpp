@@ -72,7 +72,7 @@ private:
   OCLAddrSpaceMap AddrSpaces;
 };
 
-llvm::OwningPtr<OCLPredicatesTableImpl> OCLPredicatesTable::Impl;
+std::unique_ptr<OCLPredicatesTableImpl> OCLPredicatesTable::Impl;
 
 const OCLPredicate &OCLPredicatesTable::get(llvm::Record &R) {
   if (!Impl) Impl.reset(new OCLPredicatesTableImpl());

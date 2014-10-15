@@ -7,8 +7,8 @@
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
 
-#include "llvm/Linker.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/PassManager.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
@@ -269,7 +269,7 @@ void CPUDevice::FreeMapBuffer(void *MapBuf) {
 
 bool CPUDevice::Submit(Command &Cmd) {
   bool Submitted = false;
-  llvm::OwningPtr<ProfileSample> Sample;
+  std::unique_ptr<ProfileSample> Sample;
 
   // Take the profiling information here, in order to force this sample
   // happening before the subsequents samples.
@@ -340,10 +340,10 @@ bool CPUDevice::Submit(Command &Cmd) {
     llvm::report_fatal_error("unknown command submitted");
 
   // The command has been submitted, register the sample. On failure, the
-  // llvm::OwningPtr destructor will reclaim the sample.
+  // std::unique_ptr destructor will reclaim the sample.
   if(Submitted) {
     InternalEvent &Ev = Cmd.GetNotifyEvent();
-    Ev.MarkSubmitted(Sample.take());
+    Ev.MarkSubmitted(Sample.release());
   }
 
   return Submitted;

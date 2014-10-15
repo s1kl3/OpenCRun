@@ -1,7 +1,6 @@
 #ifndef OCLTARGET_H
 #define OCLTARGET_H
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/TableGen/Record.h"
 
@@ -105,7 +104,7 @@ public:
   static const OCLAddressSpace *getAddressSpace(AddressSpaceKind K);
 
 private:
-  static llvm::OwningPtr<OCLPredicatesTableImpl> Impl;
+  static std::unique_ptr<OCLPredicatesTableImpl> Impl;
 
   friend void LoadOCLPredicates(const llvm::RecordKeeper &R,
                                 OCLPredicatesContainer &P);
