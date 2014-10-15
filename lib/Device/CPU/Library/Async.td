@@ -89,6 +89,10 @@ def : OCLTargetBuiltinImpl<blt_async_work_group_strided_copy, TemplateStrategy<[
 //----------------------------------------------------------------------------//
 
 def : OCLTargetBuiltinImpl<blt_prefetch, TemplateStrategy<[{
-  for (uint i = 0; i < param2; i++)
-    __builtin_prefetch((const void *) &param1[i]);
+  const_gen_ptr_t chg_ptr;
+  chg_ptr.g_ptr = param1;
+  const GENTYPE *dest_ptr = (const GENTYPE *)chg_ptr.ptr;
+
+   for (uint i = 0; i < param2; i++)
+    __builtin_prefetch(dest_ptr + i);
 }], [TypedefId<"GENTYPE", Pointee<1>>]>>;
