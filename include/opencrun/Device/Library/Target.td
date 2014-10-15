@@ -5,6 +5,9 @@ class OCLPredicate<string prefix, string name> {
 
 class OCLMacro<string macro> : OCLPredicate<"", macro>;
 
+def ocl_arch_32bit : OCLMacro<"__opencrun_target_arch_32">;
+def ocl_arch_64bit : OCLMacro<"__opencrun_target_arch_64">;
+
 class OCLExtension<string name> : OCLPredicate<"__opencrun_target_ext_", name>;
 
 def ocl_ext_cl_khr_fp16 : OCLExtension<"cl_khr_fp16">;
