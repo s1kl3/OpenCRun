@@ -658,7 +658,7 @@ void CPUDevice::InitJIT() {
   #define INTERNAL_CALL(N, Fmt, F)                                    \
     AddrInt = reinterpret_cast<intptr_t>(F);                          \
     Addr = reinterpret_cast<void *>(AddrInt);                         \
-    Func = DeviceBuiltinInfo::getPrototype(*BitCodeLibrary, "__builtin_ocl_" #N, Fmt); \
+    Func = DeviceBuiltinInfo::getPrototype(*BitCodeLibrary, "__internal_" #N, Fmt); \
     Engine->addGlobalMapping(Func, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL

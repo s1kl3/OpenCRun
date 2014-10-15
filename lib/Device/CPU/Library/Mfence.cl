@@ -1,10 +1,8 @@
 
-// Implemented with an internal call.
-// void __builtin_ocl_mem_fence(cl_mem_fence_flags flags);
+//
+// The Async library is auto-generated.
+//
 
-// Implemented with an internal call.
-// void __builtin_ocl_read_mem_fence(cl_mem_fence_flags flags);
-
-// Implemented with an internal call.
-// void __builtin_ocl_write_mem_fence(cl_mem_fence_flags flags);
-
+#define OPENCRUN_BUILTIN_MFENCE
+#include "Builtins.CPU.inc"
+#undef OPENCRUN_BUILTIN_MFENCE
