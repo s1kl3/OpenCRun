@@ -7,8 +7,8 @@
 #include "clang/Parse/ParseAST.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/system_error.h"
 
 // OpenCL extensions defines macro that clashes with clang internal symbols.
 // This is a workaround to include clang needed headers. Is this the right
@@ -42,7 +42,6 @@ public:
 
 Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
   Parent(NULL),
-  BitCodeLibrary(NULL),
   EnvCompilerOpts(sys::GetEnv("OPENCRUN_COMPILER_OPTIONS")),
   Triple(Triple.str()) {
   // Force initialization here, I do not want to pass explicit parameter to
@@ -95,7 +94,7 @@ bool Device::TranslateToBitCode(llvm::StringRef Opts,
   bool Success = Compiler.ExecuteAction(ToBitCode);
 
   Mod = ToBitCode.takeModule();
-  Success = Success && !Mod->MaterializeAll();
+  Success = Success && !Mod->materializeAll();
 
   LLVMOptimizer<Device> Opt(Compiler.getLangOpts(), Compiler.getCodeGenOpts(),
                             Compiler.getTargetOpts(), *this);
@@ -117,9 +116,9 @@ void Device::InitLibrary() {
     llvm::sys::path::append(Path, LLVM_PREFIX);
   llvm::sys::path::append(Path, "lib", LibName.str());
 
-  llvm::OwningPtr<llvm::MemoryBuffer> File;
+  std::unique_ptr<llvm::MemoryBuffer> File;
   if (!llvm::MemoryBuffer::getFile(Path.str(), File))
-    BitCodeLibrary.reset(llvm::ParseBitcodeFile(File.get(), LLVMCtx));
+    BitCodeLibrary.reset(llvm::parseBitcodeFile(File.get(), LLVMCtx).get());
 
   if (!BitCodeLibrary)
     llvm::report_fatal_error("Unable to find class library " + LibName +

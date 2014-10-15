@@ -4,7 +4,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/system_error.h"
+#include "llvm/Support/Errc.h"
 
 using namespace oclbench;
 
@@ -190,7 +190,7 @@ void Benchmark::SetupCommandQueue() {
 cl::Program Benchmark::LoadProgramFromFile(llvm::StringRef File) {
   // Load file if not yet done.
   if(!Sources.count(File)) {
-    llvm::OwningPtr<llvm::MemoryBuffer> BufPtr;
+    std::unique_ptr<llvm::MemoryBuffer> BufPtr;
 
     // Try loading the file.
     for(BCLPathContainer::iterator I = BCLPath.begin(),
@@ -207,7 +207,7 @@ cl::Program Benchmark::LoadProgramFromFile(llvm::StringRef File) {
     if(!BufPtr)
       throw Error("Cannot open " + File.str());
 
-    Sources[File] = BufPtr.take();
+    Sources[File] = BufPtr.get();
   }
 
   llvm::MemoryBuffer *Buf = Sources[File];

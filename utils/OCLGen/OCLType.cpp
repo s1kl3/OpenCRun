@@ -322,7 +322,7 @@ private:
   OCLOpaqueTypeDefsMap OpaqueTypeDefs;
 };
 
-llvm::OwningPtr<OCLTypesTableImpl> OCLTypesTable::Impl;
+std::unique_ptr<OCLTypesTableImpl> OCLTypesTable::Impl;
 
 const OCLType &OCLTypesTable::get(llvm::Record &R) {
   if (!Impl) Impl.reset(new OCLTypesTableImpl());

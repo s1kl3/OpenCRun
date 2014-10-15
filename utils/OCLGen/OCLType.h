@@ -3,7 +3,6 @@
 
 #include "OCLTarget.h"
 
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/TableGen/Record.h"
 
@@ -288,7 +287,7 @@ public:
                                               const OCLPtrStructure &PtrS);
 
 private:
-  static llvm::OwningPtr<OCLTypesTableImpl> Impl;
+  static std::unique_ptr<OCLTypesTableImpl> Impl;
 
   friend class OCLPointerGroupIterator;
   friend void LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T);

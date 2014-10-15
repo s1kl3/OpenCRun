@@ -37,7 +37,7 @@ enum ImageAccess {
   IA_Invalid = 0
 };
 
-ImageAccess convertImageAccess(unsigned IA);
+ImageAccess convertImageAccess(const clang::OpenCLImageAccessAttr *CLIA);
 
 class Qualifiers {
 public:

@@ -436,8 +436,8 @@ void Context::DestroyMemoryObj(MemoryObj &MemObj) {
 void Context::ReportDiagnostic(llvm::StringRef Msg) {
   if(Diag) {
     llvm::sys::ScopedLock Lock(DiagLock);
-
-    Diag->Report(Diag->getCustomDiagID(clang::DiagnosticsEngine::Error, Msg));
+    auto Diags = Diag->getDiagnosticIDs();
+    Diag->Report(Diags->getCustomDiagID(clang::DiagnosticIDs::Error, Msg));
   }
 
   UserDiag.Notify(Msg);

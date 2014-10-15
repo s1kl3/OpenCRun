@@ -71,7 +71,7 @@ public:
 
 protected:
   void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
-                              LLVMOptimizerParams &Params) const LLVM_OVERRIDE;
+                              LLVMOptimizerParams &Params) const override;
 
 private:
   void InitDeviceInfo(const sys::HardwareMachine &Machine,
@@ -131,7 +131,7 @@ private:
   MultiprocessorsContainer Multiprocessors;
   GlobalMemory Global;
 
-  llvm::OwningPtr<llvm::ExecutionEngine> JIT;
+  std::unique_ptr<llvm::ExecutionEngine> JIT;
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;

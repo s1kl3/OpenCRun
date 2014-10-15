@@ -5,10 +5,10 @@
 #include "opencrun/Util/ModuleInfo.h"
 
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/InstIterator.h"
 
 using namespace opencrun;
 
@@ -99,17 +99,15 @@ size_t FootprintEstimate::GetSizeLowerBound(llvm::Type &Ty) {
   // target information, so we have to estimate the actual value using
   // the size of the LLVM types.
 
-  if(!Ty.isSized())
+  if (!Ty.isSized())
     return 0;
 
   // Getting primitive types size is straightforward.
-  if(Ty.isPrimitiveType())
+  if(Ty.isFloatingPointTy())
     return Ty.getPrimitiveSizeInBits() / 8;
 
-  // Non primitive types required custom inspection.
-
   // Integer: ceiling to byte.
-  else if(llvm::IntegerType *IntTy = llvm::dyn_cast<llvm::IntegerType>(&Ty)) {
+  if (llvm::IntegerType *IntTy = llvm::dyn_cast<llvm::IntegerType>(&Ty)) {
     size_t BitWidth = IntTy->getBitWidth(),
            Size = BitWidth / 8;
 
@@ -117,30 +115,28 @@ size_t FootprintEstimate::GetSizeLowerBound(llvm::Type &Ty) {
       ++Size;
 
     return Size;
+  }
 
   // Struct: cycle over elements and sum their values.
-  } else if(llvm::StructType *StructTy =
-              llvm::dyn_cast<llvm::StructType>(&Ty)) {
+  if (llvm::StructType *StructTy = llvm::dyn_cast<llvm::StructType>(&Ty)) {
     size_t Size = 0;
 
-    for(llvm::StructType::subtype_iterator I = StructTy->subtype_begin(),
-                                           E = StructTy->subtype_end();
-                                           I != E;
-                                           ++I)
+    for (llvm::StructType::subtype_iterator I = StructTy->subtype_begin(),
+         E = StructTy->subtype_end(); I != E; ++I)
       Size += GetSizeLowerBound(**I);
 
     return Size;
   }
 
   // Array: base type * number of elements.
-  else if(llvm::ArrayType *ArrayTy = llvm::dyn_cast<llvm::ArrayType>(&Ty)) {
+  if (llvm::ArrayType *ArrayTy = llvm::dyn_cast<llvm::ArrayType>(&Ty)) {
     llvm::Type *ElsTy = ArrayTy->getElementType();
 
     return ArrayTy->getNumElements() * GetSizeLowerBound(*ElsTy);
+  }
 
   // Vector: like Array.
-  } else if(llvm::VectorType *VectorTy =
-              llvm::dyn_cast<llvm::VectorType>(&Ty)) {
+  if (llvm::VectorType *VectorTy = llvm::dyn_cast<llvm::VectorType>(&Ty)) {
     llvm::Type *ElsTy = VectorTy->getElementType();
 
     return VectorTy->getNumElements() * GetSizeLowerBound(*ElsTy);
@@ -148,7 +144,7 @@ size_t FootprintEstimate::GetSizeLowerBound(llvm::Type &Ty) {
 
   // Pointer: in OpenCL a pointer can be 32 or 64 bit wide, since we have to
   // provide a lower bound, estimate pointer size equal to 32 bits.
-  else if(llvm::isa<llvm::PointerType>(&Ty))
+  if (llvm::isa<llvm::PointerType>(&Ty))
     return 4;
 
   return 0;
