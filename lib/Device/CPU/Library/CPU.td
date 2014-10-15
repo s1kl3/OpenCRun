@@ -25,7 +25,5 @@ def : OCLTargetFeature<[ocl_ext_cl_khr_global_int32_extended_atomics]>;
 def : OCLTargetFeature<[ocl_ext_cl_khr_int64_base_atomics]>, Requires<[IsX86_64]>;
 def : OCLTargetFeature<[ocl_ext_cl_khr_int64_extended_atomics]>, Requires<[IsX86_64]>;
 
-def : OCLTargetOpaqueTypeDef<ocl_mem_fence_flags, "uint">;
-
-def : OCLTargetOpaqueTypeDef<ocl_uintptr_t, "uint">, Requires<[IsX86_32]>;
-def : OCLTargetOpaqueTypeDef<ocl_uintptr_t, "ulong">, Requires<[IsX86_64]>;
+def : OCLTargetFeature<[ocl_arch_32bit]>, Requires<[IsX86_32]>;
+def : OCLTargetFeature<[ocl_arch_64bit]>, Requires<[IsX86_64]>;

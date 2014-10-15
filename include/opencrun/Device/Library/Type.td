@@ -8,8 +8,22 @@ class OCLOpaqueType<string name> : OCLBasicType {
   string Name = name;
 }
 
+class OCLOpaqueTypeDef<OCLOpaqueType ty, string define> {
+  OCLOpaqueType Type = ty;
+  string Define = define;
+  list<OCLPredicate> Predicates = [];
+  bit isTarget = 0;
+}
+
+class OCLTargetOpaqueTypeDef<OCLOpaqueType ty, string define>
+ : OCLOpaqueTypeDef<ty, define> {
+  let isTarget = 1;
+}
+
 def ocl_void : OCLOpaqueType<"void">;
+def ocl_ptrdiff_t : OCLOpaqueType<"ptrdiff_t">;
 def ocl_size_t : OCLOpaqueType<"size_t">;
+def ocl_intptr_t : OCLOpaqueType<"intptr_t">;
 def ocl_uintptr_t : OCLOpaqueType<"uintptr_t">;
 def ocl_mem_fence_flags : OCLOpaqueType<"cl_mem_fence_flags">;
 def ocl_event_t : OCLOpaqueType<"event_t">;
@@ -21,16 +35,20 @@ def ocl_image2d_t : OCLOpaqueType<"image2d_t">;
 def ocl_image2d_array_t : OCLOpaqueType<"image2d_array_t">;
 def ocl_image3d_t : OCLOpaqueType<"image3d_t">;
 
-class OCLOpaqueTypeDef<OCLOpaqueType ty, string define> {
-  OCLOpaqueType Type = ty;
-  string Define = define;
-  list<OCLPredicate> Predicates = [];
-  bit isTarget = 0;
+def : OCLOpaqueTypeDef<ocl_mem_fence_flags, "uint">;
+
+let Predicates = [ocl_arch_32bit] in {
+  def : OCLOpaqueTypeDef<ocl_ptrdiff_t, "int">;
+  def : OCLOpaqueTypeDef<ocl_size_t, "uint">;
+  def : OCLOpaqueTypeDef<ocl_intptr_t, "int">;
+  def : OCLOpaqueTypeDef<ocl_uintptr_t, "uint">;
 }
 
-class OCLTargetOpaqueTypeDef<OCLOpaqueType ty, string define>
- : OCLOpaqueTypeDef<ty, define> {
-  let isTarget = 1;
+let Predicates = [ocl_arch_64bit] in {
+  def : OCLOpaqueTypeDef<ocl_ptrdiff_t, "long">;
+  def : OCLOpaqueTypeDef<ocl_size_t, "ulong">;
+  def : OCLOpaqueTypeDef<ocl_intptr_t, "long">;
+  def : OCLOpaqueTypeDef<ocl_uintptr_t, "ulong">;
 }
 
 class OCLAddressSpace<string name>
