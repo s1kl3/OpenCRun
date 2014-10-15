@@ -265,44 +265,155 @@ def blt_vstore16    : VloadstoreBuiltin_vVgzP1Sg_vVgzP2Sg_vVgzP4Sg_16<"vstore16"
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_vload2, TemplateStrategy<[{
-  return *(RETTYPE *)(param2 + (param1 * 2));  
-}], [TypedefId<"RETTYPE", Id<0>>]>>;
+  return *(const __global RETTYPE *)(param2 + (param1 * 2));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vload2, TemplateStrategy<[{
+  return *(const __local RETTYPE *)(param2 + (param1 * 2));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vload2, TemplateStrategy<[{
+  return *(const __constant RETTYPE *)(param2 + (param1 * 2));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP3Sg">;
+
+def : OCLBuiltinImpl<blt_vload2, TemplateStrategy<[{
+  return *(const __private RETTYPE *)(param2 + (param1 * 2));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vload3, TemplateStrategy<[{
-  return *(RETTYPE *)(param2 + (param1 * 3));  
-}], [TypedefId<"RETTYPE", Id<0>>]>>;
+  return *(const __global RETTYPE *)(param2 + (param1 * 3));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vload3, TemplateStrategy<[{
+  return *(const __local RETTYPE *)(param2 + (param1 * 3));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vload3, TemplateStrategy<[{
+  return *(const __constant RETTYPE *)(param2 + (param1 * 3));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP3Sg">;
+
+def : OCLBuiltinImpl<blt_vload3, TemplateStrategy<[{
+  return *(const __private RETTYPE *)(param2 + (param1 * 3));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vload4, TemplateStrategy<[{
-  return *(RETTYPE *)(param2 + (param1 * 4));  
-}], [TypedefId<"RETTYPE", Id<0>>]>>;
+  return *(const __global RETTYPE *)(param2 + (param1 * 4));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vload4, TemplateStrategy<[{
+  return *(const __local RETTYPE *)(param2 + (param1 * 4));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vload4, TemplateStrategy<[{
+  return *(const __constant RETTYPE *)(param2 + (param1 * 4));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP3Sg">;
+
+def : OCLBuiltinImpl<blt_vload4, TemplateStrategy<[{
+  return *(const __private RETTYPE *)(param2 + (param1 * 4));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vload8, TemplateStrategy<[{
-  return *(RETTYPE *)(param2 + (param1 * 8));  
-}], [TypedefId<"RETTYPE", Id<0>>]>>;
+  return *(const __global RETTYPE *)(param2 + (param1 * 8));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vload8, TemplateStrategy<[{
+  return *(const __local RETTYPE *)(param2 + (param1 * 8));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vload8, TemplateStrategy<[{
+  return *(const __constant RETTYPE *)(param2 + (param1 * 8));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP3Sg">;
+
+def : OCLBuiltinImpl<blt_vload8, TemplateStrategy<[{
+  return *(const __private RETTYPE *)(param2 + (param1 * 8));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vload16, TemplateStrategy<[{
-  return *(RETTYPE *)(param2 + (param1 * 16));  
-}], [TypedefId<"RETTYPE", Id<0>>]>>;
+  return *(const __global RETTYPE *)(param2 + (param1 * 16));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vload16, TemplateStrategy<[{
+  return *(const __local RETTYPE *)(param2 + (param1 * 16));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vload16, TemplateStrategy<[{
+  return *(const __constant RETTYPE *)(param2 + (param1 * 16));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP3Sg">;
+
+def : OCLBuiltinImpl<blt_vload16, TemplateStrategy<[{
+  return *(const __private RETTYPE *)(param2 + (param1 * 16));
+}], [TypedefId<"RETTYPE", Id<0>>]>, "VgzP4Sg">;
+
+
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_vstore2, TemplateStrategy<[{
-  *(RETTYPE *)(param3 + (param2 * 2)) = param1;  
-}], [TypedefId<"RETTYPE", Id<1>>]>>;
+  *(__global RETTYPE *)(param3 + (param2 * 2)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vstore2, TemplateStrategy<[{
+  *(__local RETTYPE *)(param3 + (param2 * 2)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vstore2, TemplateStrategy<[{
+  *(__private RETTYPE *)(param3 + (param2 * 2)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vstore3, TemplateStrategy<[{
-  *(RETTYPE *)(param3 + (param2 * 3)) = param1;  
-}], [TypedefId<"RETTYPE", Id<1>>]>>;
+  *(__global RETTYPE *)(param3 + (param2 * 3)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vstore3, TemplateStrategy<[{
+  *(__local RETTYPE *)(param3 + (param2 * 3)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vstore3, TemplateStrategy<[{
+  *(__private RETTYPE *)(param3 + (param2 * 3)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vstore4, TemplateStrategy<[{
-  *(RETTYPE *)(param3 + (param2 * 4)) = param1;  
-}], [TypedefId<"RETTYPE", Id<1>>]>>;
+  *(__global RETTYPE *)(param3 + (param2 * 4)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vstore4, TemplateStrategy<[{
+  *(__local RETTYPE *)(param3 + (param2 * 4)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vstore4, TemplateStrategy<[{
+  *(__private RETTYPE *)(param3 + (param2 * 4)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vstore8, TemplateStrategy<[{
-  *(RETTYPE *)(param3 + (param2 * 8)) = param1;  
-}], [TypedefId<"RETTYPE", Id<1>>]>>;
+  *(__global RETTYPE *)(param3 + (param2 * 8)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vstore8, TemplateStrategy<[{
+  *(__local RETTYPE *)(param3 + (param2 * 8)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vstore8, TemplateStrategy<[{
+  *(__private RETTYPE *)(param3 + (param2 * 8)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP4Sg">;
+
 
 def : OCLBuiltinImpl<blt_vstore16, TemplateStrategy<[{
-  *(RETTYPE *)(param3 + (param2 * 16)) = param1;
-}], [TypedefId<"RETTYPE", Id<1>>]>>;
+  *(__global RETTYPE *)(param3 + (param2 * 16)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP1Sg">;
+
+def : OCLBuiltinImpl<blt_vstore16, TemplateStrategy<[{
+  *(__local RETTYPE *)(param3 + (param2 * 16)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP2Sg">;
+
+def : OCLBuiltinImpl<blt_vstore16, TemplateStrategy<[{
+  *(__private RETTYPE *)(param3 + (param2 * 16)) = param1;
+}], [TypedefId<"RETTYPE", Id<1>>]>, "vVgzP4Sg">;
+
 
