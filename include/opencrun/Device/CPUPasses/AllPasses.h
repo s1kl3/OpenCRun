@@ -8,8 +8,7 @@ namespace opencrun {
 
 class Device;
 
-llvm::Pass *CreateGroupParallelStubPass(const Device *Dev = 0,
-                                        llvm::StringRef Kernel = "");
+llvm::Pass *CreateGroupParallelStubPass(llvm::StringRef Kernel = "");
 llvm::Pass *createAutomaticLocalVariablesPass();
 
 } // End namespace opencrun.
