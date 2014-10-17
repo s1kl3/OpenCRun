@@ -10,7 +10,7 @@ LINK_LIBS_IN_SHARED = 1
 SHARED_LIBRARY = 1
 
 LINK_COMPONENTS = x86 jit asmparser bitreader bitwriter instrumentation \
-		  codegen ipo selectiondag irreader option
+		  codegen ipo selectiondag irreader option profiledata
 LLVMLIBS = clangFrontend.a clangDriver.a clangSerialization.a clangCodeGen.a \
            clangParse.a clangSema.a clangAnalysis.a clangAST.a clangLex.a \
            clangBasic.a clangEdit.a clangLex.a LLVMLinker.a
