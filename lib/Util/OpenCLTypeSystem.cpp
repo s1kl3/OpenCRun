@@ -257,6 +257,14 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
     return addQualifiers(Ty.getQualifiers(), CLIA, RetTy);
   }
 
+  if (Ty->isConstantArrayType()) {
+    const clang::ConstantArrayType *CATy = llvm::cast<clang::ConstantArrayType>(Ty->getAsArrayTypeUnsafe());
+    clang::QualType Elem = CATy->getElementType();
+    unsigned NumElems = CATy->getSize().getZExtValue();
+    return addQualifiers(Ty.getQualifiers(), 0,
+                         getArrayType(get(ASTCtx, Elem), NumElems));
+  }
+
   if (Ty->isPointerType()) {
     clang::QualType Pointee = Ty->getAs<clang::PointerType>()->getPointeeType();
 
