@@ -17,18 +17,9 @@ class Device;
 
 class DeviceBuiltinInfo {
 public:
-  DeviceBuiltinInfo(const Device *D = 0) : Dev(D) {}
-
-  llvm::FunctionType *getSimpleBuiltinType(llvm::StringRef Name);
-
-  llvm::Function *getSimpleBuiltin(llvm::Module &Mod, llvm::StringRef Name);
-
   static llvm::Function *getPrototype(llvm::Module &Mod,
                                       llvm::StringRef Name,
                                       llvm::StringRef Format);
-
-private:
-  const Device *Dev;
 };
 
 }

@@ -905,7 +905,7 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   // Build the entry point and optimize.
   llvm::PassManager PM;
   PM.add(Inliner);
-  PM.add(CreateGroupParallelStubPass(this, KernName));
+  PM.add(CreateGroupParallelStubPass(KernName));
   PM.run(Mod);
 
   // Check whether there was a problem at inline time.

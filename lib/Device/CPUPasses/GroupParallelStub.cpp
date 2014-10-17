@@ -41,8 +41,8 @@ public:
   static char ID;
 
 public:
-  GroupParallelStub(const Device *Dev, llvm::StringRef Kernel = "")
-   : llvm::ModulePass(ID), DBI(Dev), Kernel(GetKernelOption(Kernel)) {}
+  GroupParallelStub(llvm::StringRef Kernel = "")
+   : llvm::ModulePass(ID), Kernel(GetKernelOption(Kernel)) {}
 
 public:
   virtual bool runOnModule(llvm::Module &Mod);
@@ -59,7 +59,6 @@ private:
   }
 
 private:
-  DeviceBuiltinInfo DBI;
   std::string Kernel;
   llvm::Function *Barrier;
 };
@@ -69,7 +68,7 @@ private:
 bool GroupParallelStub::runOnModule(llvm::Module &Mod) {
   ModuleInfo Info(Mod);
 
-  Barrier = DBI.getSimpleBuiltin(Mod, "barrier");
+  Barrier = DeviceBuiltinInfo::getPrototype(Mod, "__builtin_ocl_barrier", "vi");
 
   bool Modified = false;
 
@@ -164,7 +163,10 @@ bool GroupParallelStub::BuildStub(llvm::Function &Kern) {
 
 char GroupParallelStub::ID = 0;
 
-llvm::Pass *opencrun::CreateGroupParallelStubPass(const Device *Dev,
-                                                  llvm::StringRef Kernel) {
-  return new GroupParallelStub(Dev, Kernel);
+static llvm::RegisterPass<GroupParallelStub> X("cpu-group-parallel-stub",
+                                               "Create kernel stub for "
+                                               "cpu group parallel scheduler");
+
+llvm::Pass *opencrun::CreateGroupParallelStubPass(llvm::StringRef Kernel) {
+  return new GroupParallelStub(Kernel);
 }

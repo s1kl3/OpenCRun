@@ -1,36 +1,13 @@
 #include "opencrun/Util/BuiltinInfo.h"
-#include "opencrun/Core/Context.h"
-#include "opencrun/Core/Device.h"
 
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Module.h"
 
 using namespace opencrun;
 
-llvm::FunctionType *
-DeviceBuiltinInfo::getSimpleBuiltinType(llvm::StringRef Name) {
-  assert(Dev && "No device!");
-  llvm::Twine FullName = llvm::Twine("__builtin_ocl_").concat(Name);
-
-  if (llvm::Function *BF = Dev->BitCodeLibrary->getFunction(FullName.str()))
-    return BF->getFunctionType();
-
-  return 0;
-}
-
-llvm::Function *DeviceBuiltinInfo::getSimpleBuiltin(llvm::Module &Mod,
-                                                    llvm::StringRef Name) {
-  llvm::Twine FullName = llvm::Twine("__builtin_ocl_").concat(Name);
-
-  if (llvm::Function *F = Mod.getFunction(FullName.str()))
-    return F;
-
-  return llvm::Function::Create(getSimpleBuiltinType(Name),
-                                llvm::Function::ExternalLinkage,
-                                FullName.str(), &Mod);
-}
-
+static
 llvm::Type *parseType(llvm::LLVMContext &Ctx,
                       const llvm::DataLayout &DL,
                       llvm::StringRef::iterator &I,
@@ -56,6 +33,7 @@ llvm::Type *parseType(llvm::LLVMContext &Ctx,
   return 0;
 }
 
+static
 llvm::FunctionType *buildFunctionType(llvm::LLVMContext &Ctx,
                                       const llvm::DataLayout &DL,
                                       llvm::StringRef Format) {
