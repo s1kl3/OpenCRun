@@ -9,6 +9,7 @@
 
 namespace clang {
 class OpenCLImageAccessAttr;
+class RecordTypeDecl;
 }
 
 namespace llvm {
@@ -152,6 +153,7 @@ public:
   Type getElementType() const;
   unsigned getNumElements() const;
 
+  bool isRecordTypeAnonymous() const;
   llvm::StringRef getRecordTypeName() const;
   RecordTypeBody getRecordTypeBody() const;
 
@@ -207,14 +209,15 @@ public:
            const clang::OpenCLImageAccessAttr *CLIA = 0);
 
 private:
-  typedef std::pair<llvm::StringRef, bool> RecordTypeID;
-  typedef std::map<RecordTypeID, Type> RecordTypesContainer;
+  typedef std::map<const clang::RecordDecl*, Type> RecordTypesContainer;
 
 private:
   Type getPrimitiveType(Type::PrimitiveClass C);
   Type getImageType(Type::ImageClass C);
   Type getVectorType(Type Elem, unsigned Size);
-  Type getRecordType(llvm::StringRef Name, bool IsUnion);
+  Type getRecordType(llvm::StringRef Name, bool IsUnion, bool IsAnonymous);
+  Type getRecordTypeWithBody(llvm::StringRef Name, bool IsUnion,
+                             bool IsAnonymous, RecordTypeBody Body);
   Type getPointerType(Type Pointee);
   Type getArrayType(Type Elem, unsigned Size);
   Type getQualType(uint32_t Quals, Type Ty);

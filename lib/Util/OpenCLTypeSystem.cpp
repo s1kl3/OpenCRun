@@ -88,11 +88,16 @@ unsigned Type::getNumElements() const {
   return llvm::cast<llvm::ConstantInt>(MD->getOperand(3))->getZExtValue();
 }
 
+bool Type::isRecordTypeAnonymous() const {
+  return llvm::cast<llvm::ConstantInt>(MD->getOperand(3))->getZExtValue();
+}
+
 llvm::StringRef Type::getRecordTypeName() const {
   if (isQualType())
     return getUnqualifiedType().getRecordTypeName();
 
   assert(isStruct() || isUnion());
+  assert(!isRecordTypeAnonymous());
 
   return llvm::cast<llvm::MDString>(MD->getOperand(2))->getString();
 }
@@ -103,7 +108,7 @@ RecordTypeBody Type::getRecordTypeBody() const {
 
   assert(isStruct() || isUnion());
 
-  return llvm::cast<llvm::MDNode>(MD->getOperand(3));
+  return llvm::cast<llvm::MDNode>(MD->getOperand(4));
 }
 
 Qualifiers Type::getQualifiers() const {
@@ -183,6 +188,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
                         const clang::OpenCLImageAccessAttr *CLIA) {
   llvm::LLVMContext &Ctx = Mod.getContext();
 
+  llvm::StringRef Name;
   Ty = Ty.getDesugaredType(ASTCtx);
 
   if (Ty->isBuiltinType()) {
@@ -284,14 +290,23 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
     const clang::RecordDecl *RD = Ty->getAs<clang::RecordType>()->getDecl();
     assert(RD->isUnion() || RD->isStruct());
 
-    RecordTypeID ID(RD->getName(), RD->isUnion());
-
-    RecordTypesContainer::const_iterator I = RTCache.find(ID);
+    RecordTypesContainer::const_iterator I = RTCache.find(RD);
     if (I != RTCache.end())
       return addQualifiers(Ty.getQualifiers(), CLIA, I->second);
 
-    Type R = getRecordType(RD->getName(), RD->isUnion());
-    RTCache[ID] = R;
+    bool IsUnion = RD->isUnion();
+    bool IsAnonymous = RD->isAnonymousStructOrUnion();
+    llvm::StringRef Name = RD->getName();
+
+    Type R;
+
+    if (!IsAnonymous) {
+      // Named struct or union can have recursive dependencies, but have a
+      // unique definition. Thus we can create the type immediatly and safely
+      // replace the body reference later.
+      R = getRecordType(Name, IsUnion, IsAnonymous);
+      RTCache[RD] = R;
+    }
 
     const clang::ASTRecordLayout &Layout = ASTCtx.getASTRecordLayout(RD);
 
@@ -302,21 +317,31 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
     llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
     llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
 
-    llvm::SmallVector<llvm::Value *, 32> Body;
-    Body.push_back(llvm::ConstantInt::get(I64Ty, ID_RecordTypeBody));
-    Body.push_back(llvm::ConstantInt::get(I64Ty, Size));
-    Body.push_back(llvm::ConstantInt::get(I64Ty, Alignment));
-    Body.push_back(llvm::ConstantInt::get(I1Ty, Packed));
+    llvm::SmallVector<llvm::Value *, 32> BodyVals;
+    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, ID_RecordTypeBody));
+    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Size));
+    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Alignment));
+    BodyVals.push_back(llvm::ConstantInt::get(I1Ty, Packed));
 
     uint64_t FieldIdx = 0;
     for (clang::RecordDecl::field_iterator I = RD->field_begin(),
          E = RD->field_end(); I != E; ++I, ++FieldIdx) {
-      Body.push_back(get(ASTCtx, I->getType()).getMDNode());
+      BodyVals.push_back(get(ASTCtx, I->getType()).getMDNode());
       uint64_t Offset = Layout.getFieldOffset(FieldIdx);
-      Body.push_back(llvm::ConstantInt::get(I64Ty, Offset));
+      BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Offset));
     }
 
-    R.getMDNode()->replaceOperandWith(2, llvm::MDNode::get(Ctx, Body));
+    RecordTypeBody Body = llvm::MDNode::get(Ctx, BodyVals);
+
+    if (IsAnonymous) {
+      // Anonymous struct or union cannot have recursive dependencies. However
+      // different anonymous struct or union can be equivalent, thus we have to
+      // unify the type descriptor.
+      R = getRecordTypeWithBody(Name, IsUnion, true, Body);
+    } else {
+      // Replace the body reference in the current MDNode.
+      R.getMDNode()->replaceOperandWith(4, Body.getMDNode());
+    }
 
     return addQualifiers(Ty.getQualifiers(), CLIA, R);
   }
@@ -366,15 +391,37 @@ Type TypeGenerator::getVectorType(Type Elem, unsigned NumElems) {
   return llvm::MDNode::get(Ctx, Vals);
 }
 
-Type TypeGenerator::getRecordType(llvm::StringRef Name, bool IsUnion) {
+Type TypeGenerator::getRecordType(llvm::StringRef Name, bool IsUnion,
+                                  bool IsAnonymous) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
+  llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
 
-  llvm::Value *Vals[4] = {
+  llvm::Value *Vals[5] = {
     llvm::ConstantInt::get(I64Ty, ID_Type),
     llvm::ConstantInt::get(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
     llvm::MDString::get(Ctx, Name),
+    llvm::ConstantInt::get(I1Ty, IsAnonymous),
     llvm::Constant::getNullValue(I64Ty) // Placeholder for body
+  };
+
+  Type Res = llvm::MDNode::get(Ctx, Vals);
+  Res.getMDNode()->replaceOperandWith(4, Res.getMDNode());
+  return Res;
+}
+
+Type TypeGenerator::getRecordTypeWithBody(llvm::StringRef Name, bool IsUnion,
+                                          bool IsAnonymous, RecordTypeBody B) {
+  llvm::LLVMContext &Ctx = Mod.getContext();
+  llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
+  llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
+
+  llvm::Value *Vals[5] = {
+    llvm::ConstantInt::get(I64Ty, ID_Type),
+    llvm::ConstantInt::get(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
+    llvm::MDString::get(Ctx, Name),
+    llvm::ConstantInt::get(I1Ty, IsAnonymous),
+    B.getMDNode()
   };
 
   return llvm::MDNode::get(Ctx, Vals);
@@ -479,7 +526,11 @@ bool TypeComparator::match(Type T1, Type T2, std::set<MatchedTypes> &Visited) {
   if (Visited.count(MP))
     return true;
 
-  if (T1.getRecordTypeName() != T2.getRecordTypeName())
+  if (T1.isRecordTypeAnonymous() != T2.isRecordTypeAnonymous())
+    return false;
+
+  if (!T1.isRecordTypeAnonymous() &&
+      T1.getRecordTypeName() != T2.getRecordTypeName())
     return false;
 
   RecordTypeBody B1 = T1.getRecordTypeBody();
