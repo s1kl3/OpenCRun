@@ -26,13 +26,13 @@ public:
                       const clang::LangOptions &LangOpts,
                       const std::string &InFile,
                       llvm::LLVMContext &C)
-   : Gen(clang::CreateLLVMCodeGen(Diags, InFile, CGOpts, TargetOpts, C)) {}
+   : Gen(clang::CreateLLVMCodeGen(Diags, InFile, CGOpts, TargetOpts, C)),
+     TheModule(Gen->GetModule()), TyGen(*TheModule) {}
 
   llvm::Module *takeModule() { return TheModule.release(); }
 
   void Initialize(clang::ASTContext &Ctx) override {
     Gen->Initialize(Ctx);
-    TheModule.reset(Gen->GetModule());
   }
 
   void HandleTranslationUnit(clang::ASTContext &Ctx) override {
@@ -97,6 +97,7 @@ private:
 private:
   std::unique_ptr<clang::CodeGenerator> Gen;
   std::unique_ptr<llvm::Module> TheModule;
+  opencl::TypeGenerator TyGen;
 };
 
 }
@@ -130,8 +131,6 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   clang::ASTContext &ASTCtx = FD->getASTContext();
   llvm::LLVMContext &Ctx = F->getContext();
   llvm::Type *I32Ty = llvm::Type::getInt32Ty(Ctx);
-
-  opencl::TypeGenerator TyGen(*TheModule);
 
   llvm::SmallVector<llvm::Value*, 8> ArgAddrSpace;
   ArgAddrSpace.push_back(llvm::MDString::get(Ctx, "kernel_arg_addr_space"));
