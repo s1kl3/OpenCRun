@@ -56,11 +56,11 @@ Device::Device(llvm::StringRef Name, llvm::StringRef Triple) :
 Device::Device(Device &Parent, const PartitionPropertiesContainer &PartProps) :
   Parent(&Parent),
   PartProps(const_cast<PartitionPropertiesContainer &>(PartProps)),
-  BitCodeLibrary(Parent.GetBitCodeLibrary()),
   EnvCompilerOpts(Parent.GetEnvCompilerOpts()),
   Triple(Parent.GetTriple()) {
     this->Name = Parent.GetName();  
-    
+  
+    InitLibrary();
     InitCompiler();
 }
 
