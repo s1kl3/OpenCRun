@@ -38,15 +38,11 @@ def ocl_image3d_t : OCLOpaqueType<"image3d_t">;
 def : OCLOpaqueTypeDef<ocl_mem_fence_flags, "uint">;
 
 let Predicates = [ocl_arch_32bit] in {
-  def : OCLOpaqueTypeDef<ocl_ptrdiff_t, "int">;
-  def : OCLOpaqueTypeDef<ocl_size_t, "uint">;
   def : OCLOpaqueTypeDef<ocl_intptr_t, "int">;
   def : OCLOpaqueTypeDef<ocl_uintptr_t, "uint">;
 }
 
 let Predicates = [ocl_arch_64bit] in {
-  def : OCLOpaqueTypeDef<ocl_ptrdiff_t, "long">;
-  def : OCLOpaqueTypeDef<ocl_size_t, "ulong">;
   def : OCLOpaqueTypeDef<ocl_intptr_t, "long">;
   def : OCLOpaqueTypeDef<ocl_uintptr_t, "ulong">;
 }
