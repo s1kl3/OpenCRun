@@ -264,7 +264,8 @@ bool AutomaticLocalVariables::prepareKernelForLocals(llvm::Function &F) {
 
   llvm::Module &M = *F.getParent();
   const llvm::DataLayout &DL = *M.getDataLayout();
-  llvm::MDNode *InfoMD = ModuleInfo(M).getKernelInfo(F.getName()).getInfo();
+  KernelInfo KI = ModuleInfo(M).getKernelInfo(F.getName());
+  llvm::MDNode *InfoMD = KI.getCustomInfo();
 
   llvm::SmallVector<llvm::Value *, 8> Info;
   for (unsigned I = 0, E = InfoMD->getNumOperands(); I != E; ++I)

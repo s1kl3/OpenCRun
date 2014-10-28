@@ -7,9 +7,12 @@
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
 
+#include "CPUKernelInfo.h"
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/PassManager.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetSelect.h"
@@ -953,9 +956,8 @@ unsigned CPUDevice::GetBlockParallelStaticLocalSize(Kernel &Kern) {
   if (I != BlockParallelStaticLocalsCache.end())
     return I->second;
 
-  llvm::Module &Mod = *Kern.GetModule(*this);
-
-  llvm::KernelInfo Info = ModuleInfo(Mod).getKernelInfo(Kern.GetName());
+  ModuleInfo ModInfo(*Kern.GetModule(*this));
+  CPUKernelInfo Info(ModInfo.getKernelInfo(Kern.GetName()));
 
   unsigned StaticLocalSize = Info.getStaticLocalSize();
   BlockParallelStaticLocalsCache[K] = StaticLocalSize;
