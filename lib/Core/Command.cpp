@@ -2699,11 +2699,13 @@ EnqueueNDRangeKernelBuilder::EnqueueNDRangeKernelBuilder(
   else
     this->Kern = llvm::cast<Kernel>(Kern);
 
-  if(!this->Kern->IsBuiltFor(Dev))
+  const KernelDescriptor &Desc = this->Kern->getDescriptor();
+
+  if(!Desc.isBuiltForDevice(&Dev))
     NotifyError(CL_INVALID_PROGRAM_EXECUTABLE,
                 "kernel not built for current device");
 
-  if(this->Kern->GetContext() != Ctx)
+  if(Desc.getContext() != Ctx)
     NotifyError(CL_INVALID_CONTEXT,
                 "cannot enqueue a kernel into a command queue with "
                 "a different context");
@@ -2756,8 +2758,9 @@ EnqueueNDRangeKernelBuilder::SetGlobalWorkOffset(
 
 EnqueueNDRangeKernelBuilder &
 EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
+  const KernelDescriptor &Desc = Kern->getDescriptor();
   if(!LocalWorkSizes) {
-    if(Kern->RequireWorkGroupSizes())
+    if(Desc.hasRequireWorkGroupSizes(&Dev))
       NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                   "kernel requires fixed local work size");
 
@@ -2767,8 +2770,11 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
     return *this;
   }
 
-  llvm::SmallVector<size_t, 4> &MaxWorkItemSizes = Dev.GetMaxWorkItemSizes();
+  const auto &MaxWorkItemSizes = Dev.GetMaxWorkItemSizes();
   size_t WorkGroupSize = 1;
+
+  llvm::SmallVector<size_t, 4> ReqWorkGroupSizes;
+  Desc.getRequiredWorkGroupSizes(ReqWorkGroupSizes, &Dev);
 
   for(unsigned I = 0; I < WorkDimensions; ++I) {
     if(LocalWorkSizes[I] > MaxWorkItemSizes[I])
@@ -2780,8 +2786,8 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
                          "work group size does not divide "
                          "number of work items");
 
-    if(Kern->RequireWorkGroupSizes() &&
-       (I >= 3 || Kern->GetRequiredWorkGroupSizes()[I] != LocalWorkSizes[I]))
+    if(Desc.hasRequireWorkGroupSizes(&Dev) &&
+       (I >= 3 || ReqWorkGroupSizes[I] != LocalWorkSizes[I]))
       return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                          "work group size does not match "
                          "the one requested by the kernel");

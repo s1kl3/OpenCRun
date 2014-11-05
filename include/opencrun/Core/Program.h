@@ -32,6 +32,7 @@ namespace opencrun {
 class Context;
 class Device;
 class Kernel;
+class KernelDescriptor;
 class Program;
 
 class CompilerCallbackClojure {
@@ -97,14 +98,14 @@ public:
 
   cl_build_status GetBuildStatus() { return BuildStatus; }
 
-  llvm::Function *GetKernel(llvm::StringRef KernName) {
+  KernelInfo GetKernel(llvm::StringRef KernName) {
     if (!BitCode)
       return NULL;
 
     ModuleInfo Info(*BitCode); 
     kernel_info_iterator I = Info.findKernel(KernName);
 
-    return I != Info.kernel_info_end() ? I->getFunction() : NULL;
+    return I != Info.kernel_info_end() ? *I : NULL;
   }
 
   KernelSignature GetKernelSignature(llvm::StringRef KernName) {
@@ -147,7 +148,7 @@ public:
   typedef llvm::SmallVector<Device *, 2> DevicesContainer;
   typedef std::map<Device *, BuildInformation *> BuildInformationContainer;
   typedef std::map<Device *, llvm::MemoryBuffer *> BinariesContainer;
-  typedef llvm::SmallPtrSet<Kernel *, 4> AttachedKernelsContainer;
+  typedef llvm::SmallPtrSet<const KernelDescriptor*, 4> AttachedKernelsContainer;
 
   typedef DevicesContainer::iterator device_iterator;
   typedef BuildInformationContainer::iterator buildinfo_iterator;
@@ -209,14 +210,7 @@ public:
     return !AttachedKernels.empty();
   }
 
-public:
-  void RegisterKernel(Kernel &Kern) {
-    llvm::sys::ScopedLock Lock(ThisLock);
-
-    AttachedKernels.insert(&Kern);
-  }
-
-  void UnregisterKernel(Kernel &Kern) {
+  void DetachKernel(const KernelDescriptor &Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);
 
     AttachedKernels.erase(&Kern);

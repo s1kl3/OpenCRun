@@ -7,8 +7,9 @@
 
 inline bool clValidKernelDevicePair(opencrun::Kernel *Kern,
                                     opencrun::Device *Dev) {
-  return (!Dev && Kern->IsBuiltForOnlyADevice()) ||
-         (Dev && Kern->IsBuiltFor(*Dev));
+  const opencrun::KernelDescriptor &Desc = Kern->getDescriptor();
+  return (!Dev && Desc.isBuiltForSingleDevice()) ||
+         (Dev && Desc.isBuiltForDevice(Dev));
 }
 
 CL_API_ENTRY cl_kernel CL_API_CALL
@@ -160,7 +161,7 @@ CL_API_SUFFIX__VERSION_1_0 {
   #define DS_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)  \
   case PARAM: {                                      \
     FUN_TY FunRet;                                   \
-    if(!Kern.FUN(FunRet, Dev))                       \
+    if(!Kern.getDescriptor().FUN(FunRet, Dev))       \
       return CL_INVALID_DEVICE;                      \
     else                                             \
       return clFillValue<PARAM_TY, FUN_TY>(          \
@@ -178,16 +179,19 @@ CL_API_SUFFIX__VERSION_1_0 {
 
   // This property does not depended on the device, however we must ensure that
   // the device is associated with the kernel.
-  case CL_KERNEL_COMPILE_WORK_GROUP_SIZE:
+  case CL_KERNEL_COMPILE_WORK_GROUP_SIZE: {
     if(!clValidKernelDevicePair(&Kern, Dev))
       return CL_INVALID_DEVICE;
 
+    llvm::SmallVector<size_t, 4> Sizes;
+    Kern.getDescriptor().getRequiredWorkGroupSizes(Sizes, Dev); 
+
     return clFillValue<size_t, llvm::SmallVector<size_t, 4> &>(
              static_cast<size_t *>(param_value),
-             Kern.GetRequiredWorkGroupSizes(),
+             Sizes,
              param_value_size,
              param_value_size_ret);
-
+  }
   // This property depends on the device, but not on the kernel, however we must
   // ensure that the device is associated with the kernel.
   case CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE:

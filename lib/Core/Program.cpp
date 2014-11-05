@@ -129,8 +129,8 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
 
   BuildInformation &Fst = *I->second;
 
-  Kernel::CodesContainer Codes;
-  Codes[I->first] = Fst.GetKernel(KernName);
+  KernelDescriptor::KernelInfoContainer Infos;
+  Infos[I->first] = Fst.GetKernel(KernName);
 
   for(buildinfo_iterator J = ++I; J != E; ++J) {
     Device &Dev = *J->first;
@@ -144,15 +144,19 @@ Kernel *Program::CreateKernel(llvm::StringRef KernName, cl_int *ErrCode) {
                         CL_INVALID_KERNEL_DEFINITION,
                         "kernel signatures do not match");
 
-    Codes[&Dev] = Cur.GetKernel(KernName);
+    Infos[&Dev] = Cur.GetKernel(KernName);
   }
 
-  Kernel *Kern = new Kernel(*this, Codes);
+  std::unique_ptr<KernelDescriptor> Desc;
+  Desc.reset(new KernelDescriptor(KernName, *this, std::move(Infos)));
+
+  std::unique_ptr<Kernel> Kern(new Kernel(Desc.get()));
+  AttachedKernels.insert(Desc.release());
 
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return Kern;
+  return Kern.release();
 }
 
 cl_int Program::CreateKernelsInProgram(cl_uint num_kernels, 
@@ -163,7 +167,7 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
   if(BuildInfo.empty())
     return CL_INVALID_PROGRAM_EXECUTABLE;
 
-  typedef llvm::SmallVector<std::pair<Device *, llvm::Function * >,
+  typedef llvm::SmallVector<std::pair<Device *, KernelInfo>,
                             4> DeviceFunctionVector;
 
   typedef std::map<llvm::StringRef,
@@ -186,7 +190,7 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
 
     for(; KI != KE; ++KI) {
       llvm::StringRef KernName = KI->getName();
-      SignMap[KernName].push_back(std::make_pair(&Dev, KI->getFunction()));
+      SignMap[KernName].push_back(std::make_pair(&Dev, *KI));
     }
   }
 
@@ -201,15 +205,17 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
       SE = SignMap.end();
 
     for(; SI != SE; ++SI) {
-      Kernel::CodesContainer Codes;
+      KernelDescriptor::KernelInfoContainer Infos;
 
       DeviceFunctionVector &DevFun = SI->second;
 
       for(unsigned I = 0; I < DevFun.size(); ++I)
-        Codes[DevFun[I].first] = DevFun[I].second;
+        Infos[DevFun[I].first] = DevFun[I].second;
 
-      Kernel *Kern = new Kernel(*this, Codes);
-      Kernels.push_back(Kern);
+      std::unique_ptr<KernelDescriptor> Desc;
+      Desc.reset(new KernelDescriptor(SI->first, *this, std::move(Infos)));
+      Kernels.push_back(new Kernel(Desc.get()));
+      AttachedKernels.insert(Desc.release());
     }
 
     for(unsigned I = 0; I < num_kernels && I < Kernels.size(); ++I)
