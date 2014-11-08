@@ -30,12 +30,8 @@ public:
   static bool classof(const _cl_command_queue *Cmd) { return true; }
 
 public:
-  typedef std::deque<Command *> CommandsContainer;
-
-  // TODO: use a more suitable data structure.
-  typedef llvm::SmallPtrSet<InternalEvent *, 8> EventsContainer;
-
-  typedef EventsContainer::iterator event_iterator;
+  typedef std::deque<std::unique_ptr<Command> > CommandsContainer;
+  typedef std::set<Command *> PendingCommandsContainer;
 
 protected:                     
   CommandQueue(Type Ty, Context &Ctx, Device &Dev, bool EnableProfile) :
@@ -46,12 +42,13 @@ protected:
   virtual ~CommandQueue() { }
 
 public:
-  InternalEvent *Enqueue(Command &Cmd, cl_int *ErrCode = NULL);
+  llvm::IntrusiveRefCntPtr<Event> Enqueue(Command &Cmd, cl_int *ErrCode = NULL);
+
   void Flush();
   void Finish();
 
   virtual bool RunScheduler() = 0;
-  virtual void CommandDone(InternalEvent &Ev);
+  virtual void CommandDone(Command &Cmd);
 
 public:
   Type GetType() const { return Ty; }
@@ -71,7 +68,7 @@ protected:
 
   llvm::sys::Mutex ThisLock;
   CommandsContainer Commands;
-  EventsContainer Events;
+  PendingCommandsContainer PendingCommands;
 };
 
 class OutOfOrderQueue : public CommandQueue {
@@ -91,7 +88,7 @@ private:
 
 public:
   virtual bool RunScheduler();
-  virtual void CommandDone(InternalEvent &Ev);
+  virtual void CommandDone(Command &Cmd);
 };
 
 class InOrderQueue : public CommandQueue {
@@ -112,7 +109,7 @@ private:
 
 public:
   virtual bool RunScheduler();
-  virtual void CommandDone(InternalEvent &Ev);
+  virtual void CommandDone(Command &Cmd);
 
 private:
   bool CommandOnFly;

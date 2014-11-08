@@ -1,5 +1,6 @@
 
 #include "opencrun/Device/CPU/CPUDevice.h"
+#include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPUPasses/AllPasses.h"
@@ -277,8 +278,7 @@ bool CPUDevice::Submit(Command &Cmd) {
   // Take the profiling information here, in order to force this sample
   // happening before the subsequents samples.
   unsigned Counters = Cmd.IsProfiled() ? Profiler::Time : Profiler::None;
-  Sample.reset(GetProfilerSample(*this,
-                                 Counters,
+  Sample.reset(GetProfilerSample(*this, Counters,
                                  ProfileSample::CommandSubmitted));
 
   if(EnqueueReadBuffer *Read = llvm::dyn_cast<EnqueueReadBuffer>(&Cmd))
@@ -341,13 +341,9 @@ bool CPUDevice::Submit(Command &Cmd) {
 
   else
     llvm::report_fatal_error("unknown command submitted");
-
-  // The command has been submitted, register the sample. On failure, the
-  // std::unique_ptr destructor will reclaim the sample.
-  if(Submitted) {
-    InternalEvent &Ev = Cmd.GetNotifyEvent();
-    Ev.MarkSubmitted(Sample.release());
-  }
+  // The command has been submitted, register the sample.
+  if (Submitted)
+    Cmd.GetNotifyEvent().MarkSubmitted(Sample.release());
 
   return Submitted;
 }
@@ -374,6 +370,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   // Get counters to profile.
   Command &QueueCmd = Cmd->GetQueueCommand();
   InternalEvent &Ev = QueueCmd.GetNotifyEvent();
+  CommandQueue &Queue = Ev.GetCommandQueue();
   unsigned Counters = Cmd->IsProfiled() ? Profiler::Time : Profiler::None;
 
   // This command does not directly translate to an OpenCL command. Register
@@ -392,6 +389,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
                                               Counters,
                                               ProfileSample::CommandCompleted);
     Ev.MarkCompleted(Cmd->GetExitStatus(), Sample);
+    Queue.CommandDone(QueueCmd);
   }
 
   delete Cmd;

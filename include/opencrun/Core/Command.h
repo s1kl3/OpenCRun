@@ -4,6 +4,7 @@
 
 #include "CL/opencl.h"
 
+#include "opencrun/Core/Event.h"
 #include "opencrun/Core/Kernel.h"
 #include "opencrun/Util/DimensionInfo.h"
 
@@ -19,8 +20,6 @@ class CommandQueue;
 class Buffer;
 class Image;
 class Device;
-class Event;
-class InternalEvent;
 class MemoryObj;
 
 template<class ImgCmdBuilderType>
@@ -85,7 +84,7 @@ protected:
                                    Blocking(Blocking) { }
 
 public:
-  void SetNotifyEvent(InternalEvent &Ev) { NotifyEv = &Ev; }
+  void SetNotifyEvent(InternalEvent *Ev) { NotifyEv = Ev; }
   InternalEvent &GetNotifyEvent() { return *NotifyEv; }
 
   Type GetType() const { return CommandTy; }
@@ -101,7 +100,7 @@ protected:
   EventsContainer WaitList;
   bool Blocking;
 
-  InternalEvent *NotifyEv;
+  llvm::IntrusiveRefCntPtr<InternalEvent> NotifyEv;
 };
 
 class EnqueueReadBuffer : public Command {

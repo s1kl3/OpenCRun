@@ -33,7 +33,7 @@ Profiler::Profiler() : ProfileStream(STDERR_FILENO, false, true),
                    .Default(None);
 }
 
-void Profiler::DumpTrace(Command &Cmd,
+void Profiler::DumpTrace(unsigned CmdType,
                          const ProfileTrace &Trace,
                          bool Force) {
   llvm::sys::ScopedLock Lock(ThisLock);
@@ -73,7 +73,7 @@ void Profiler::DumpTrace(Command &Cmd,
   }
 
   DumpPrefix() << " ";
-  DumpCommandName(Cmd) << "\n";
+  DumpCommandType(CmdType) << "\n";
   Tab.Dump(ProfileStream, "profile");
   DumpPrefix() << "\n";
 }
@@ -119,17 +119,9 @@ llvm::raw_ostream &Profiler::DumpPrefix() {
   return ProfileStream;
 }
 
-llvm::raw_ostream &Profiler::DumpCommandName(Command &Cmd) {
-  if(llvm::isa<EnqueueReadBuffer>(Cmd))
-    ProfileStream << "Enqueue Read Buffer (" << &Cmd << ")";
-  else if(llvm::isa<EnqueueWriteBuffer>(Cmd))
-    ProfileStream << "Enqueue Write Buffer (" << &Cmd << ")";
-  else if(llvm::isa<EnqueueNDRangeKernel>(Cmd))
-    ProfileStream << "Enqueue ND-Range Kernel (" << &Cmd << ")";
-  else if(llvm::isa<EnqueueNativeKernel>(Cmd))
-    ProfileStream << "Enqueue Native Kernel (" << &Cmd << ")";
-  else
-    llvm_unreachable("Unknown command type");
+llvm::raw_ostream &Profiler::DumpCommandType(unsigned CmdType) {
+  // TODO: implement meaningful print.
+  ProfileStream << CmdType;
 
   return ProfileStream;
 }

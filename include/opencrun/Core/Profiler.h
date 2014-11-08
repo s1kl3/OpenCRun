@@ -140,7 +140,7 @@ public:
   bool IsProfilingForcedFromEnvironment() const { return ToProfile; }
 
 public:
-  void DumpTrace(Command &Cmd,
+  void DumpTrace(unsigned CmdType,
                  const ProfileTrace &Trace,
                  bool Force = false);
 
@@ -148,7 +148,7 @@ private:
   std::string FormatLabel(ProfileSample::Label Label, int SubId);
 
   llvm::raw_ostream &DumpPrefix();
-  llvm::raw_ostream &DumpCommandName(Command &Cmd);
+  llvm::raw_ostream &DumpCommandType(unsigned CmdType);
 
 private:
   llvm::sys::Mutex ThisLock;

@@ -2,7 +2,6 @@
 #ifndef OPENCRUN_CORE_EVENT_H
 #define OPENCRUN_CORE_EVENT_H
 
-#include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
 #include "opencrun/Core/Profiler.h"
 #include "opencrun/System/Monitor.h"
@@ -98,8 +97,7 @@ public:
   }
 
 public:
-  InternalEvent(CommandQueue &Queue,
-                Command &Cmd,
+  InternalEvent(CommandQueue &Queue, unsigned CmdType,
                 ProfileSample *Sample = NULL);
   virtual ~InternalEvent();
 
@@ -109,7 +107,7 @@ public:
 public:
   Context &GetContext() const;
   CommandQueue &GetCommandQueue() const { return *Queue; }
-  Command &GetCommand() const { return Cmd; }
+  unsigned GetCommandType() const { return CmdType; }
 
   bool IsProfiled() const { return Profile.IsEnabled(); }
 
@@ -133,8 +131,7 @@ protected:
 
 private:
   llvm::IntrusiveRefCntPtr<CommandQueue> Queue;
-  Command &Cmd;
-
+  unsigned CmdType;
   ProfileTrace Profile;
 };
 

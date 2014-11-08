@@ -19,7 +19,8 @@ using namespace opencrun;
   return NULL;                               \
   }
 
-InternalEvent *CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
+llvm::IntrusiveRefCntPtr<Event>
+CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   for(Command::event_iterator I = Cmd.wait_begin(), E = Cmd.wait_end();
                               I != E;
                               ++I)
@@ -40,14 +41,10 @@ InternalEvent *CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
                                             Cnts,
                                             ProfileSample::CommandEnqueued);
   llvm::IntrusiveRefCntPtr<InternalEvent> Ev;
-  Ev = new InternalEvent(*this, Cmd, Sample);
+  Ev = new InternalEvent(*this, Cmd.GetType(), Sample);
 
-  Cmd.SetNotifyEvent(*Ev);
-  Commands.push_back(&Cmd);
-
-  // TODO: use a more suitable data structure.
-  Ev->Retain();
-  Events.insert(Ev.getPtr());
+  Cmd.SetNotifyEvent(Ev.getPtr());
+  Commands.push_back(std::unique_ptr<Command>(&Cmd));
 
   ThisLock.release();
 
@@ -59,21 +56,17 @@ InternalEvent *CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   if(Cmd.IsBlocking())
     Ev->Wait();
 
-  // We must ensure caller can access a valid event, even if the associated
-  // command is terminated.
-  Ev->Retain();
-
-  return Ev.getPtr();
+  return Ev;
 }
 
-void CommandQueue::CommandDone(InternalEvent &Ev) {
+void CommandQueue::CommandDone(Command &Cmd) {
   RunScheduler();
 
   ThisLock.acquire();
-  Events.erase(&Ev);
+  PendingCommands.erase(&Cmd);
   ThisLock.release();
 
-  Ev.Release();
+  delete &Cmd;
 }
 
 void CommandQueue::Flush() {
@@ -83,18 +76,26 @@ void CommandQueue::Flush() {
 void CommandQueue::Finish() {
   Flush();
 
+  typedef llvm::IntrusiveRefCntPtr<InternalEvent> InternalEventRefPtr;
+  typedef llvm::SmallVector<InternalEventRefPtr, 32> EventsContainer;
+
+  EventsContainer WaitList;
+
   // Safely copy events to wait in a new container. Reference counting is
   // incremented, because current thread can not be the same who has enqueued
   // the commands.
   ThisLock.acquire();
-  EventsContainer ToWait = Events;
+  for (auto I = PendingCommands.begin(), E = PendingCommands.end(); I != E; ++I)
+    WaitList.push_back(&(*I)->GetNotifyEvent());
+  for (auto I = Commands.begin(), E = Commands.end(); I != E; ++I)
+    WaitList.push_back(&(*I)->GetNotifyEvent());
   ThisLock.release();
 
   // Wait for all events. If an event was linked to a command that is terminated
   // after leaving the critical section, the reference counting mechanism had
   // prevented the runtime to delete the memory associated with the event: we
   // can safely use the event to wait for a already terminated command.
-  for(event_iterator I = ToWait.begin(), E = ToWait.end(); I != E; ++I)
+  for (auto I = WaitList.begin(), E = WaitList.end(); I != E; ++I)
     (*I)->Wait();
 }
 
@@ -110,7 +111,7 @@ bool OutOfOrderQueue::RunScheduler() {
   return false;
 }
 
-void OutOfOrderQueue::CommandDone(InternalEvent &Ev) { }
+void OutOfOrderQueue::CommandDone(Command &Cmd) { }
 
 //
 // InOrderQueue implementation.
@@ -126,35 +127,40 @@ bool InOrderQueue::RunScheduler() {
   if(CommandOnFly || Commands.empty())
     return false;
 
-  Command &Cmd = *Commands.front();
+  if (!Commands.front()->CanRun())
+    return true;
 
-  if(Cmd.CanRun()) {
-    if(Cmd.GetType() == Command::Marker || Cmd.GetType() == Command::Barrier) {
-      Commands.pop_front();
-      CommandOnFly = true; // Not necessary but just for clarity.
-      unsigned Cnts = ProfilingEnabled() ? Profiler::Time : Profiler::None;
-      ProfileSample *Sample = GetProfilerSample(Dev,
-                                                Cnts,
-                                                ProfileSample::CommandCompleted);
-      
-      InternalEvent &Ev = Cmd.GetNotifyEvent();
-      Ev.MarkCompleted(CL_COMPLETE, Sample);
-      CommandOnFly = false; // Not necessary but just for clarity.
-    } else {
-      if(Dev.Submit(Cmd)) {
-        Commands.pop_front();
-        CommandOnFly = true;
-      }
-    }
+  std::unique_ptr<Command> Cmd = std::move(Commands.front());
+
+  if (Cmd->GetType() == Command::Marker || Cmd->GetType() == Command::Barrier) {
+    Commands.pop_front();
+    CommandOnFly = true; // Not necessary but just for clarity.
+    unsigned Cnts = ProfilingEnabled() ? Profiler::Time : Profiler::None;
+    ProfileSample *Sample = GetProfilerSample(Dev, Cnts,
+                                              ProfileSample::CommandCompleted);
+
+    Cmd->GetNotifyEvent().MarkCompleted(CL_COMPLETE, Sample);
+    CommandOnFly = false; // Not necessary but just for clarity.
+    CommandDone(*Cmd.release());
+    return Commands.size();
   }
+
+  if (!Dev.Submit(*Cmd)) {
+    Commands.front() = std::move(Cmd);
+    return true;
+  }
+
+  PendingCommands.insert(Cmd.release());
+  Commands.pop_front();
+  CommandOnFly = true;
 
   return Commands.size();
 }
 
-void InOrderQueue::CommandDone(InternalEvent &Ev) {
+void InOrderQueue::CommandDone(Command &Cmd) {
   ThisLock.acquire();
   CommandOnFly = false;
   ThisLock.release();
 
-  CommandQueue::CommandDone(Ev);
+  CommandQueue::CommandDone(Cmd);
 }

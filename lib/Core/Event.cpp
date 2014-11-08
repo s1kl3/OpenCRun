@@ -75,19 +75,17 @@ void Event::Signal(int Status) {
   }
 
 InternalEvent::InternalEvent(CommandQueue &Queue,
-                             Command &Cmd,
+                             unsigned CmdType,
                              ProfileSample *Sample) :
   Event(Event::InternalEvent, CL_QUEUED),
   Queue(&Queue),
-  Cmd(Cmd) {
+  CmdType(CmdType) {
   Profile.SetEnabled(Sample != NULL);
   Profile << Sample;
 }
 
 InternalEvent::~InternalEvent() {
-  GetProfiler().DumpTrace(Cmd, Profile);
-
-  delete &Cmd;
+  GetProfiler().DumpTrace(CmdType, Profile);
 }
 
 Context &InternalEvent::GetContext() const {
@@ -148,9 +146,6 @@ void InternalEvent::MarkCompleted(int Status, ProfileSample *Sample) {
 
   Profile << Sample;
   Signal(Status);
-
-  if(Cmd.GetType() != Command::Marker || Cmd.GetType() != Command::Barrier)
-    Queue->CommandDone(*this);
 }
 
 //

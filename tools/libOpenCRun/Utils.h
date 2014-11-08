@@ -27,10 +27,10 @@
 
 #define RETURN_WITH_EVENT(VAR, EV) \
   {                                \
-  if(VAR)                          \
-    *VAR = EV;                     \
-  else                             \
-    EV->Release();                 \
+  if(VAR) {                        \
+    *VAR = EV.getPtr();            \
+    EV.resetWithoutRelease();      \
+  }                                \
   return CL_SUCCESS;               \
   }
 
