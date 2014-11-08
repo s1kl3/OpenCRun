@@ -834,7 +834,7 @@ clEnqueueMarkerWithWaitList(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueMarkerWithWaitListBuilder Bld(*Queue);
+  opencrun::EnqueueMarkerBuilder Bld(*Queue);
   opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);
@@ -886,7 +886,7 @@ clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueBarrierWithWaitListBuilder Bld(*Queue);
+  opencrun::EnqueueBarrierBuilder Bld(*Queue);
   opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);
