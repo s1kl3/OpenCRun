@@ -104,6 +104,8 @@ private:
   bool Submit(EnqueueFillImage &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
+  bool Submit(EnqueueMarker &Cmd);
+  bool Submit(EnqueueBarrier &Cmd);
 
   bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                            GlobalArgMappingsContainer &GlobalArgs);

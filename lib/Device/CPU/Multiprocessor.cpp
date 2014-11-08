@@ -159,6 +159,13 @@ bool Multiprocessor::Submit(NativeKernelCPUCommand *Cmd) {
   return Thr.Submit(static_cast<CPUCommand *>(Cmd));
 }
 
+bool Multiprocessor::Submit(NoOpCPUCommand *Cmd) {
+  // TODO: implement a smarter selection policy.
+  CPUThread &Thr = **Threads.begin();
+
+  return Thr.Submit(static_cast<CPUCommand *>(Cmd));
+}
+
 void Multiprocessor::NotifyDone(CPUServiceCommand *Cmd) {
   Dev.NotifyDone(Cmd);
 }

@@ -124,26 +124,13 @@ InOrderQueue::~InOrderQueue() {
 bool InOrderQueue::RunScheduler() {
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  if(CommandOnFly || Commands.empty())
+  if (Commands.empty() || CommandOnFly)
     return false;
 
   if (!Commands.front()->CanRun())
     return true;
 
   std::unique_ptr<Command> Cmd = std::move(Commands.front());
-
-  if (Cmd->GetType() == Command::Marker || Cmd->GetType() == Command::Barrier) {
-    Commands.pop_front();
-    CommandOnFly = true; // Not necessary but just for clarity.
-    unsigned Cnts = ProfilingEnabled() ? Profiler::Time : Profiler::None;
-    ProfileSample *Sample = GetProfilerSample(Dev, Cnts,
-                                              ProfileSample::CommandCompleted);
-
-    Cmd->GetNotifyEvent().MarkCompleted(CL_COMPLETE, Sample);
-    CommandOnFly = false; // Not necessary but just for clarity.
-    CommandDone(*Cmd.release());
-    return Commands.size();
-  }
 
   if (!Dev.Submit(*Cmd)) {
     Commands.front() = std::move(Cmd);

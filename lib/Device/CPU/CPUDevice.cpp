@@ -281,66 +281,37 @@ bool CPUDevice::Submit(Command &Cmd) {
   Sample.reset(GetProfilerSample(*this, Counters,
                                  ProfileSample::CommandSubmitted));
 
-  if(EnqueueReadBuffer *Read = llvm::dyn_cast<EnqueueReadBuffer>(&Cmd))
-    Submitted = Submit(*Read);
+#define DISPATCH(CmdType)                                          \
+  case Command::CmdType:                                           \
+    Submitted = Submit(*llvm::cast<Enqueue ## CmdType>(&Cmd)); \
+    break;
 
-  else if(EnqueueWriteBuffer *Write = llvm::dyn_cast<EnqueueWriteBuffer>(&Cmd))
-    Submitted = Submit(*Write);
+  switch (Cmd.GetType()) {
+  default: llvm_unreachable("Unknown command type!");
+  DISPATCH(ReadBuffer)
+  DISPATCH(WriteBuffer)
+  DISPATCH(CopyBuffer)
+  DISPATCH(ReadImage)
+  DISPATCH(WriteImage)
+  DISPATCH(CopyImage)
+  DISPATCH(CopyImageToBuffer)
+  DISPATCH(CopyBufferToImage)
+  DISPATCH(MapBuffer)
+  DISPATCH(MapImage)
+  DISPATCH(UnmapMemObject)
+  DISPATCH(ReadBufferRect)
+  DISPATCH(WriteBufferRect)
+  DISPATCH(CopyBufferRect)
+  DISPATCH(FillBuffer)
+  DISPATCH(FillImage)
+  DISPATCH(NDRangeKernel)
+  DISPATCH(NativeKernel)
+  DISPATCH(Marker)
+  DISPATCH(Barrier)
+  }
 
-  else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
-    Submitted = Submit(*Copy);
+#undef DISPATCH
 
-  else if(EnqueueReadImage *ReadImg = llvm::dyn_cast<EnqueueReadImage>(&Cmd))
-    Submitted = Submit(*ReadImg);
-
-  else if(EnqueueWriteImage *WriteImg = llvm::dyn_cast<EnqueueWriteImage>(&Cmd))
-    Submitted = Submit(*WriteImg);
-
-  else if(EnqueueCopyImage *CopyImg = llvm::dyn_cast<EnqueueCopyImage>(&Cmd))
-    Submitted = Submit(*CopyImg);
-
-  else if(EnqueueCopyImageToBuffer *CopyImgToBuf = 
-      llvm::dyn_cast<EnqueueCopyImageToBuffer>(&Cmd))
-    Submitted = Submit(*CopyImgToBuf);
-
-  else if(EnqueueCopyBufferToImage *CopyBufToImg = 
-      llvm::dyn_cast<EnqueueCopyBufferToImage>(&Cmd))
-    Submitted = Submit(*CopyBufToImg);
-
-  else if(EnqueueMapBuffer *MapBuf = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
-    Submitted = Submit(*MapBuf);
-  
-  else if(EnqueueMapImage *MapImg = llvm::dyn_cast<EnqueueMapImage>(&Cmd))
-    Submitted = Submit(*MapImg);
-
-  else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
-    Submitted = Submit(*Unmap);
-
-  else if(EnqueueReadBufferRect *ReadRect = llvm::dyn_cast<EnqueueReadBufferRect>(&Cmd))
-    Submitted = Submit(*ReadRect);
-
-  else if(EnqueueWriteBufferRect *WriteRect = llvm::dyn_cast<EnqueueWriteBufferRect>(&Cmd))
-    Submitted = Submit(*WriteRect);
-    
-  else if(EnqueueCopyBufferRect *CopyRect = llvm::dyn_cast<EnqueueCopyBufferRect>(&Cmd))
-    Submitted = Submit(*CopyRect);
-
-  else if(EnqueueFillBuffer *Fill = llvm::dyn_cast<EnqueueFillBuffer>(&Cmd))
-    Submitted = Submit(*Fill);
-    
-  else if(EnqueueFillImage *Fill = llvm::dyn_cast<EnqueueFillImage>(&Cmd))
-    Submitted = Submit(*Fill);
-
-  else if(EnqueueNDRangeKernel *NDRange =
-            llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
-    Submitted = Submit(*NDRange);
-
-  else if(EnqueueNativeKernel *Native =
-            llvm::dyn_cast<EnqueueNativeKernel>(&Cmd))
-    Submitted = Submit(*Native);
-
-  else
-    llvm::report_fatal_error("unknown command submitted");
   // The command has been submitted, register the sample.
   if (Submitted)
     Cmd.GetNotifyEvent().MarkSubmitted(Sample.release());
@@ -825,6 +796,18 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
   Cmd.RemapMemoryObjAddresses(Mappings);
 
   return MP.Submit(new NativeKernelCPUCommand(Cmd));
+}
+
+bool CPUDevice::Submit(EnqueueMarker &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+  return MP.Submit(new NoOpCPUCommand(Cmd));
+}
+
+bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+  return MP.Submit(new NoOpCPUCommand(Cmd));
 }
 
 bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,

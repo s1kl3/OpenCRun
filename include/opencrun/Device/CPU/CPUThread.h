@@ -90,6 +90,7 @@ private:
   bool Submit(CopyBufferRectCPUCommand *Cmd) { return true; }
   bool Submit(FillBufferCPUCommand *Cmd) { return true; }
   bool Submit(FillImageCPUCommand *Cmd) { return true; }
+  bool Submit(NoOpCPUCommand *Cmd) { return true; }
   bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
   bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
 
