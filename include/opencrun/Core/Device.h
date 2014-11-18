@@ -466,7 +466,7 @@ public:
     return false;
   }
 
-  virtual const Footprint &ComputeKernelFootprint(Kernel &Kern) = 0;
+  virtual const Footprint &getKernelFootprint(const KernelDescriptor &KD) const = 0;
 
   virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;
@@ -490,8 +490,8 @@ public:
                           llvm::MemoryBuffer &Src,
                           llvm::Module *&Mod);
 
-  virtual void RegisterKernel(Kernel &Kern) { }
-  virtual void UnregisterKernel(Kernel &Kern) { }
+  virtual void RegisterKernel(const KernelDescriptor &Kern) { }
+  virtual void UnregisterKernel(const KernelDescriptor &Kern) { }
 
 protected:
   virtual void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
@@ -513,7 +513,7 @@ public:
   llvm::Module *GetBitCodeLibrary() const { return BitCodeLibrary.get(); }
 
 protected:
-  llvm::sys::Mutex ThisLock;
+  mutable llvm::sys::Mutex ThisLock;
 
   Device *Parent;
   PartitionPropertiesContainer PartProps;

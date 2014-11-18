@@ -33,6 +33,7 @@ public:
     FillBuffer,
     FillImage,
     NativeKernel,
+    NoOp,
     LastCPUSingleExecCommand,
     NDRangeKernelBlock
   };
@@ -207,6 +208,16 @@ public:
 
 public:
   StopDeviceCPUCommand() : CPUServiceCommand(CPUCommand::StopDevice) { }
+};
+
+class NoOpCPUCommand : public CPUExecCommand {
+public:
+  static bool classof(const CPUCommand *Cmd) {
+    return Cmd->GetType() == CPUCommand::NoOp;
+  }
+
+public:
+  NoOpCPUCommand(Command &Cmd) : CPUExecCommand(CPUCommand::NoOp, Cmd) {}
 };
 
 class ReadBufferCPUCommand : public CPUExecCommand {

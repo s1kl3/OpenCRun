@@ -4,6 +4,7 @@
 
 #include "CL/opencl.h"
 
+#include "opencrun/Core/Event.h"
 #include "opencrun/Core/Kernel.h"
 #include "opencrun/Util/DimensionInfo.h"
 
@@ -19,8 +20,6 @@ class CommandQueue;
 class Buffer;
 class Image;
 class Device;
-class Event;
-class InternalEvent;
 class MemoryObj;
 
 template<class ImgCmdBuilderType>
@@ -85,7 +84,7 @@ protected:
                                    Blocking(Blocking) { }
 
 public:
-  void SetNotifyEvent(InternalEvent &Ev) { NotifyEv = &Ev; }
+  void SetNotifyEvent(InternalEvent *Ev) { NotifyEv = Ev; }
   InternalEvent &GetNotifyEvent() { return *NotifyEv; }
 
   Type GetType() const { return CommandTy; }
@@ -101,7 +100,7 @@ protected:
   EventsContainer WaitList;
   bool Blocking;
 
-  InternalEvent *NotifyEv;
+  llvm::IntrusiveRefCntPtr<InternalEvent> NotifyEv;
 };
 
 class EnqueueReadBuffer : public Command {
@@ -489,16 +488,16 @@ private:
   friend class EnqueueUnmapMemObjectBuilder;
 };
 
-class EnqueueMarkerWithWaitList : public Command {
+class EnqueueMarker : public Command {
 public:
   static bool classof(const Command *Cmd) {
     return Cmd->GetType() == Command::Marker;
   }
 
 private:
-  EnqueueMarkerWithWaitList(EventsContainer &WaitList);
+  EnqueueMarker(EventsContainer &WaitList);
 
-  friend class EnqueueMarkerWithWaitListBuilder;
+  friend class EnqueueMarkerBuilder;
 };
 
 class EnqueueReadBufferRect : public Command {
@@ -620,16 +619,16 @@ private:
   friend class EnqueueCopyBufferRectBuilder;
 };
 
-class EnqueueBarrierWithWaitList : public Command {
+class EnqueueBarrier : public Command {
 public:
   static bool classof(const Command *Cmd) {
     return Cmd->GetType() == Command::Barrier;
   }
 
 private:
-  EnqueueBarrierWithWaitList(EventsContainer &WaitList);
+  EnqueueBarrier(EventsContainer &WaitList);
 
-  friend class EnqueueBarrierWithWaitListBuilder;
+  friend class EnqueueBarrierBuilder;
 };
 
 class EnqueueFillBuffer : public Command {
@@ -776,11 +775,11 @@ public:
     EnqueueMapBufferBuilder,
     EnqueueMapImageBuilder,
     EnqueueUnmapMemObjectBuilder,
-    EnqueueMarkerWithWaitListBuilder,
+    EnqueueMarkerBuilder,
     EnqueueReadBufferRectBuilder,
     EnqueueWriteBufferRectBuilder,
     EnqueueCopyBufferRectBuilder,
-    EnqueueBarrierWithWaitListBuilder,
+    EnqueueBarrierBuilder,
     EnqueueFillBufferBuilder,
     EnqueueFillImageBuilder
   };
@@ -1238,22 +1237,22 @@ private:
   void *MappedPtr;
 };
 
-class EnqueueMarkerWithWaitListBuilder : public CommandBuilder {
+class EnqueueMarkerBuilder : public CommandBuilder {
 public:
   static bool classof(const CommandBuilder *Bld) {
-    return Bld->GetType() == CommandBuilder::EnqueueMarkerWithWaitListBuilder;
+    return Bld->GetType() == CommandBuilder::EnqueueMarkerBuilder;
   }
 
 public:
-  EnqueueMarkerWithWaitListBuilder(CommandQueue &Queue);
+  EnqueueMarkerBuilder(CommandQueue &Queue);
 
 public:
-  EnqueueMarkerWithWaitListBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  EnqueueMarkerBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
-  EnqueueMarkerWithWaitList *Create(cl_int *ErrCode);
+  EnqueueMarker *Create(cl_int *ErrCode);
 
 private:
-  EnqueueMarkerWithWaitListBuilder &NotifyError(cl_int ErrCode,
+  EnqueueMarkerBuilder &NotifyError(cl_int ErrCode,
                                                 const char *Msg = "") {
     CommandBuilder::NotifyError(ErrCode, Msg);
     return *this;
@@ -1388,22 +1387,22 @@ private:
   size_t SourceOffset;
 };
 
-class EnqueueBarrierWithWaitListBuilder : public CommandBuilder {
+class EnqueueBarrierBuilder : public CommandBuilder {
 public:
   static bool classof(const CommandBuilder *Bld) {
-    return Bld->GetType() == CommandBuilder::EnqueueBarrierWithWaitListBuilder;
+    return Bld->GetType() == CommandBuilder::EnqueueBarrierBuilder;
   }
 
 public:
-  EnqueueBarrierWithWaitListBuilder(CommandQueue &Queue);
+  EnqueueBarrierBuilder(CommandQueue &Queue);
 
 public:
-  EnqueueBarrierWithWaitListBuilder &SetWaitList(unsigned N, const cl_event *Evs);
+  EnqueueBarrierBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
-  EnqueueBarrierWithWaitList *Create(cl_int *ErrCode);
+  EnqueueBarrier *Create(cl_int *ErrCode);
 
 private:
-  EnqueueBarrierWithWaitListBuilder &NotifyError(cl_int ErrCode,
+  EnqueueBarrierBuilder &NotifyError(cl_int ErrCode,
                                                 const char *Msg = "") {
     CommandBuilder::NotifyError(ErrCode, Msg);
     return *this;

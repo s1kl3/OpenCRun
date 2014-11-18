@@ -157,104 +157,86 @@ private:
   size_t Size;
 };
 
+class KernelDescriptor : public MTRefCountedBase<KernelDescriptor> {
+public:
+  typedef std::map<Device *, KernelInfo> KernelInfoContainer;
+
+public:
+  KernelDescriptor(llvm::StringRef Name, Program &P, KernelInfoContainer &&I);
+  ~KernelDescriptor();
+
+  Context &getContext() const { return Prog->GetContext(); }
+  Program &getProgram() const { return *Prog; }
+  llvm::StringRef getName() const { return Name; }
+
+  llvm::Function *getFunction(const Device *Dev) const {
+    auto I = Infos.find(const_cast<Device*>(Dev));
+    return I != Infos.end() ? I->second.getFunction() : nullptr;
+  }
+
+  bool isBuiltForDevice(const Device *Dev) const {
+    return Infos.count(const_cast<Device*>(Dev));
+  }
+
+  bool isBuiltForSingleDevice() const {
+    return Infos.size() == 1;
+  }
+
+  KernelInfo getKernelInfo() const {
+    assert(!Infos.empty());
+    return Infos.begin()->second;
+  }
+
+  bool hasRequireWorkGroupSizes(const Device *Dev) const;
+  bool getRequiredWorkGroupSizes(llvm::SmallVectorImpl<size_t> &Sizes,
+                                 const Device *Dev) const;
+
+  bool getMaxWorkGroupSize(size_t &Size, const Device *Dev) const;
+  bool getMinLocalMemoryUsage(size_t &Size, const Device *Dev) const;
+  bool getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const;
+
+private:
+  llvm::SmallString<64> Name;
+  KernelInfoContainer Infos;
+  llvm::IntrusiveRefCntPtr<Program> Prog;
+};
+
 class Kernel : public _cl_kernel, public MTRefCountedBase<Kernel> {
 public:
-  static bool classof(const _cl_kernel *Kern) { return true; }
-
-public:
-  class LifetimeHandler : public MTRefCountedBase<LifetimeHandler> {
-  public:
-    LifetimeHandler(Kernel &KernHandle);
-    ~LifetimeHandler();
-
-  private:
-    Kernel &KernHandle;
-  };
-
-  typedef std::map<Device *, llvm::Function *> CodesContainer;
-
   typedef llvm::SmallVector<KernelArg *, 8> ArgumentsContainer;
-  
   typedef ArgumentsContainer::iterator arg_iterator;
 
 public:
+  Kernel(KernelDescriptor *KD) : Desc(KD), Arguments(GetArgCount()) {}
+  Kernel(const Kernel &K);
+  ~Kernel();
+
+  const KernelDescriptor &getDescriptor() const { return *Desc; }
+
+  Context &GetContext() const { return Desc->getContext(); }
+  Program &GetProgram() const { return Desc->getProgram(); }
+  llvm::StringRef GetName() const { return Desc->getName(); }
+
   arg_iterator arg_begin() { return Arguments.begin(); }
   arg_iterator arg_end() { return Arguments.end(); }
 
-public:
-  Kernel(Program &Prog, CodesContainer &Codes)
-   : Prog(&Prog), Codes(Codes), Arguments(GetArgCount()), 
-     Lifetime(new LifetimeHandler(*this)) {}
+  bool AreAllArgsSpecified() const;
 
-  Kernel(const Kernel &K);
+  unsigned GetArgCount() const;
 
-  ~Kernel();
+  llvm::StringRef GetArgName(unsigned I) const;
+  llvm::StringRef GetArgTypeName(unsigned I) const;
 
-public:
+  cl_kernel_arg_address_qualifier GetArgAddressQualifier(unsigned I) const;
+  cl_kernel_arg_access_qualifier GetArgAccessQualifier(unsigned I) const;
+  cl_kernel_arg_type_qualifier GetArgTypeQualifier(unsigned I) const;
+
   cl_int SetArg(unsigned I, size_t Size, const void *Arg);
 
 public:
-  llvm::Function *GetFunction(Device &Dev) const {
-    CodesContainer::const_iterator I = Codes.find(&Dev);
-    return (I != Codes.end()) ? I->second : NULL;
-  }
-
-  llvm::StringRef GetName() const {
-    // All stored functions share the same signature, just return the first.
-    CodesContainer::const_iterator I = Codes.begin();
-    const llvm::Function &Func = *I->second;
-
-    return Func.getName();
-  }
-
-  unsigned GetArgCount() const {
-    return GetSignature().getNumArguments();
-  }
-
-  llvm::StringRef GetArgName(unsigned I) const;
-
-  llvm::Module *GetModule(Device &Dev) const {
-    CodesContainer::const_iterator I = Codes.find(&Dev);
-    return (I != Codes.end()) ? I->second->getParent() : NULL;
-  }
-
-  Context &GetContext() const { return Prog->GetContext(); }
-  Program &GetProgram() const { return *Prog; }
-
-  // TODO: implement. Attribute must be gathered from metadata.
-  llvm::SmallVector<size_t, 4> &GetRequiredWorkGroupSizes() const {
-    return *(new llvm::SmallVector<size_t, 4>(3, size_t(0)));
-  }
-
-  bool IsBuiltFor(Device &Dev) const { return Prog->IsBuiltFor(Dev); }
-  bool IsBuiltForOnlyADevice() const { return Codes.size() == 1; }
-
-  // TODO: implement. Depends on kernel argument setting code, not well written.
-  bool AreAllArgsSpecified() const { return true; }
-
-  // TODO: implement. Attribute must be gathered from metadata.
-  bool RequireWorkGroupSizes() const { return false; }
-
-  bool GetMaxWorkGroupSize(size_t &Size, Device *Dev = NULL);
-  bool GetMinLocalMemoryUsage(size_t &Size, Device *Dev = NULL);
-  bool GetMinPrivateMemoryUsage(size_t &Size, Device *Dev = NULL);
-
-  void RegisterToDevices();
-  void UnregisterFromDevices();
-
-public:
-  cl_kernel_arg_address_qualifier GetArgAddressQualifier(unsigned I) const;
-
-  cl_kernel_arg_access_qualifier GetArgAccessQualifier(unsigned I) const;
-
-  llvm::StringRef GetArgTypeName(unsigned I) const;
-
-  cl_kernel_arg_type_qualifier GetArgTypeQualifier(unsigned I) const;
+  static bool classof(const _cl_kernel *Kern) { return true; }
 
 private:
-  KernelSignature GetSignature() const;
-  KernelInfo GetInfo() const;
-
   cl_int SetBufferArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetImageArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetSamplerArg(unsigned I, size_t Size, const void *Arg);
@@ -263,10 +245,8 @@ private:
 private:
   llvm::sys::Mutex ThisLock;
 
-  llvm::IntrusiveRefCntPtr<Program> Prog;
-  CodesContainer Codes;
+  llvm::IntrusiveRefCntPtr<KernelDescriptor> Desc;
   ArgumentsContainer Arguments;
-  llvm::IntrusiveRefCntPtr<LifetimeHandler> Lifetime;
 };
 
 } // End namespace opencrun.

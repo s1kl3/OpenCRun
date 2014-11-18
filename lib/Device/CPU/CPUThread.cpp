@@ -400,6 +400,10 @@ bool CPUThread::Submit(CPUExecCommand *Cmd) {
             llvm::dyn_cast<NativeKernelCPUCommand>(Cmd))
     return Submit(Native);
 
+  else if(NoOpCPUCommand *NoOp =
+            llvm::dyn_cast<NoOpCPUCommand>(Cmd))
+    return Submit(NoOp);
+
   else
     llvm::report_fatal_error("unknown command submitted");
 
@@ -513,6 +517,9 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   else if(NativeKernelCPUCommand *OnFly =
             llvm::dyn_cast<NativeKernelCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);
+
+  else if(llvm::isa<NoOpCPUCommand>(Cmd))
+    ExitStatus = CPUCommand::NoError;
   
   else
     ExitStatus = CPUCommand::Unsupported;

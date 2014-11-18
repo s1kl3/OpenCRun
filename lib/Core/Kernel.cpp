@@ -10,29 +10,76 @@
 
 using namespace opencrun;
 
-#define RETURN_WITH_ERROR(ERR, MSG)  \
-  {                                  \
-  Context &Ctx = Prog->GetContext(); \
-  Ctx.ReportDiagnostic(MSG);         \
-  return ERR;                        \
+#define RETURN_WITH_ERROR(ERR, MSG)   \
+  {                                   \
+  GetContext().ReportDiagnostic(MSG); \
+  return ERR;                         \
   }
 
-Kernel::LifetimeHandler::LifetimeHandler(Kernel &KernHandle)
- : KernHandle(KernHandle) {
-  KernHandle.GetProgram().RegisterKernel(KernHandle);
-  KernHandle.RegisterToDevices();
+KernelDescriptor::KernelDescriptor(llvm::StringRef N, Program &P,
+                                   KernelInfoContainer &&I)
+ : Name(N), Infos(std::move(I)), Prog(&P) {
+  for (const auto &V : Infos)
+    V.first->RegisterKernel(*this);
 }
 
-Kernel::LifetimeHandler::~LifetimeHandler() {
-  KernHandle.UnregisterFromDevices();
-  KernHandle.GetProgram().UnregisterKernel(KernHandle);
+KernelDescriptor::~KernelDescriptor() {
+  Prog->DetachKernel(*this);
+  for (const auto &V : Infos)
+    V.first->UnregisterKernel(*this);
 }
 
-Kernel::Kernel(const Kernel &K)
- : Prog(K.Prog), Codes(K.Codes), Lifetime(K.Lifetime) {
+bool KernelDescriptor::hasRequireWorkGroupSizes(const Device *Dev) const {
+  // TODO: check kernel metadata.
+  return false;
+}
+
+bool KernelDescriptor::
+getRequiredWorkGroupSizes(llvm::SmallVectorImpl<size_t> &Sizes,
+                          const Device *Dev) const {
+  // TODO: check kernel metadata.
+  Sizes.clear();
+  Sizes.append(3, size_t(0));
+  return true;
+}
+
+bool KernelDescriptor::
+getMaxWorkGroupSize(size_t &Size, const Device *Dev) const {
+  const Footprint &FP = Dev->getKernelFootprint(*this);
+
+  Size = FP.GetMaxWorkGroupSize(Dev->GetPrivateMemorySize());
+
+  size_t DevMaxSize = Dev->GetMaxWorkGroupSize();
+  if(Size > DevMaxSize)
+    Size = DevMaxSize;
+
+  return true;
+}
+
+bool KernelDescriptor::
+getMinLocalMemoryUsage(size_t &Size, const Device *Dev) const {
+  const Footprint &FP = Dev->getKernelFootprint(*this);
+
+  Size = FP.GetLocalMemoryUsage();
+
+  return true;
+}
+
+bool KernelDescriptor::
+getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const {
+  const Footprint &FP = Dev->getKernelFootprint(*this);
+
+  Size = FP.GetPrivateMemoryUsage();
+
+  return true;
+}
+
+Kernel::Kernel(const Kernel &K) : Desc(K.Desc) {
+  Arguments.reserve(K.Arguments.size());
   for (unsigned I = 0, E = K.Arguments.size(); I != E; ++I) {
     llvm::KernelArg *Arg = K.Arguments[I];
     switch (Arg->GetType()) {
+    default: llvm_unreachable(0);
     case KernelArg::BufferArg:
       Arg = new BufferKernelArg(llvm::cast<BufferKernelArg>(*Arg));
       break;
@@ -51,30 +98,27 @@ Kernel::Kernel(const Kernel &K)
 } 
 
 Kernel::~Kernel() {
-  llvm::DeleteContainerPointers(Arguments);
+  //llvm::DeleteContainerPointers(Arguments);
 }
 
 llvm::StringRef Kernel::GetArgName(unsigned I) const {
-  return GetInfo().getArgsName().getArgumentAs<llvm::MDString>(I)->getString();
+  KernelArgInfo ArgsName = Desc->getKernelInfo().getArgsName();
+  return ArgsName.getArgumentAs<llvm::MDString>(I)->getString();
 }
 
-void Kernel::RegisterToDevices() {
-  for (CodesContainer::const_iterator I = Codes.begin(),
-       E = Codes.end(); I != E; ++I)
-    I->first->RegisterKernel(*this);
+unsigned Kernel::GetArgCount() const {
+  return Desc->getKernelInfo().getSignature().getNumArguments();
 }
 
-void Kernel::UnregisterFromDevices() {
-  for (CodesContainer::const_iterator I = Codes.begin(),
-       E = Codes.end(); I != E; ++I)
-    I->first->UnregisterKernel(*this);
+bool Kernel::AreAllArgsSpecified() const {
+  // FIXME: effectively check if all arguments have been assigned.
+  return true;
 }
 
 cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const {
-  opencl::AddressSpace AS;
+  KernelArgInfo ArgsAS = Desc->getKernelInfo().getArgsAddrSpace();
 
-  AS = static_cast<opencl::AddressSpace>(
-      GetInfo().getArgsAddrSpace().getArgumentAs<llvm::ConstantInt>(I)->getZExtValue());
+  unsigned AS = ArgsAS.getArgumentAs<llvm::ConstantInt>(I)->getZExtValue();
 
   switch(AS) {
   case opencl::AS_Global:
@@ -85,40 +129,43 @@ cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const
     return CL_KERNEL_ARG_ADDRESS_LOCAL;
   case opencl::AS_Private:
   case opencl::AS_Invalid:
-  default:
     return CL_KERNEL_ARG_ADDRESS_PRIVATE;
+  default:
+    llvm_unreachable("Unexpected address space!");
   }
 }
 
 cl_kernel_arg_access_qualifier Kernel::GetArgAccessQualifier(unsigned I) const {
-  cl_kernel_arg_access_qualifier ArgAccQls;
-  llvm::StringRef ArgAccStr;
+  KernelArgInfo ArgsAccessQual = Desc->getKernelInfo().getArgsAccessQual();
 
-  ArgAccStr = GetInfo().getArgsAccessQual().getArgumentAs<llvm::MDString>(I)->getString();
-  ArgAccQls = llvm::StringSwitch<cl_kernel_arg_access_qualifier>(ArgAccStr)
-    .Case("read_only", CL_KERNEL_ARG_ACCESS_READ_ONLY)
-    .Case("write_only", CL_KERNEL_ARG_ACCESS_WRITE_ONLY)
-    .Case("none", CL_KERNEL_ARG_ACCESS_NONE)
-    .Default(CL_KERNEL_ARG_ACCESS_NONE);
+  llvm::StringRef ArgAccStr =
+    ArgsAccessQual.getArgumentAs<llvm::MDString>(I)->getString();
 
-  return ArgAccQls;
+  return llvm::StringSwitch<cl_kernel_arg_access_qualifier>(ArgAccStr)
+          .Case("read_only", CL_KERNEL_ARG_ACCESS_READ_ONLY)
+          .Case("write_only", CL_KERNEL_ARG_ACCESS_WRITE_ONLY)
+          .Case("none", CL_KERNEL_ARG_ACCESS_NONE)
+          .Default(CL_KERNEL_ARG_ACCESS_NONE);
 }
 
 llvm::StringRef Kernel::GetArgTypeName(unsigned I) const {
-  return GetInfo().getArgsType().getArgumentAs<llvm::MDString>(I)->getString();
+  KernelArgInfo ArgsType = Desc->getKernelInfo().getArgsType();
+  return ArgsType.getArgumentAs<llvm::MDString>(I)->getString();
 }
 
 cl_kernel_arg_type_qualifier Kernel::GetArgTypeQualifier(unsigned I) const {
-  cl_kernel_arg_type_qualifier TyQls = CL_KERNEL_ARG_TYPE_NONE;
-  llvm::StringRef TyQlsStr;
-  
-  TyQlsStr = GetInfo().getArgsTypeQual().getArgumentAs<llvm::MDString>(I)->getString();
+  KernelArgInfo ArgsTypeQual = Desc->getKernelInfo().getArgsTypeQual();
 
-  if(TyQlsStr.find("const") != llvm::StringRef::npos)
+  llvm::StringRef TyQlsStr =
+    ArgsTypeQual.getArgumentAs<llvm::MDString>(I)->getString();
+
+  cl_kernel_arg_type_qualifier TyQls = CL_KERNEL_ARG_TYPE_NONE;
+
+  if (TyQlsStr.find("const") != llvm::StringRef::npos)
     TyQls |= CL_KERNEL_ARG_TYPE_CONST;
-  else if(TyQlsStr.find("restrict") != llvm::StringRef::npos)
+  if (TyQlsStr.find("restrict") != llvm::StringRef::npos)
     TyQls |= CL_KERNEL_ARG_TYPE_RESTRICT;
-  else if(TyQlsStr.find("volatile") != llvm::StringRef::npos)
+  if (TyQlsStr.find("volatile") != llvm::StringRef::npos)
     TyQls |= CL_KERNEL_ARG_TYPE_VOLATILE;
 
   return TyQls;
@@ -145,7 +192,7 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_ARG_INDEX,
                       "argument number exceed kernel argument count");
 
-  opencl::Type ArgTy = GetSignature().getArgument(I);
+  opencl::Type ArgTy = Desc->getKernelInfo().getSignature().getArgument(I);
 
   if (isBufferArg(ArgTy))
     return SetBufferArg(I, Size, Arg);
@@ -162,40 +209,15 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
   llvm_unreachable("Unknown argument type");
 }
 
-bool Kernel::GetMaxWorkGroupSize(size_t &Size, Device *Dev) {
-  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
-
-  Size = FP.GetMaxWorkGroupSize(Dev->GetPrivateMemorySize());
-
-  size_t DevMaxSize = Dev->GetMaxWorkGroupSize();
-  if(Size > DevMaxSize)
-    Size = DevMaxSize;
-
-  return true;
-}
-
-bool Kernel::GetMinLocalMemoryUsage(size_t &Size, Device *Dev) {
-  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
-
-  Size = FP.GetLocalMemoryUsage();
-
-  return true;
-}
-
-bool Kernel::GetMinPrivateMemoryUsage(size_t &Size, Device *Dev) {
-  const Footprint &FP = Dev->ComputeKernelFootprint(*this);
-
-  Size = FP.GetPrivateMemoryUsage();
-
-  return true;
-}
 
 cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
   Buffer *Buf;
 
   Context &Ctx = GetContext();
 
-  opencl::Type PointeeTy = GetSignature().getArgument(I).getElementType();
+  KernelSignature Sign = Desc->getKernelInfo().getSignature();
+
+  opencl::Type PointeeTy = Sign.getArgument(I).getElementType();
 
   opencl::AddressSpace AddrSpace = PointeeTy.getQualifiers().getAddressSpace();
 
@@ -245,7 +267,7 @@ cl_int Kernel::SetImageArg(unsigned I, size_t Size, const void *Arg) {
 
   Context &Ctx = GetContext();
 
-  opencl::Type ImgTy = GetSignature().getArgument(I);
+  opencl::Type ImgTy = Desc->getKernelInfo().getSignature().getArgument(I);
 
   opencl::ImageAccess ImgAccess = ImgTy.getQualifiers().getImageAccess(); 
   
@@ -304,24 +326,4 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   ThisLock.release();
 
   return CL_SUCCESS;
-}
-
-KernelSignature Kernel::GetSignature() const {
-  // All stored functions share the same signature, use the first.
-  CodesContainer::const_iterator J = Codes.begin();
-  assert(J != Codes.end());
-  llvm::Function &Kern = *J->second;
-  llvm::Module &Mod = *Kern.getParent();
-
-  return ModuleInfo(Mod).getKernelInfo(Kern.getName()).getSignature();
-}
-
-KernelInfo Kernel::GetInfo() const {
-  // All stored functions share the same signature, use the first.
-  CodesContainer::const_iterator J = Codes.begin();
-  assert(J != Codes.end());
-  llvm::Function &Kern = *J->second;
-  llvm::Module &Mod = *Kern.getParent();
-
-  return ModuleInfo(Mod).getKernelInfo(Kern.getName());
 }

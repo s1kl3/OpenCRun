@@ -88,9 +88,9 @@ clGetEventInfo(cl_event event,
       return CL_INVALID_VALUE;
 
     return clFillValue<cl_command_type,
-                       opencrun::Command &>(
+                       unsigned>(
              static_cast<cl_command_type *>(param_value),
-             InternalEv->GetCommand(),
+             InternalEv->GetCommandType(),
              param_value_size,
              param_value_size_ret);
   }

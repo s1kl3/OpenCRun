@@ -19,7 +19,7 @@ public:
 public:
   typedef NDRangeKernelBlockCPUCommand::Signature BlockParallelEntryPoint;
 
-  typedef llvm::Function *KernelID;
+  typedef const KernelDescriptor *KernelID;
   typedef std::map<KernelID, BlockParallelEntryPoint> BlockParallelEntryPoints;
   typedef std::map<KernelID, unsigned> BlockParallelStaticLocalSizes;
   typedef std::map<KernelID, Footprint> FootprintsContainer;
@@ -45,7 +45,7 @@ public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
                                           WorkSizes &LW) const;
 
-  virtual const Footprint &ComputeKernelFootprint(Kernel &Kern);
+  virtual const Footprint &getKernelFootprint(const KernelDescriptor &Kern) const;
 
   virtual bool CreateHostBuffer(HostBuffer &Buf);
   virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
@@ -64,7 +64,7 @@ public:
 
   virtual bool Submit(Command &Cmd);
 
-  virtual void UnregisterKernel(Kernel &Kern);
+  virtual void UnregisterKernel(const KernelDescriptor &Kern);
 
   void NotifyDone(CPUServiceCommand *Cmd) { delete Cmd; }
   void NotifyDone(CPUExecCommand *Cmd, int ExitStatus);
@@ -104,12 +104,14 @@ private:
   bool Submit(EnqueueFillImage &Cmd);
   bool Submit(EnqueueNDRangeKernel &Cmd);
   bool Submit(EnqueueNativeKernel &Cmd);
+  bool Submit(EnqueueMarker &Cmd);
+  bool Submit(EnqueueBarrier &Cmd);
 
   bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                            GlobalArgMappingsContainer &GlobalArgs);
 
-  CPUDevice::BlockParallelEntryPoint GetBlockParallelEntryPoint(Kernel &Kern);
-  unsigned GetBlockParallelStaticLocalSize(Kernel &Kern);
+  CPUDevice::BlockParallelEntryPoint GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc);
+  unsigned GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc);
 
   void *LinkLibFunction(const std::string &Name);
 
@@ -135,7 +137,7 @@ private:
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
-  FootprintsContainer KernelFootprints;
+  mutable FootprintsContainer KernelFootprints;
 
   PartitionsContainer Partitions;
 

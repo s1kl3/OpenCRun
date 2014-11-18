@@ -207,7 +207,7 @@ cl::Program Benchmark::LoadProgramFromFile(llvm::StringRef File) {
     if(!BufPtr)
       throw Error("Cannot open " + File.str());
 
-    Sources[File] = BufPtr.get();
+    Sources[File] = BufPtr.release();
   }
 
   llvm::MemoryBuffer *Buf = Sources[File];

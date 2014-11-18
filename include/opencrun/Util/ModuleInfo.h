@@ -65,18 +65,18 @@ class KernelInfo {
 public:
   KernelInfo(llvm::MDNode *KernMD = 0) : MD(KernMD) {
     assert(checkValidity());
-    InfoMD = retrieveKernelInfo();
+    CustomInfoMD = retrieveCustomInfo();
   }
-  KernelInfo(const KernelInfo &I) : MD(I.MD), InfoMD(I.InfoMD) {}
+  KernelInfo(const KernelInfo &I) : MD(I.MD), CustomInfoMD(I.CustomInfoMD) {}
   KernelInfo &operator=(const KernelInfo &I) {
     MD = I.MD;
-    InfoMD = I.InfoMD;
+    CustomInfoMD = I.CustomInfoMD;
     return *this;
   }
   KernelInfo &operator=(llvm::MDNode *KernMD) {
     MD = KernMD;
     assert(checkValidity());
-    InfoMD = retrieveKernelInfo();
+    CustomInfoMD = retrieveCustomInfo();
     return *this;
   }
 
@@ -90,7 +90,7 @@ public:
   }
 
   KernelSignature getSignature() const {
-    return getKernelInfo("signature");
+    return getCustomInfo("signature");
   }
 
   KernelArgInfo getArgsAddrSpace() const {
@@ -113,20 +113,20 @@ public:
     return getKernelArgInfo("kernel_arg_name");
   }
 
-  llvm::MDNode *getInfo() const { return InfoMD; }
+  llvm::MDNode *getCustomInfo() const { return CustomInfoMD; }
 
-  uint64_t getStaticLocalSize() const;
+protected:
+  llvm::MDNode *getCustomInfo(llvm::StringRef Name) const;
 
 private:
   bool checkValidity() const;
-  llvm::MDNode *retrieveKernelInfo() const;
+  llvm::MDNode *retrieveCustomInfo() const;
 
   llvm::MDNode *getKernelArgInfo(llvm::StringRef Name) const;
-  llvm::MDNode *getKernelInfo(llvm::StringRef Name) const;
 
 private:
   llvm::MDNode *MD;
-  llvm::MDNode *InfoMD;
+  llvm::MDNode *CustomInfoMD;
 };
 
 class ModuleInfo {

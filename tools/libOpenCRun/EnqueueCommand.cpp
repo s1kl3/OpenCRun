@@ -49,7 +49,7 @@ clEnqueueReadBuffer(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -93,7 +93,7 @@ clEnqueueReadBufferRect(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
   
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -133,7 +133,7 @@ clEnqueueWriteBuffer(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -177,7 +177,7 @@ clEnqueueWriteBufferRect(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
   
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -214,7 +214,7 @@ clEnqueueFillBuffer(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -253,7 +253,7 @@ clEnqueueCopyBuffer(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -296,7 +296,7 @@ clEnqueueCopyBufferRect(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -341,7 +341,7 @@ clEnqueueReadImage(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -386,7 +386,7 @@ clEnqueueWriteImage(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -424,7 +424,7 @@ clEnqueueFillImage(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -463,7 +463,7 @@ clEnqueueCopyImage(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -502,7 +502,7 @@ clEnqueueCopyImageToBuffer(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -541,7 +541,7 @@ clEnqueueCopyBufferToImage(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -589,17 +589,17 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
     return NULL;
   }
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, errcode_ret);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, errcode_ret);
 
   if(!Ev) {
     Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
   
-  if(event)
-    *event = Ev;
-  else
-    Ev->Release();
+  if(event) {
+    *event = Ev.getPtr();
+    Ev.resetWithoutRelease();
+  }
   
   return MapBuf;
 }
@@ -648,17 +648,17 @@ clEnqueueMapImage(cl_command_queue command_queue,
     return NULL;
   }
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, errcode_ret);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, errcode_ret);
 
   if(!Ev) {
     Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
   
-  if(event)
-    *event = Ev;
-  else
-    Ev->Release();
+  if(event) {
+    *event = Ev.getPtr();
+    Ev.resetWithoutRelease();
+  }
   
   return MapBuf;
 }
@@ -695,7 +695,7 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -747,7 +747,7 @@ clEnqueueNDRangeKernel(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -812,7 +812,7 @@ clEnqueueNativeKernel(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -834,7 +834,7 @@ clEnqueueMarkerWithWaitList(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueMarkerWithWaitListBuilder Bld(*Queue);
+  opencrun::EnqueueMarkerBuilder Bld(*Queue);
   opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);
@@ -842,7 +842,7 @@ clEnqueueMarkerWithWaitList(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;
@@ -886,7 +886,7 @@ clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
 
   cl_int ErrCode;
 
-  opencrun::EnqueueBarrierWithWaitListBuilder Bld(*Queue);
+  opencrun::EnqueueBarrierBuilder Bld(*Queue);
   opencrun::Command *Cmd = Bld.SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);
@@ -894,7 +894,7 @@ clEnqueueBarrierWithWaitList(cl_command_queue command_queue,
   if(!Cmd)
     return ErrCode;
 
-  opencrun::Event *Ev = Queue->Enqueue(*Cmd, &ErrCode);
+  llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, &ErrCode);
 
   if(!Ev)
     return ErrCode;

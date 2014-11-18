@@ -1,5 +1,6 @@
 
 #include "opencrun/Device/CPU/CPUDevice.h"
+#include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPUPasses/AllPasses.h"
@@ -7,9 +8,12 @@
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
 
+#include "CPUKernelInfo.h"
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/PassManager.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetSelect.h"
@@ -274,96 +278,60 @@ bool CPUDevice::Submit(Command &Cmd) {
   // Take the profiling information here, in order to force this sample
   // happening before the subsequents samples.
   unsigned Counters = Cmd.IsProfiled() ? Profiler::Time : Profiler::None;
-  Sample.reset(GetProfilerSample(*this,
-                                 Counters,
+  Sample.reset(GetProfilerSample(*this, Counters,
                                  ProfileSample::CommandSubmitted));
 
-  if(EnqueueReadBuffer *Read = llvm::dyn_cast<EnqueueReadBuffer>(&Cmd))
-    Submitted = Submit(*Read);
+#define DISPATCH(CmdType)                                          \
+  case Command::CmdType:                                           \
+    Submitted = Submit(*llvm::cast<Enqueue ## CmdType>(&Cmd)); \
+    break;
 
-  else if(EnqueueWriteBuffer *Write = llvm::dyn_cast<EnqueueWriteBuffer>(&Cmd))
-    Submitted = Submit(*Write);
-
-  else if(EnqueueCopyBuffer *Copy = llvm::dyn_cast<EnqueueCopyBuffer>(&Cmd))
-    Submitted = Submit(*Copy);
-
-  else if(EnqueueReadImage *ReadImg = llvm::dyn_cast<EnqueueReadImage>(&Cmd))
-    Submitted = Submit(*ReadImg);
-
-  else if(EnqueueWriteImage *WriteImg = llvm::dyn_cast<EnqueueWriteImage>(&Cmd))
-    Submitted = Submit(*WriteImg);
-
-  else if(EnqueueCopyImage *CopyImg = llvm::dyn_cast<EnqueueCopyImage>(&Cmd))
-    Submitted = Submit(*CopyImg);
-
-  else if(EnqueueCopyImageToBuffer *CopyImgToBuf = 
-      llvm::dyn_cast<EnqueueCopyImageToBuffer>(&Cmd))
-    Submitted = Submit(*CopyImgToBuf);
-
-  else if(EnqueueCopyBufferToImage *CopyBufToImg = 
-      llvm::dyn_cast<EnqueueCopyBufferToImage>(&Cmd))
-    Submitted = Submit(*CopyBufToImg);
-
-  else if(EnqueueMapBuffer *MapBuf = llvm::dyn_cast<EnqueueMapBuffer>(&Cmd))
-    Submitted = Submit(*MapBuf);
-  
-  else if(EnqueueMapImage *MapImg = llvm::dyn_cast<EnqueueMapImage>(&Cmd))
-    Submitted = Submit(*MapImg);
-
-  else if(EnqueueUnmapMemObject *Unmap = llvm::dyn_cast<EnqueueUnmapMemObject>(&Cmd))
-    Submitted = Submit(*Unmap);
-
-  else if(EnqueueReadBufferRect *ReadRect = llvm::dyn_cast<EnqueueReadBufferRect>(&Cmd))
-    Submitted = Submit(*ReadRect);
-
-  else if(EnqueueWriteBufferRect *WriteRect = llvm::dyn_cast<EnqueueWriteBufferRect>(&Cmd))
-    Submitted = Submit(*WriteRect);
-    
-  else if(EnqueueCopyBufferRect *CopyRect = llvm::dyn_cast<EnqueueCopyBufferRect>(&Cmd))
-    Submitted = Submit(*CopyRect);
-
-  else if(EnqueueFillBuffer *Fill = llvm::dyn_cast<EnqueueFillBuffer>(&Cmd))
-    Submitted = Submit(*Fill);
-    
-  else if(EnqueueFillImage *Fill = llvm::dyn_cast<EnqueueFillImage>(&Cmd))
-    Submitted = Submit(*Fill);
-
-  else if(EnqueueNDRangeKernel *NDRange =
-            llvm::dyn_cast<EnqueueNDRangeKernel>(&Cmd))
-    Submitted = Submit(*NDRange);
-
-  else if(EnqueueNativeKernel *Native =
-            llvm::dyn_cast<EnqueueNativeKernel>(&Cmd))
-    Submitted = Submit(*Native);
-
-  else
-    llvm::report_fatal_error("unknown command submitted");
-
-  // The command has been submitted, register the sample. On failure, the
-  // std::unique_ptr destructor will reclaim the sample.
-  if(Submitted) {
-    InternalEvent &Ev = Cmd.GetNotifyEvent();
-    Ev.MarkSubmitted(Sample.release());
+  switch (Cmd.GetType()) {
+  default: llvm_unreachable("Unknown command type!");
+  DISPATCH(ReadBuffer)
+  DISPATCH(WriteBuffer)
+  DISPATCH(CopyBuffer)
+  DISPATCH(ReadImage)
+  DISPATCH(WriteImage)
+  DISPATCH(CopyImage)
+  DISPATCH(CopyImageToBuffer)
+  DISPATCH(CopyBufferToImage)
+  DISPATCH(MapBuffer)
+  DISPATCH(MapImage)
+  DISPATCH(UnmapMemObject)
+  DISPATCH(ReadBufferRect)
+  DISPATCH(WriteBufferRect)
+  DISPATCH(CopyBufferRect)
+  DISPATCH(FillBuffer)
+  DISPATCH(FillImage)
+  DISPATCH(NDRangeKernel)
+  DISPATCH(NativeKernel)
+  DISPATCH(Marker)
+  DISPATCH(Barrier)
   }
+
+#undef DISPATCH
+
+  // The command has been submitted, register the sample.
+  if (Submitted)
+    Cmd.GetNotifyEvent().MarkSubmitted(Sample.release());
 
   return Submitted;
 }
 
-void CPUDevice::UnregisterKernel(Kernel &Kern) {
+void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   // TODO: modules must be ref-counted -- unregister a kernel does not
   // necessary enforce module unloading?
   llvm::sys::ScopedLock Lock(ThisLock);
 
   // Remove module from the JIT.
-  llvm::Module &Mod = *Kern.GetModule(*this);
+  llvm::Module &Mod = *Kern.getFunction(this)->getParent();
   JIT->removeModule(&Mod);
 
-  KernelID K = Kern.GetFunction(*this);
-
   // Erase kernel from the cache.
-  BlockParallelEntriesCache.erase(K);
-  BlockParallelStaticLocalsCache.erase(K);
-  KernelFootprints.erase(K);
+  BlockParallelEntriesCache.erase(&Kern);
+  BlockParallelStaticLocalsCache.erase(&Kern);
+  KernelFootprints.erase(&Kern);
 
   // Invoke static destructors.
   JIT->runStaticConstructorsDestructors(&Mod, true);
@@ -373,6 +341,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   // Get counters to profile.
   Command &QueueCmd = Cmd->GetQueueCommand();
   InternalEvent &Ev = QueueCmd.GetNotifyEvent();
+  CommandQueue &Queue = Ev.GetCommandQueue();
   unsigned Counters = Cmd->IsProfiled() ? Profiler::Time : Profiler::None;
 
   // This command does not directly translate to an OpenCL command. Register
@@ -391,6 +360,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
                                               Counters,
                                               ProfileSample::CommandCompleted);
     Ev.MarkCompleted(Cmd->GetExitStatus(), Sample);
+    Queue.CommandDone(QueueCmd);
   }
 
   delete Cmd;
@@ -828,16 +798,29 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
   return MP.Submit(new NativeKernelCPUCommand(Cmd));
 }
 
+bool CPUDevice::Submit(EnqueueMarker &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+  return MP.Submit(new NoOpCPUCommand(Cmd));
+}
+
+bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
+  // TODO: implement a smarter selection policy.
+  Multiprocessor &MP = **Multiprocessors.begin();
+  return MP.Submit(new NoOpCPUCommand(Cmd));
+}
+
 bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                     GlobalArgMappingsContainer &GlobalArgs) {
+  const KernelDescriptor &KernDesc = Cmd.GetKernel().getDescriptor();
   // Native launcher address.
-  BlockParallelEntryPoint Entry = GetBlockParallelEntryPoint(Cmd.GetKernel());
+  BlockParallelEntryPoint Entry = GetBlockParallelEntryPoint(KernDesc);
 
   // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
 
   // Static local size
-  unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(Cmd.GetKernel());
+  unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(KernDesc);
 
   // Decide the work group size.
   if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
@@ -885,19 +868,19 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
 }
 
 CPUDevice::BlockParallelEntryPoint
-CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
+CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  KernelID K = Kern.GetFunction(*this);
-
   // Cache hit.
-  BlockParallelEntryPoints::iterator I = BlockParallelEntriesCache.find(K);
+  BlockParallelEntryPoints::iterator I =
+    BlockParallelEntriesCache.find(&KernDesc);
+
   if (I != BlockParallelEntriesCache.end())
     return I->second;
 
   // Cache miss.
-  llvm::Module &Mod = *Kern.GetModule(*this);
-  llvm::StringRef KernName = Kern.GetName();
+  llvm::Module &Mod = *KernDesc.getFunction(this)->getParent();
+  llvm::StringRef KernName = KernDesc.getFunction(this)->getName();
 
   // The aggressive inliner cache info about call graph shape.
   AggressiveInliner *Inliner = CreateAggressiveInlinerPass(KernName);
@@ -938,50 +921,46 @@ CPUDevice::GetBlockParallelEntryPoint(Kernel &Kern) {
   uintptr_t EntryPtrInt = reinterpret_cast<uintptr_t>(EntryPtr);
   CPUDevice::BlockParallelEntryPoint Entry;
   Entry = reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtrInt);
-  BlockParallelEntriesCache[K] = Entry;
+  BlockParallelEntriesCache[&KernDesc] = Entry;
 
   return Entry;
 }
 
-unsigned CPUDevice::GetBlockParallelStaticLocalSize(Kernel &Kern) {
+unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  KernelID K = Kern.GetFunction(*this);
-
   BlockParallelStaticLocalSizes::iterator I =
-    BlockParallelStaticLocalsCache.find(K);
+    BlockParallelStaticLocalsCache.find(&KernDesc);
   if (I != BlockParallelStaticLocalsCache.end())
     return I->second;
 
-  llvm::Module &Mod = *Kern.GetModule(*this);
-
-  llvm::KernelInfo Info = ModuleInfo(Mod).getKernelInfo(Kern.GetName());
+  CPUKernelInfo Info(KernDesc.getKernelInfo());
 
   unsigned StaticLocalSize = Info.getStaticLocalSize();
-  BlockParallelStaticLocalsCache[K] = StaticLocalSize;
+  BlockParallelStaticLocalsCache[&KernDesc] = StaticLocalSize;
 
   return StaticLocalSize;
 }
 
-const Footprint &CPUDevice::ComputeKernelFootprint(Kernel &Kern) {
+const Footprint &
+CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  KernelID K = Kern.GetFunction(*this);
-  FootprintsContainer::iterator I = KernelFootprints.find(K);
+  FootprintsContainer::iterator I = KernelFootprints.find(&Kern);
 
   if (I != KernelFootprints.end())
     return I->second;
 
   FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
-  llvm::Function *Fun = Kern.GetFunction(*this);
+  llvm::Function *Fun = Kern.getFunction(this);
 
   llvm::PassManager PM;
   PM.add(Pass);
   PM.run(*Fun->getParent());
 
-  KernelFootprints[K] = *Pass;
+  KernelFootprints[&Kern] = *Pass;
 
-  return KernelFootprints[K];
+  return KernelFootprints[&Kern];
 }
 
 void *CPUDevice::LinkLibFunction(const std::string &Name) {

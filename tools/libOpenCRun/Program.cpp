@@ -259,7 +259,7 @@ clGetProgramInfo(cl_program program,
                                                               E = AttachedKernels.end();
                                                               I != E;
                                                               I++) {
-      kernel_names += (*I)->GetName().str();
+      kernel_names += (*I)->getName().str();
       kernel_names += ';';
     }
     

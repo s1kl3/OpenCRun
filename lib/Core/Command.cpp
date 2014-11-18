@@ -292,10 +292,10 @@ EnqueueUnmapMemObject::EnqueueUnmapMemObject(MemoryObj &MemObj,
     MappedPtr(MappedPtr) { }
 
 //
-// EnqueueMarkerWithWaitList implementation.
+// EnqueueMarker implementation.
 //
 
-EnqueueMarkerWithWaitList::EnqueueMarkerWithWaitList(EventsContainer &WaitList)
+EnqueueMarker::EnqueueMarker(EventsContainer &WaitList)
   : Command(Command::Marker, WaitList) { }
 
 //
@@ -367,10 +367,10 @@ EnqueueCopyBufferRect::EnqueueCopyBufferRect(Buffer &Target,
 }
     
 //
-// EnqueueBarrierWithWaitList implementation.
+// EnqueueBarrier implementation.
 //
 
-EnqueueBarrierWithWaitList::EnqueueBarrierWithWaitList(EventsContainer &WaitList)
+EnqueueBarrier::EnqueueBarrier(EventsContainer &WaitList)
   : Command(Command::Barrier, WaitList) { }
 
 //
@@ -1798,16 +1798,16 @@ EnqueueUnmapMemObject *EnqueueUnmapMemObjectBuilder::Create(cl_int *ErrCode) {
 }
 
 //
-// EnqueueMarkerWithWaitListBuilder implementation.
+// EnqueueMarkerBuilder implementation.
 //
 
-EnqueueMarkerWithWaitListBuilder::EnqueueMarkerWithWaitListBuilder(CommandQueue &Queue)
-  : CommandBuilder(CommandBuilder::EnqueueMarkerWithWaitListBuilder,
+EnqueueMarkerBuilder::EnqueueMarkerBuilder(CommandQueue &Queue)
+  : CommandBuilder(CommandBuilder::EnqueueMarkerBuilder,
                    Queue.GetContext()),
     Queue(Queue) { }
 
-EnqueueMarkerWithWaitListBuilder
-&EnqueueMarkerWithWaitListBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+EnqueueMarkerBuilder
+&EnqueueMarkerBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
   CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
 
   for(Command::const_event_iterator I = WaitList.begin(), 
@@ -1819,17 +1819,17 @@ EnqueueMarkerWithWaitListBuilder
                          "command queue and event in wait list with different context");
   }
 
-  return llvm::cast<EnqueueMarkerWithWaitListBuilder>(Super);
+  return llvm::cast<EnqueueMarkerBuilder>(Super);
 }
 
-EnqueueMarkerWithWaitList *EnqueueMarkerWithWaitListBuilder::Create(cl_int *ErrCode) {
+EnqueueMarker *EnqueueMarkerBuilder::Create(cl_int *ErrCode) {
   if(this->ErrCode != CL_SUCCESS)
     RETURN_WITH_ERROR(ErrCode);
     
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
     
-  return new EnqueueMarkerWithWaitList(WaitList);
+  return new EnqueueMarker(WaitList);
 }
 
 //
@@ -2470,15 +2470,15 @@ EnqueueCopyBufferRect *EnqueueCopyBufferRectBuilder::Create(cl_int *ErrCode) {
 }
 
 //
-// EnqueueBarrierWithWaitListBuilder implementation.
+// EnqueueBarrierBuilder implementation.
 //
 
-EnqueueBarrierWithWaitListBuilder::EnqueueBarrierWithWaitListBuilder(CommandQueue &Queue)
-  : CommandBuilder(CommandBuilder::EnqueueBarrierWithWaitListBuilder,
+EnqueueBarrierBuilder::EnqueueBarrierBuilder(CommandQueue &Queue)
+  : CommandBuilder(CommandBuilder::EnqueueBarrierBuilder,
                    Queue.GetContext()) { }
 
-EnqueueBarrierWithWaitListBuilder
-&EnqueueBarrierWithWaitListBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
+EnqueueBarrierBuilder
+&EnqueueBarrierBuilder::SetWaitList(unsigned N, const cl_event *Evs) {
   CommandBuilder &Super = CommandBuilder::SetWaitList(N, Evs);
 
   for(Command::const_event_iterator I = WaitList.begin(), 
@@ -2490,17 +2490,17 @@ EnqueueBarrierWithWaitListBuilder
                          "command queue and event in wait list with different context");
   }
 
-  return llvm::cast<EnqueueBarrierWithWaitListBuilder>(Super);
+  return llvm::cast<EnqueueBarrierBuilder>(Super);
 }
 
-EnqueueBarrierWithWaitList *EnqueueBarrierWithWaitListBuilder::Create(cl_int *ErrCode) {
+EnqueueBarrier *EnqueueBarrierBuilder::Create(cl_int *ErrCode) {
   if(this->ErrCode != CL_SUCCESS)
     RETURN_WITH_ERROR(ErrCode);
     
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
     
-  return new EnqueueBarrierWithWaitList(WaitList);
+  return new EnqueueBarrier(WaitList);
 }
 
 //
@@ -2699,11 +2699,13 @@ EnqueueNDRangeKernelBuilder::EnqueueNDRangeKernelBuilder(
   else
     this->Kern = llvm::cast<Kernel>(Kern);
 
-  if(!this->Kern->IsBuiltFor(Dev))
+  const KernelDescriptor &Desc = this->Kern->getDescriptor();
+
+  if(!Desc.isBuiltForDevice(&Dev))
     NotifyError(CL_INVALID_PROGRAM_EXECUTABLE,
                 "kernel not built for current device");
 
-  if(this->Kern->GetContext() != Ctx)
+  if(Desc.getContext() != Ctx)
     NotifyError(CL_INVALID_CONTEXT,
                 "cannot enqueue a kernel into a command queue with "
                 "a different context");
@@ -2756,8 +2758,9 @@ EnqueueNDRangeKernelBuilder::SetGlobalWorkOffset(
 
 EnqueueNDRangeKernelBuilder &
 EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
+  const KernelDescriptor &Desc = Kern->getDescriptor();
   if(!LocalWorkSizes) {
-    if(Kern->RequireWorkGroupSizes())
+    if(Desc.hasRequireWorkGroupSizes(&Dev))
       NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                   "kernel requires fixed local work size");
 
@@ -2767,8 +2770,11 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
     return *this;
   }
 
-  llvm::SmallVector<size_t, 4> &MaxWorkItemSizes = Dev.GetMaxWorkItemSizes();
+  const auto &MaxWorkItemSizes = Dev.GetMaxWorkItemSizes();
   size_t WorkGroupSize = 1;
+
+  llvm::SmallVector<size_t, 4> ReqWorkGroupSizes;
+  Desc.getRequiredWorkGroupSizes(ReqWorkGroupSizes, &Dev);
 
   for(unsigned I = 0; I < WorkDimensions; ++I) {
     if(LocalWorkSizes[I] > MaxWorkItemSizes[I])
@@ -2780,8 +2786,8 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
                          "work group size does not divide "
                          "number of work items");
 
-    if(Kern->RequireWorkGroupSizes() &&
-       (I >= 3 || Kern->GetRequiredWorkGroupSizes()[I] != LocalWorkSizes[I]))
+    if(Desc.hasRequireWorkGroupSizes(&Dev) &&
+       (I >= 3 || ReqWorkGroupSizes[I] != LocalWorkSizes[I]))
       return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                          "work group size does not match "
                          "the one requested by the kernel");

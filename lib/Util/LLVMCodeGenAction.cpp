@@ -166,11 +166,11 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
     MDs.push_back(Cur);
   }
 
-  llvm::SmallVector<llvm::Value *, 8> OpenCRunInfo;
-  OpenCRunInfo.push_back(llvm::MDString::get(Ctx, "kernel_info"));
-  OpenCRunInfo.push_back(llvm::MDNode::get(Ctx, Sign));
+  llvm::SmallVector<llvm::Value *, 8> CustomInfo;
+  CustomInfo.push_back(llvm::MDString::get(Ctx, "custom_info"));
+  CustomInfo.push_back(llvm::MDNode::get(Ctx, Sign));
 
-  MDs.push_back(llvm::MDNode::get(Ctx, OpenCRunInfo));
+  MDs.push_back(llvm::MDNode::get(Ctx, CustomInfo));
 
   KernMD->replaceAllUsesWith(llvm::MDNode::get(Ctx, MDs));
 }
