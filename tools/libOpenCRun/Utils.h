@@ -93,6 +93,7 @@ cl_int clFillValue<char, llvm::StringRef>(char *Dst,
       return CL_INVALID_VALUE;
 
     std::strncpy(Dst, Src.begin(), RightSize);
+    Dst[RightSize - 1] = '\0';
   }
 
   return CL_SUCCESS;
