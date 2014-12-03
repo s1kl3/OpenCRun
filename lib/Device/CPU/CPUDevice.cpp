@@ -331,6 +331,7 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   // Erase kernel from the cache.
   BlockParallelEntriesCache.erase(&Kern);
   BlockParallelStaticLocalsCache.erase(&Kern);
+  BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
 
   // Invoke static destructors.
@@ -822,6 +823,10 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   // Static local size
   unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(KernDesc);
 
+  // Collect <Index, Offset> pairs for each kernel local storage.
+  BlockParallelStaticLocalVector StaticLocalInfos;
+  GetBlockParallelStaticLocalVector(KernDesc, StaticLocalInfos);
+
   // Decide the work group size.
   if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
     llvm::SmallVector<size_t, 4> Sizes;
@@ -854,6 +859,7 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                                   I,
                                                   I + WorkGroupSize,
                                                   StaticLocalSize,
+                                                  StaticLocalInfos,
                                                   *Result);
 
     // Submit command.
@@ -929,17 +935,39 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
 unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
+  // Cache hit.
   BlockParallelStaticLocalSizes::iterator I =
     BlockParallelStaticLocalsCache.find(&KernDesc);
   if (I != BlockParallelStaticLocalsCache.end())
     return I->second;
 
+  // Cache miss.
   CPUKernelInfo Info(KernDesc.getKernelInfo());
 
   unsigned StaticLocalSize = Info.getStaticLocalSize();
   BlockParallelStaticLocalsCache[&KernDesc] = StaticLocalSize;
 
   return StaticLocalSize;
+}
+
+void
+CPUDevice::GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
+                                             BlockParallelStaticLocalVector &SLVec) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  // Cache hit.
+  BlockParallelStaticLocalVectors::iterator I =
+    BlockParallelStaticLocalVectorsCache.find(&KernDesc);
+  if (I != BlockParallelStaticLocalVectorsCache.end())
+    SLVec = I->second;
+
+  // Cache miss.
+  CPUKernelInfo Info(KernDesc.getKernelInfo());
+
+  for (unsigned i = 0; i < Info.getNumStaticLocalAreas(); ++i) {
+    SLVec.push_back(std::make_pair(Info.getStaticLocalIndex(i),
+                                   Info.getStaticLocalOffset(i)));
+  }
 }
 
 const Footprint &

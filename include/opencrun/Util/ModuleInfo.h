@@ -113,6 +113,7 @@ public:
     return getKernelArgInfo("kernel_arg_name");
   }
 
+  llvm::MDNode *getKernelInfo() const { return MD; }
   llvm::MDNode *getCustomInfo() const { return CustomInfoMD; }
 
 protected:

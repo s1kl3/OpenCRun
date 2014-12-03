@@ -8,6 +8,8 @@
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
+#include <utility>
+
 namespace opencrun {
 namespace cpu {
 
@@ -954,6 +956,8 @@ public:
   typedef llvm::DenseMap<unsigned, void *> ArgsMappings;
   typedef llvm::SmallVector<DeviceImage *, 4> DeviceImagesContainer;
   typedef llvm::SmallVector<DeviceSampler *, 4> DeviceSamplersContainer;
+  typedef llvm::SmallVector<std::pair<unsigned, size_t>, 4> IndexOffsetVector;
+  typedef llvm::SmallVector<void *, 8> StaticLocalPointers;
 
 public:
   DimensionInfo::iterator index_begin() { return Start; }
@@ -965,13 +969,14 @@ public:
                                ArgsMappings &GlobalArgs,
                                DimensionInfo::iterator I,
                                DimensionInfo::iterator E,
-                               unsigned StaticLocalSize,
+                               size_t StaticLocalSize,
+                               IndexOffsetVector &StaticLocalInfos,
                                CPUCommand::ResultRecorder &Result);
 
   ~NDRangeKernelBlockCPUCommand();
 
 public:
-  void SetLocalParams(LocalMemory &Local);
+  void SetLocalParams(LocalMemory &Local, StaticLocalPointers &StaticLocalPtrs);
 
 public:
   Signature &GetFunction() { return Entry; }
@@ -992,7 +997,8 @@ private:
 private:
   Signature Entry;
   void **Args;
-  unsigned StaticLocalSize;
+  size_t StaticLocalSize;
+  IndexOffsetVector StaticLocalInfos;
 
   DeviceImagesContainer DevImgs;
   DeviceSamplersContainer DevSmplrs;

@@ -2,6 +2,7 @@
 #include "opencrun/Device/CPU/Command.h"
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/System/OS.h"
+#include "CPUKernelInfo.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;
@@ -12,7 +13,8 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
                                 ArgsMappings &GlobalArgs,
                                 DimensionInfo::iterator I,
                                 DimensionInfo::iterator E,
-                                unsigned StaticLocalSize,
+                                size_t StaticLocalSize,
+                                IndexOffsetVector &StaticLocalInfos,
                                 CPUCommand::ResultRecorder &Result) :
   CPUMultiExecCommand(CPUCommand::NDRangeKernelBlock,
                       Cmd,
@@ -20,6 +22,7 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
                       I.GetWorkGroup()),
   Entry(Entry),
   StaticLocalSize(StaticLocalSize),
+  StaticLocalInfos(StaticLocalInfos),
   Start(I),
   End(E) {
   Kernel &Kern = GetKernel();
@@ -78,7 +81,9 @@ NDRangeKernelBlockCPUCommand::~NDRangeKernelBlockCPUCommand() {
   sys::Free(Args);
 }
 
-void NDRangeKernelBlockCPUCommand::SetLocalParams(LocalMemory &Local) {
+void NDRangeKernelBlockCPUCommand::SetLocalParams(
+                                    LocalMemory &Local,
+                                    StaticLocalPointers &StaticLocalPtrs) {
   Kernel &Kern = GetKernel();
 
   unsigned J = 0;
@@ -93,8 +98,21 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(LocalMemory &Local) {
     ++J;
   }
 
-  if (StaticLocalSize)
-    Args[J] = Local.GetStaticPtr();
+  if (StaticLocalSize) {
+    CPUKernelInfo Info(Kern.getDescriptor().getKernelInfo());
+
+    StaticLocalPtrs.clear();
+    StaticLocalPtrs.resize(Info.getNumStaticLocalStructs());
+    for (IndexOffsetVector::const_iterator I = StaticLocalInfos.begin(),
+                                           E = StaticLocalInfos.end();
+                                           I != E;
+                                           ++I) {
+      uintptr_t StaticLocalsAddr = reinterpret_cast<uintptr_t>(Local.GetStaticPtr()) + I->second;
+      StaticLocalPtrs[I->first] = reinterpret_cast<void *>(StaticLocalsAddr);
+    }
+
+    Args[J] = StaticLocalPtrs.data();
+  }
 }
 
 cl_uint NDRangeKernelBlockCPUCommand::GetDeviceSampler(const Sampler &Smplr) {

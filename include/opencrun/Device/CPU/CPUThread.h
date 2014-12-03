@@ -44,6 +44,7 @@ private:
 class CPUThread : public sys::Thread {
 public:
   typedef std::deque<CPUCommand *> CPUCommands;
+  typedef llvm::SmallVector<void *, 8> StaticLocalPointers;
 
   enum WorkingMode {
     FullyOperational = 1 << 0,
@@ -184,6 +185,7 @@ private:
 
   volatile WorkingMode Mode;
   CPUCommands Commands;
+  StaticLocalPointers StaticLocalPtrs;
   Multiprocessor &MP;
 
   DimensionInfo::iterator Begin;
