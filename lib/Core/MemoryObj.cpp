@@ -752,9 +752,21 @@ ImageBuilder &ImageBuilder::SetDesc(const cl_image_desc *ImgDesc) {
     if(ImgDesc->image_row_pitch != 0)
       return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
                          "host-ptr is null but row pitch is not zero");
-    if(ImgDesc->image_slice_pitch != 0)
-      return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
-                         "host-ptr is null but slice pitch is not zero"); 
+
+    // The image_slice_pitch correctness is checked only for those image
+    // types for which it makes sense. In this way we avoid errors caused
+    // by calling the C++ APIs (cl::Image derived classes from cl.hpp).
+    switch(ImgTy) {
+    case Image::Image1D_Array:
+    case Image::Image2D_Array:
+    case Image::Image3D:
+      if(ImgDesc->image_slice_pitch != 0)
+        return NotifyError(CL_INVALID_IMAGE_DESCRIPTOR,
+                           "host-ptr is null but slice pitch is not zero");
+      break;
+    default:
+      break;
+    }
   } else {
     if(ImgDesc->image_row_pitch == 0)
       HostRowPitch = Width * ElementSize;
