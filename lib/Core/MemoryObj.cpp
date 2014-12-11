@@ -349,8 +349,10 @@ BufferBuilder::BufferBuilder(Buffer &Parent, size_t Offset, size_t Size) :
                                E = Ctx.device_end(); 
                                I != E;
                                ++I) {
+    // CL_DEVICE_MEM_BASE_ADDR_ALIGN is expressed in bits so Offset is converted
+    // in bits.
     if(((*I)->GetMemoryBaseAddressAlignment() != 0) && 
-       ((Offset % (*I)->GetMemoryBaseAddressAlignment()) == 0)) {
+       (((Offset * 8) % (*I)->GetMemoryBaseAddressAlignment()) == 0)) {
       IsMisalignedOffset = false;
       break;
     }
