@@ -139,6 +139,7 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   Sign.push_back(llvm::MDString::get(Ctx, "signature"));
 
   for (unsigned I = 0, E = FD->getNumParams(); I != E; ++I) {
+    const clang::ParmVarDecl *ParamDecl = FD->getParamDecl(I);
     clang::QualType ParamTy = FD->getParamDecl(I)->getType();
 
     // Recompute address space info
@@ -147,8 +148,12 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
     unsigned AS = opencl::convertAddressSpace(LangAS);
     ArgAddrSpace.push_back(llvm::ConstantInt::get(I32Ty, AS));
 
+    // Access qualifiers
+    const clang::OpenCLImageAccessAttr *CLIA =
+      ParamDecl->getAttr<clang::OpenCLImageAccessAttr>();
+
     // Generate argument type descriptor
-    Sign.push_back(TyGen.get(ASTCtx, ParamTy).getMDNode());
+    Sign.push_back(TyGen.get(ASTCtx, ParamTy, CLIA).getMDNode());
   }
 
   llvm::NamedMDNode *Kernels = TheModule->getNamedMetadata("opencl.kernels");
