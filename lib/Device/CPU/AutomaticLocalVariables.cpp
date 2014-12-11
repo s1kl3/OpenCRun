@@ -221,6 +221,11 @@ char AutomaticLocalVariables::ID = 0;
 
 static bool isAutomaticLocal(llvm::StringRef KernelName,
                             const llvm::GlobalVariable &GV) {
+  // All global variables rapresenting automatic local variables
+  // have internal linkage (like C static variables).
+  if (!GV.hasInternalLinkage())
+    return false;
+
   size_t SeparatorPos = GV.getName().find('.');
 
   if (SeparatorPos == llvm::StringRef::npos)
