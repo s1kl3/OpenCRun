@@ -204,6 +204,7 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   clang::CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
   CodeGenOpts.EmitOpenCLArgMetadata = true;
   CodeGenOpts.DisableLLVMOpts = true;
+  CodeGenOpts.StackRealignment = true;
 }
 
 sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
