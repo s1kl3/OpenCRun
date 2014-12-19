@@ -190,13 +190,20 @@ public:
 public:
   unsigned GetDimensions() const { return Info.size(); }
 
+  unsigned GetGlobalOffset(unsigned I) const {
+    if (I >= Info.size())
+      return 0;
+
+    return Info[I].GetOffset();
+  }
+
   unsigned GetWorkGroupsCount() const {
     return GetGlobalWorkItems() / GetLocalWorkItems();
   }
 
   unsigned GetWorkGroupsCount(unsigned I) const {
     if(I >= Info.size())
-      return 0;
+      return 1;
 
     size_t GlobalSize = Info[I].GetGlobalSize();
     size_t LocalSize = Info[I].GetLocalSize();
@@ -221,14 +228,14 @@ public:
 
   unsigned GetGlobalWorkItems(unsigned I) const {
     if(I >= Info.size())
-      return 0;
+      return 1;
 
     return Info[I].GetGlobalSize();
   }
 
   unsigned GetLocalWorkItems(unsigned I) const {
     if(I >= Info.size())
-      return 0;
+      return 1;
 
     return Info[I].GetLocalSize();
   }

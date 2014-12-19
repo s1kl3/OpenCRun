@@ -10,10 +10,16 @@ using namespace opencrun;
 size_t DimensionInfo::DimensionInfoIterator::GetWorkGroup() const {
   const IndexesContainer &WorkGroups = Indexes.second;
 
-  size_t WorkGroup = WorkGroups.back();
+  // WorkGroup = WorkGroups[0]
+  size_t WorkGroup = WorkGroups.front();
 
-  for(unsigned I = 0, E = WorkGroups.size() - 1; I != E; ++I)
-    WorkGroup += DimInfo->GetLocalWorkItems(I) * WorkGroups[I];
+  for (unsigned I = 1; I < WorkGroups.size(); ++I) {
+    size_t WG_Count = 1;
+    for (unsigned K = 0; K < I; ++K)
+      WG_Count *= DimInfo->GetWorkGroupsCount(K);
+
+    WorkGroup += WorkGroups[I] * WG_Count;
+  }
 
   return WorkGroup;
 }
@@ -24,6 +30,9 @@ DimensionInfo::DimensionInfoIterator::GetWorkGroupsCount(unsigned I) const {
 }
 
 size_t DimensionInfo::DimensionInfoIterator::GetWorkGroup(unsigned I) const {
+  if (I >= DimInfo->GetDimensions())
+    return 0;
+
   const IndexesContainer &WorkGroups = Indexes.second;
 
   return WorkGroups[I];
@@ -46,6 +55,9 @@ size_t DimensionInfo::DimensionInfoIterator::GetGlobalSize(unsigned I) const {
 }
 
 size_t DimensionInfo::DimensionInfoIterator::GetGlobalId(unsigned I) const {
+  if (I >= DimInfo->GetDimensions())
+    return 0;
+
   const IndexesContainer &Locals = Indexes.first;
 
   return GetWorkGroup(I) * DimInfo->GetLocalWorkItems(I) + Locals[I];
@@ -56,14 +68,16 @@ size_t DimensionInfo::DimensionInfoIterator::GetLocalSize(unsigned I) const {
 }
 
 size_t DimensionInfo::DimensionInfoIterator::GetLocalId(unsigned I) const {
+  if (I >= DimInfo->GetDimensions())
+    return 0;
+
   const IndexesContainer &Locals = Indexes.first;
 
   return Locals[I];
 }
 
 size_t DimensionInfo::DimensionInfoIterator::GetGlobalOffset(unsigned I) const {
-  // TODO: implement.
-  return 0;
+  return DimInfo->GetGlobalOffset(I);
 }
 
 void DimensionInfo::DimensionInfoIterator::Dump() {
@@ -100,11 +114,11 @@ void DimensionInfo::DimensionInfoIterator::Advance(unsigned N) {
 
   // Overflow.
   if(Carry) {
-    unsigned WorkGroupsCount = WorkGroups.size();
-
     Locals.assign(Locals.size(), 0);
+    WorkGroups.assign(WorkGroups.size(), 0);
 
-    WorkGroups.assign(WorkGroupsCount, 0);
+    // One work-item beyond the last one of the iteration
+    // space.
     WorkGroups[0] = DimInfo->GetWorkGroupsCount(0);
   }
 }
