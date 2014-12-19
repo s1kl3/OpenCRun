@@ -148,26 +148,6 @@ public:
   }
 
 public:
-  typedef llvm::SmallPtrSet<Image *, 4> ImagesContainer;
-
-  typedef ImagesContainer::iterator image_iterator;
-
-public:
-  image_iterator image_begin() { return AttachedImages.begin(); }
-  image_iterator image_end() { return AttachedImages.end(); }
-
-public:
-  bool AddAttachedImage(Image *Img) {
-    if(!Img) return false;
-    return AttachedImages.insert(Img);
-  }
-
-  bool RemoveAttachedImage(Image *Img) {
-    if(!Img) return false;
-    return AttachedImages.erase(Img);
-  }
-
-public:
   bool IsSubBuffer() const { return Parent; }
   size_t GetOffset() const { return Offset; }
   Buffer *GetParent() const { return Parent; }
@@ -187,10 +167,6 @@ protected:
   Offset(0) { }
 
 private:
-  // This container holds all 1D image buffers initialized using
-  // the buffer object.
-  ImagesContainer AttachedImages;
-
   // In case of a sub-buffer object, this attribute points to the
   // parent buffer.
   Buffer *Parent;
@@ -316,12 +292,6 @@ protected:
       HostPitches[1] = HostSlicePitch;
       Pitches[0] = Width * ElementSize;
       Pitches[1] = Pitches[0] * Height;
-    }
-  }
-
-  ~Image() {
-    if(GetImageType() == Image1D_Buffer) {
-      GetBuffer()->RemoveAttachedImage(this); 
     }
   }
 

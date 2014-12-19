@@ -27,7 +27,6 @@ public:
   ~GlobalMemory();
 
 public:
-  void *Alloc(MemoryObj &MemObj);
   void *Alloc(HostBuffer &Buf);
   void *Alloc(HostAccessibleBuffer &Buf);
   void *Alloc(DeviceBuffer &Buf);
@@ -49,6 +48,11 @@ public:
 
     return Mappings.count(&MemObj) ? Mappings[&MemObj] : NULL;
   }
+
+private:
+  void *Alloc(MemoryObj &MemObj);
+  void *AllocBufferStorage(Buffer &Buf);
+  void *AllocImageStorage(Image &Img);
 
 private:
   llvm::sys::Mutex ThisLock;
