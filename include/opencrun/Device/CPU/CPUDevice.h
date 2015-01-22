@@ -30,18 +30,18 @@ public:
 
   typedef llvm::SmallPtrSet<Multiprocessor *, 4> MultiprocessorsContainer;
   typedef llvm::SmallPtrSet<const sys::HardwareCPU *, 16> HardwareCPUsContainer;
-  typedef std::map<cl_device_affinity_domain, llvm::SmallVector<HardwareCPUsContainer, 4> > PartitionsContainer;
 
 public:
   CPUDevice(const sys::HardwareMachine &Machine);
   CPUDevice(CPUDevice &Parent,
-            const PartitionPropertiesContainer &PartProps,
+            const DevicePartition &Part,
             const HardwareCPUsContainer &CPUs);
   ~CPUDevice();
 
 protected:
-  virtual bool IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
-                                          cl_int &ErrCode) const;
+  bool isPartitionSupported(const DevicePartition &Part) const override;
+  bool createSubDevices(const DevicePartition &Part,
+      llvm::SmallVectorImpl<std::unique_ptr<Device>> &Devs) override;
 
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -76,11 +76,13 @@ protected:
                               LLVMOptimizerParams &Params) const override;
 
 private:
-  void InitDeviceInfo(const sys::HardwareMachine &Machine,
-                      const HardwareCPUsContainer *CPUs = NULL);
+  void InitDeviceInfo();
+  void InitSubDeviceInfo(const HardwareCPUsContainer &CPUs);
   void InitJIT();
-  void InitMultiprocessors(const sys::HardwareMachine &Machine);
+  void InitMultiprocessors();
   void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
+
+  void computeSubDeviceInfo(const HardwareCPUsContainer &CPUs);
 
   void DestroyJIT();
   void DestroyMultiprocessors();
@@ -144,27 +146,7 @@ private:
   BlockParallelStaticLocalVectors BlockParallelStaticLocalVectorsCache;
   mutable FootprintsContainer KernelFootprints;
 
-  PartitionsContainer Partitions;
-
   friend void *LibLinker(const std::string &);
-  friend class CPUSubDevicesBuilder;
-};
-
-class CPUSubDevicesBuilder : public SubDevicesBuilder {
-public:
-  static bool classof(const SubDevicesBuilder *Bld) {
-    return Bld->GetType() == SubDevicesBuilder::CPUSubDevicesBuilder;
-  }
-
-public:
-  CPUSubDevicesBuilder(CPUDevice &Parent,
-                       const DeviceInfo::PartitionPropertiesContainer &PartProps) :
-    SubDevicesBuilder(SubDevicesBuilder::CPUSubDevicesBuilder, Parent, PartProps) { }
-
-  virtual ~CPUSubDevicesBuilder() { }
-
-public:
-  virtual unsigned Create(SubDevicesContainer *SubDevs, cl_int &ErrCode);
 };
 
 void *LibLinker(const std::string &Name);

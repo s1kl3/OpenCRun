@@ -4,7 +4,6 @@
 #include "Utils.h"
 
 #include "opencrun/Core/Platform.h"
-#include "opencrun/Device/CPU/CPUDevice.h"
 
 CL_API_ENTRY cl_int CL_API_CALL
 clGetDeviceIDs(cl_platform_id platform,
@@ -101,7 +100,17 @@ clGetDeviceInfo(cl_device_id device,
              param_value_size,                     \
              param_value_size_ret);                \
   }
+  #define PROPERTY_ARRAY(PARAM, FUN, PARAM_TY, ELEM_TY) \
+  case PARAM: {                                         \
+    auto List = Dev.FUN();                              \
+    return clFillValue(                                 \
+             static_cast<PARAM_TY *>(param_value),      \
+             List.begin(), List.end(),                  \
+             param_value_size,                          \
+             param_value_size_ret);                     \
+  }
   #include "DeviceProperties.def"
+  #undef PROPERTY_ARRAY
   #undef PROPERTY
 
   case CL_DEVICE_TYPE: {
@@ -142,13 +151,11 @@ clCreateSubDevices(cl_device_id in_device,
   if(out_devices && num_devices < 1)
     return CL_INVALID_VALUE;
 
-  unsigned num_props = 0;
   switch(properties[0]) {
   case CL_DEVICE_PARTITION_EQUALLY:
     if(properties[1] <= 0 || properties[2] != 0)
       return CL_INVALID_VALUE;
 
-    num_props = 3;
     break;
   case CL_DEVICE_PARTITION_BY_COUNTS: {
     unsigned i;
@@ -160,7 +167,6 @@ clCreateSubDevices(cl_device_id in_device,
     if(properties[++i] != 0)
       return CL_INVALID_VALUE;
 
-    num_props = i;
     break;
   }
   case CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN:
@@ -179,60 +185,36 @@ clCreateSubDevices(cl_device_id in_device,
       return CL_INVALID_VALUE;
     }
 
-    num_props = 3;
     break;
   default:
     return CL_INVALID_VALUE;
   }
 
-  opencrun::Device &ParentDev = *llvm::cast<opencrun::Device>(in_device);
-  opencrun::DeviceInfo::PartitionPropertiesContainer Props(properties, properties + num_props);
+  opencrun::Device &Dev = *llvm::cast<opencrun::Device>(in_device);
+  opencrun::DeviceInfo::DevicePartition Part(properties);
 
-  opencrun::SubDevicesBuilder *Bld;
-  opencrun::SubDevicesBuilder::SubDevicesContainer *SubDevs = NULL;
-  cl_uint NumSubDevs;
-  cl_int ErrCode;
-  opencrun::CPUDevice *ParentCPU;
+  llvm::SmallVector<std::unique_ptr<opencrun::Device>, 16> SubDevs;
 
-  if((ParentCPU = llvm::dyn_cast<opencrun::CPUDevice>(&ParentDev)))
-    Bld = new opencrun::CPUSubDevicesBuilder(*ParentCPU, Props);
-  else
-    return CL_INVALID_DEVICE;
+  if (!Dev.createSubDevices(Part, SubDevs))
+    return CL_INVALID_VALUE;
 
-  if(out_devices)
-    SubDevs = new opencrun::SubDevicesBuilder::SubDevicesContainer();
+  if (num_devices_ret)
+    *num_devices_ret = SubDevs.size();
 
-  NumSubDevs = Bld->Create(SubDevs, ErrCode);
+  if (!out_devices)
+    return CL_SUCCESS;
 
-  if(num_devices_ret)
-    *num_devices_ret = NumSubDevs;
+  if (num_devices < SubDevs.size())
+    return CL_INVALID_VALUE;
 
-  if(out_devices) {
-    if(num_devices < NumSubDevs) {
-      delete SubDevs;
-      delete Bld;
-      return CL_INVALID_VALUE;
-    }
-
-    // Reference count for sub-devices set initially to 1.
-    for(opencrun::SubDevicesBuilder::SubDevicesContainer::iterator I = SubDevs->begin(),
-                                                                   E = SubDevs->end();
-                                                                   I != E;
-                                                                   ++I)
-      if(*I)
-        (*I)->Retain();
-
-    // Reference count for the parent device is incremented only if it is
-    // a sub-device.
-    if(ParentCPU->IsSubDevice())
-      ParentCPU->Retain();
-
-    std::copy(SubDevs->begin(), SubDevs->end(), out_devices);
-    delete SubDevs;
+  for (auto &D : SubDevs) {
+    D->Retain();
+    if (Dev.IsSubDevice())
+      Dev.Retain();
+    *out_devices++ = D.release();
   }
 
-  delete Bld;
-  return ErrCode;
+  return CL_SUCCESS;
 }
 
 CL_API_ENTRY cl_int CL_API_CALL

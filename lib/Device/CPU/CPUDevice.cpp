@@ -31,93 +31,6 @@ void SignalJITCallEnd();
 } // End anonymous namespace.
 
 //
-// Supported image formats.
-//
-
-static const cl_image_format CPUImgFmts[] = {
-  { CL_R, CL_SNORM_INT8 },
-  { CL_R, CL_SNORM_INT16 },
-  { CL_R, CL_UNORM_INT8 },
-  { CL_R, CL_UNORM_INT16 },
-  { CL_R, CL_SIGNED_INT8 },
-  { CL_R, CL_SIGNED_INT16 },
-  { CL_R, CL_SIGNED_INT32 },
-  { CL_R, CL_UNSIGNED_INT8 },
-  { CL_R, CL_UNSIGNED_INT16 },
-  { CL_R, CL_UNSIGNED_INT32 },
-  { CL_R, CL_HALF_FLOAT },
-  { CL_R, CL_FLOAT },
-  { CL_A, CL_SNORM_INT8 },
-  { CL_A, CL_SNORM_INT16 },
-  { CL_A, CL_UNORM_INT8 },
-  { CL_A, CL_UNORM_INT16 },
-  { CL_A, CL_SIGNED_INT8 },
-  { CL_A, CL_SIGNED_INT16 },
-  { CL_A, CL_SIGNED_INT32 },
-  { CL_A, CL_UNSIGNED_INT8 },
-  { CL_A, CL_UNSIGNED_INT16 },
-  { CL_A, CL_UNSIGNED_INT32 },
-  { CL_A, CL_HALF_FLOAT },
-  { CL_A, CL_FLOAT },
-  { CL_RG, CL_SNORM_INT8 },
-  { CL_RG, CL_SNORM_INT16 },
-  { CL_RG, CL_UNORM_INT8 },
-  { CL_RG, CL_UNORM_INT16 },
-  { CL_RG, CL_SIGNED_INT8 },
-  { CL_RG, CL_SIGNED_INT16 },
-  { CL_RG, CL_SIGNED_INT32 },
-  { CL_RG, CL_UNSIGNED_INT8 },
-  { CL_RG, CL_UNSIGNED_INT16 },
-  { CL_RG, CL_UNSIGNED_INT32 },
-  { CL_RG, CL_HALF_FLOAT },
-  { CL_RG, CL_FLOAT },
-  { CL_RGBA, CL_SNORM_INT8 },
-  { CL_RGBA, CL_SNORM_INT16 },
-  { CL_RGBA, CL_UNORM_INT8 },
-  { CL_RGBA, CL_UNORM_INT16 },
-  { CL_RGBA, CL_SIGNED_INT8 },
-  { CL_RGBA, CL_SIGNED_INT16 },
-  { CL_RGBA, CL_SIGNED_INT32 },
-  { CL_RGBA, CL_UNSIGNED_INT8 },
-  { CL_RGBA, CL_UNSIGNED_INT16 },
-  { CL_RGBA, CL_UNSIGNED_INT32 },
-  { CL_RGBA, CL_HALF_FLOAT },
-  { CL_RGBA, CL_FLOAT },
-  { CL_ARGB, CL_SNORM_INT8 },
-  { CL_ARGB, CL_UNORM_INT8 },
-  { CL_ARGB, CL_SIGNED_INT8 },
-  { CL_ARGB, CL_UNSIGNED_INT8 },
-  { CL_BGRA, CL_SNORM_INT8 },
-  { CL_BGRA, CL_UNORM_INT8 },
-  { CL_BGRA, CL_SIGNED_INT8 },
-  { CL_BGRA, CL_UNSIGNED_INT8 },
-  { CL_LUMINANCE, CL_SNORM_INT8 },
-  { CL_LUMINANCE, CL_SNORM_INT16 },
-  { CL_LUMINANCE, CL_UNORM_INT8 },
-  { CL_LUMINANCE, CL_UNORM_INT16 },
-  { CL_LUMINANCE, CL_HALF_FLOAT },
-  { CL_LUMINANCE, CL_FLOAT },
-  { CL_INTENSITY, CL_SNORM_INT8 },
-  { CL_INTENSITY, CL_SNORM_INT16 },
-  { CL_INTENSITY, CL_UNORM_INT8 },
-  { CL_INTENSITY, CL_UNORM_INT16 },
-  { CL_INTENSITY, CL_HALF_FLOAT },
-  { CL_INTENSITY, CL_FLOAT },
-  { CL_RA, CL_SNORM_INT8 },
-  { CL_RA, CL_SNORM_INT16 },
-  { CL_RA, CL_UNORM_INT8 },
-  { CL_RA, CL_UNORM_INT16 },
-  { CL_RA, CL_SIGNED_INT8 },
-  { CL_RA, CL_SIGNED_INT16 },
-  { CL_RA, CL_SIGNED_INT32 },
-  { CL_RA, CL_UNSIGNED_INT8 },
-  { CL_RA, CL_UNSIGNED_INT16 },
-  { CL_RA, CL_UNSIGNED_INT32 },
-  { CL_RA, CL_HALF_FLOAT },
-  { CL_RA, CL_FLOAT }
-};
-
-//
 // CPUDevice implementation.
 //
 
@@ -125,69 +38,30 @@ CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
   Device(CPUType, "CPU", llvm::sys::getDefaultTargetTriple()),
   Machine(Machine),
   Global(Machine.GetTotalMemorySize()) {
-  InitDeviceInfo(Machine);
-  InitMultiprocessors(Machine);
+  HardwareCPUsContainer CPUs;
+  for(auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
+    CPUs.insert(&*I);
+
+  InitDeviceInfo();
+  InitSubDeviceInfo(CPUs);
+
+  InitMultiprocessors();
   InitJIT();
 }
 
-CPUDevice::CPUDevice(CPUDevice &Parent,
-                     const PartitionPropertiesContainer &PartProps,
+CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
                      const HardwareCPUsContainer &CPUs) :
-  Device(Parent, PartProps),
+  Device(Parent, Part),
   Machine(Parent.GetHardwareMachine()),
   Global(Parent.GetHardwareMachine().GetTotalMemorySize()) {
-    InitDeviceInfo(Parent.GetHardwareMachine(), &CPUs);
-    InitMultiprocessors(CPUs);
-    InitJIT();
+  InitSubDeviceInfo(CPUs);
+  InitMultiprocessors(CPUs);
+  InitJIT();
 }
 
 CPUDevice::~CPUDevice() {
   DestroyMultiprocessors();
   DestroyJIT();
-}
-
-bool CPUDevice::IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
-                                           cl_int &ErrCode) const {
-  // Check for partitioning type support.
-  if(!std::count(PartTys.begin(), PartTys.end(), PartProps[0])) {
-    ErrCode = CL_INVALID_VALUE;
-    return false;
-  }
-
-  // Check for affinity domain support.
-  if(PartProps[0] == DeviceInfo::PartitionByAffinityDomain) {
-    if(!(AffinityDomains & static_cast<cl_device_affinity_domain>(PartProps[1]))) {
-      ErrCode = CL_INVALID_VALUE;
-      return false;
-    }
-  }
-
-  // For partitioning by counts check the number of sub-devices and compute units
-  // requestes.
-  if(PartProps[0] == CL_DEVICE_PARTITION_BY_COUNTS) {
-    // Number of sub-devices requested.
-    unsigned NumSubDevs = 0;
-    // Number of CUs requested.
-    unsigned NumCUs = 0;
-    for(unsigned i = 1; PartProps[i] != DeviceInfo::PartitionByCountsListEnd; ++i) {
-      if(PartProps[i] < 0) {
-        ErrCode = CL_INVALID_DEVICE_PARTITION_COUNT;
-        return 0;
-      }
-
-      ++NumSubDevs;
-      NumCUs += PartProps[i];
-    }
-
-    if(NumSubDevs > GetMaxSubDevices() ||
-       NumCUs > GetMaxComputeUnits()) {
-      ErrCode = CL_INVALID_DEVICE_PARTITION_COUNT;
-      return false;
-    }
-
-  }
-
-  return true;
 }
 
 bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -369,7 +243,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   delete Cmd;
 }
 
-void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const HardwareCPUsContainer *CPUs) {
+void CPUDevice::InitDeviceInfo() {
   // Assuming symmetric systems.
   const sys::HardwareCache &L1Cache = Machine.socket_front().l1dc_front();
   const sys::HardwareCache &LLCache = Machine.socket_front().llc_front();
@@ -461,6 +335,50 @@ void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const Hardwa
   MaxMemoryAllocSize = Machine.GetTotalMemorySize();
 
   // Image properties set to the minimum values for CPU target.
+  static const cl_image_format CPUImgFmts[] = {
+    { CL_R, CL_SNORM_INT8 }, { CL_R, CL_SNORM_INT16 },
+    { CL_R, CL_UNORM_INT8 }, { CL_R, CL_UNORM_INT16 },
+    { CL_R, CL_SIGNED_INT8 }, { CL_R, CL_SIGNED_INT16 },
+    { CL_R, CL_SIGNED_INT32 }, { CL_R, CL_UNSIGNED_INT8 },
+    { CL_R, CL_UNSIGNED_INT16 }, { CL_R, CL_UNSIGNED_INT32 },
+    { CL_R, CL_HALF_FLOAT }, { CL_R, CL_FLOAT },
+    { CL_A, CL_SNORM_INT8 }, { CL_A, CL_SNORM_INT16 },
+    { CL_A, CL_UNORM_INT8 }, { CL_A, CL_UNORM_INT16 },
+    { CL_A, CL_SIGNED_INT8 }, { CL_A, CL_SIGNED_INT16 },
+    { CL_A, CL_SIGNED_INT32 }, { CL_A, CL_UNSIGNED_INT8 },
+    { CL_A, CL_UNSIGNED_INT16 }, { CL_A, CL_UNSIGNED_INT32 },
+    { CL_A, CL_HALF_FLOAT }, { CL_A, CL_FLOAT },
+    { CL_RG, CL_SNORM_INT8 }, { CL_RG, CL_SNORM_INT16 },
+    { CL_RG, CL_UNORM_INT8 }, { CL_RG, CL_UNORM_INT16 },
+    { CL_RG, CL_SIGNED_INT8 }, { CL_RG, CL_SIGNED_INT16 },
+    { CL_RG, CL_SIGNED_INT32 }, { CL_RG, CL_UNSIGNED_INT8 },
+    { CL_RG, CL_UNSIGNED_INT16 }, { CL_RG, CL_UNSIGNED_INT32 },
+    { CL_RG, CL_HALF_FLOAT }, { CL_RG, CL_FLOAT },
+    { CL_RGBA, CL_SNORM_INT8 }, { CL_RGBA, CL_SNORM_INT16 },
+    { CL_RGBA, CL_UNORM_INT8 }, { CL_RGBA, CL_UNORM_INT16 },
+    { CL_RGBA, CL_SIGNED_INT8 }, { CL_RGBA, CL_SIGNED_INT16 },
+    { CL_RGBA, CL_SIGNED_INT32 }, { CL_RGBA, CL_UNSIGNED_INT8 },
+    { CL_RGBA, CL_UNSIGNED_INT16 }, { CL_RGBA, CL_UNSIGNED_INT32 },
+    { CL_RGBA, CL_HALF_FLOAT }, { CL_RGBA, CL_FLOAT },
+    { CL_ARGB, CL_SNORM_INT8 }, { CL_ARGB, CL_UNORM_INT8 },
+    { CL_ARGB, CL_SIGNED_INT8 }, { CL_ARGB, CL_UNSIGNED_INT8 },
+    { CL_BGRA, CL_SNORM_INT8 }, { CL_BGRA, CL_UNORM_INT8 },
+    { CL_BGRA, CL_SIGNED_INT8 }, { CL_BGRA, CL_UNSIGNED_INT8 },
+    { CL_LUMINANCE, CL_SNORM_INT8 }, { CL_LUMINANCE, CL_SNORM_INT16 },
+    { CL_LUMINANCE, CL_UNORM_INT8 }, { CL_LUMINANCE, CL_UNORM_INT16 },
+    { CL_LUMINANCE, CL_HALF_FLOAT }, { CL_LUMINANCE, CL_FLOAT },
+    { CL_INTENSITY, CL_SNORM_INT8 }, { CL_INTENSITY, CL_SNORM_INT16 },
+    { CL_INTENSITY, CL_UNORM_INT8 }, { CL_INTENSITY, CL_UNORM_INT16 },
+    { CL_INTENSITY, CL_HALF_FLOAT }, { CL_INTENSITY, CL_FLOAT },
+    { CL_RA, CL_SNORM_INT8 }, { CL_RA, CL_SNORM_INT16 },
+    { CL_RA, CL_UNORM_INT8 }, { CL_RA, CL_UNORM_INT16 },
+    { CL_RA, CL_SIGNED_INT8 }, { CL_RA, CL_SIGNED_INT16 },
+    { CL_RA, CL_SIGNED_INT32 }, { CL_RA, CL_UNSIGNED_INT8 },
+    { CL_RA, CL_UNSIGNED_INT16 }, { CL_RA, CL_UNSIGNED_INT32 },
+    { CL_RA, CL_HALF_FLOAT }, { CL_RA, CL_FLOAT }
+  };
+  NumImgFmts = llvm::array_lengthof(CPUImgFmts);
+  ImgFmts = CPUImgFmts;
   SupportImages = true;
   MaxReadableImages = 128;
   MaxWriteableImages = 8;
@@ -472,8 +390,6 @@ void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const Hardwa
   ImageMaxBufferSize = 65536;
   ImageMaxArraySize = 2048;
   MaxSamplers = 16;
-  NumImgFmts = sizeof(CPUImgFmts)/sizeof(cl_image_format);
-  ImgFmts = CPUImgFmts;
 
   // TODO: set MaxParameterSize.
 
@@ -530,84 +446,60 @@ void CPUDevice::InitDeviceInfo(const sys::HardwareMachine &Machine, const Hardwa
 
   // TODO: set SizeTypeMax, by the compiler?
   PrivateMemorySize = LocalMemorySize;
+}
 
-  // Pointers to HardwareCPUs which are part of the current device (root/sub-device)
-  // are copied inside the following container.
-  HardwareCPUsContainer DevCPUs;
-  if(Parent && CPUs) {
-    MaxComputeUnits = CPUs->size();
-    DevCPUs = *CPUs;
-  } else {
-    MaxComputeUnits = Machine.GetNumCoveredCPUs();
-    // The CPU iterators from sys::HardwareMachine class are preferred over the
-    // GetPinnedCPUs method in order to avoid dependency from the InitMultiprocessors
-    // method.
-    for(sys::HardwareMachine::const_cpu_iterator I = Machine.cpu_begin(),
-                                                 E = Machine.cpu_end();
-                                                 I != E;
-                                                 ++I)
-      DevCPUs.insert(&(*I));
-  }
-
+void CPUDevice::InitSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
+  MaxComputeUnits = CPUs.size();
   MaxSubDevices = MaxComputeUnits;
 
-  // Partitioning makes sense only if the current device refers to more than one
-  // compute unit.
-  if(MaxComputeUnits > 1) {
-    PartTys.push_back(DeviceInfo::PartitionEqually); 
-    PartTys.push_back(DeviceInfo::PartitionByCounts);
+  computeSubDeviceInfo(CPUs);
+}
 
-    std::map<sys::HardwareComponent *, HardwareCPUsContainer> AffinityPartitions;
-    for(HardwareCPUsContainer::iterator I = DevCPUs.begin(), E = DevCPUs.end(); I != E; ++I) {
-      if(sys::HardwareNode *NUMANode = (*I)->GetNUMANode())
-        AffinityPartitions[NUMANode].insert(*I);
+void CPUDevice::computeSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
+  assert(!CPUs.empty());
 
-      for(unsigned J = 1; J <= 4; ++J) {
-        if(sys::HardwareCache *Cache = (*I)->GetCache(J))
-          AffinityPartitions[Cache].insert(*I);
-      }
-    }
-  
-    for(std::map<sys::HardwareComponent *, HardwareCPUsContainer>::iterator I = AffinityPartitions.begin(),
-                                                                            E = AffinityPartitions.end();
-                                                                            I != E;
-                                                                            ++I) {
-      if(llvm::isa<sys::HardwareNode>(I->first))
-        Partitions[DeviceInfo::AffinityDomainNUMA].push_back(I->second);
-      else if(sys::HardwareCache *Cache = llvm::dyn_cast<sys::HardwareCache>(I->first)) {
-        switch(Cache->GetLevel()) {
-        case 4:
-          Partitions[DeviceInfo::AffinityDomainL4Cache].push_back(I->second);
-          break;
-        case 3:
-          Partitions[DeviceInfo::AffinityDomainL3Cache].push_back(I->second);
-          break;
-        case 2:
-          Partitions[DeviceInfo::AffinityDomainL2Cache].push_back(I->second);
-          break;
-        case 1:
-          Partitions[DeviceInfo::AffinityDomainL1Cache].push_back(I->second);
-          break;
-        }
-      }
-    }
+  MaxComputeUnits = CPUs.size();
+  MaxSubDevices = MaxComputeUnits;
+  SupportedPartitionTypes.clear();
 
-    for(PartitionsContainer::iterator I = Partitions.begin(),
-                                      E = Partitions.end();
-                                      I != E;
-                                      ++I) {
-      if(I->second.size() > 1) {
-        AffinityDomains |= I->first;
-      }
-    }
-
-    if(AffinityDomains) {
-      AffinityDomains |= DeviceInfo::AffinityDomainNext;
-      PartTys.push_back(DeviceInfo::PartitionByAffinityDomain);
-    }
-
+  if (MaxComputeUnits == 1) {
+    SupportedAffinityDomains = 0;
+    return;
   }
 
+  std::set<const void*> Nodes;
+  std::vector<std::set<const void*>> Caches(4);
+
+  for (auto *C : CPUs) {
+    if (auto *NUMANode = C->GetNUMANode())
+      Nodes.insert(NUMANode);
+
+    for (unsigned Level = 1; Level <= 4; ++Level)
+      if (auto *Cache = C->GetCache(Level))
+        Caches[Level - 1].insert(Cache);
+  }
+
+  SupportedPartitionTypes.push_back(PartitionEqually);
+  SupportedPartitionTypes.push_back(PartitionByCounts);
+
+  if (Nodes.size() > 1)
+    SupportedAffinityDomains |= DeviceInfo::AffinityDomainNUMA;
+
+  static const PartitionAffinity Affinities[] = {
+    AffinityDomainL1Cache, AffinityDomainL2Cache,
+    AffinityDomainL3Cache, AffinityDomainL4Cache
+  };
+
+  for (unsigned Level = 0; Level < 4; ++Level)
+    if (Caches[Level].size() > 1)
+      SupportedAffinityDomains |= Affinities[Level];
+
+  if (!llvm::isPowerOf2_32(SupportedAffinityDomains) &&
+      SupportedAffinityDomains)
+    SupportedAffinityDomains |= AffinityDomainNext;
+
+  if (SupportedAffinityDomains)
+    SupportedPartitionTypes.push_back(PartitionByAffinityDomain);
 }
 
 void CPUDevice::InitJIT() {
@@ -617,7 +509,7 @@ void CPUDevice::InitJIT() {
   // Create the JIT.
   llvm::EngineBuilder Bld(&*BitCodeLibrary);
   llvm::ExecutionEngine *Engine = Bld.setEngineKind(llvm::EngineKind::JIT)
-                                     .setOptLevel(llvm::CodeGenOpt::None)
+                                     .setOptLevel(llvm::CodeGenOpt::Default)
                                      .create();
 
   // Configure the JIT.
@@ -640,11 +532,8 @@ void CPUDevice::InitJIT() {
   JIT.reset(Engine);
 }
 
-void CPUDevice::InitMultiprocessors(const sys::HardwareMachine &Machine) {
-  for(sys::HardwareMachine::const_socket_iterator I = Machine.socket_begin(),
-                                                  E = Machine.socket_end();
-                                                  I != E;
-                                                  ++I)
+void CPUDevice::InitMultiprocessors() {
+  for (auto I = Machine.socket_begin(), E = Machine.socket_end(); I != E; ++I)
     Multiprocessors.insert(new Multiprocessor(*this, *I));
 }
 
@@ -1043,117 +932,126 @@ void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
                    createAutoLocalVarsPass);
 }
 
-//
-// CPUSubDevicesBuilder implementation.
-//
+bool CPUDevice::isPartitionSupported(const DevicePartition &Part) const {
+  // Check for partitioning type support.
+  if (!std::count(SupportedPartitionTypes.begin(),
+                  SupportedPartitionTypes.end(), Part.getType()))
+    return false;
 
-unsigned CPUSubDevicesBuilder::Create(SubDevicesContainer *SubDevs, cl_int &ErrCode) {
-  CPUDevice::HardwareCPUsContainer CPUs;
-  cl_uint NumSubDevs = 0;
-
-  CPUDevice *ParentCPUDev = llvm::dyn_cast<CPUDevice>(&Parent);
-  if(!ParentCPUDev) {
-    // Parent device is not a CPUDevice.
-    ErrCode = CL_INVALID_DEVICE;
-    return 0;
+  switch (Part.getType()) {
+  case PartitionByAffinityDomain:
+    if ((SupportedAffinityDomains & Part.getAffinityDomain()) == 0)
+      return false;
+    return true;
+  case PartitionByCounts:
+    if (Part.getNumCounts() > GetMaxSubDevices() ||
+        Part.getTotalComputeUnits() > GetMaxComputeUnits())
+      return false;
+    return true;
+  case PartitionEqually:
+    if (Part.getNumComputeUnits() > GetMaxComputeUnits())
+      return false;
+    return true;
+  default: llvm_unreachable(0);
   }
+}
 
-  if(!ParentCPUDev->IsSupportedPartitionSchema(PartProps, ErrCode))
-    return 0;
+static bool computeAffinityDomain(unsigned SupportedDomains,
+                                  DeviceInfo::PartitionAffinity &Affinity) {
+  if (Affinity != DeviceInfo::AffinityDomainNext)
+    return Affinity & SupportedDomains;
 
-  ParentCPUDev->GetPinnedCPUs(CPUs);
-  
-  switch(PartProps[0]) {
-    case DeviceInfo::PartitionEqually:
-      {
-        CPUDevice::HardwareCPUsContainer SubDevCPUs;
-        unsigned K = 1; 
-        for(CPUDevice::HardwareCPUsContainer::iterator I = CPUs.begin(),
-                                                       E = CPUs.end();
-                                                       I != E;
-                                                       ++I) {
-          SubDevCPUs.insert(*I);
-          if(K == static_cast<unsigned>(PartProps[1])) {
-            if(SubDevs)
-              SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, SubDevCPUs));
+  static const DeviceInfo::PartitionAffinity Domains[] = {
+    DeviceInfo::AffinityDomainNUMA,
+    DeviceInfo::AffinityDomainL4Cache,
+    DeviceInfo::AffinityDomainL3Cache,
+    DeviceInfo::AffinityDomainL2Cache,
+    DeviceInfo::AffinityDomainL1Cache
+  };
 
-            SubDevCPUs.clear();
-            ++NumSubDevs;
-            K = 1;
-          } else
-            ++K;
-        }
+  for (unsigned i = 0; i != llvm::array_lengthof(Domains); ++i)
+    if (Domains[i] & SupportedDomains) {
+      Affinity = Domains[i];
+      return true;
+    }
 
-        break;
-      }
+  return false;
+}
 
-    case DeviceInfo::PartitionByCounts:
-      {
-        CPUDevice::HardwareCPUsContainer SubDevCPUs;
-        CPUDevice::HardwareCPUsContainer::iterator I = CPUs.begin(),
-                                                   E = CPUs.end();
-
-        for(unsigned J = 1; static_cast<unsigned>(PartProps[J]) != DeviceInfo::PartitionByCountsListEnd; ++J) {
-          unsigned K = 1;
-          for(; I != E && K <= static_cast<unsigned>(PartProps[J]); ++I, ++K) {
-            SubDevCPUs.insert(*I);
-            if(K == static_cast<unsigned>(PartProps[J])) {
-              if(SubDevs)
-                SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, SubDevCPUs));
-              SubDevCPUs.clear();
-              ++NumSubDevs;
-            }
-          }
-        }
-
-        break;
-      }
-
-    case DeviceInfo::PartitionByAffinityDomain:
-      {
-        cl_device_affinity_domain AffinityTy;
-
-        if(static_cast<cl_device_affinity_domain>(PartProps[1]) == DeviceInfo::AffinityDomainNext) {
-          // Split the CPUDevice along the first available partitionable affinity domain, in the order
-          // NUMA, L4, L3, L2, L1.
-          if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainNUMA)
-            AffinityTy = DeviceInfo::AffinityDomainNUMA;
-          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL4Cache)
-            AffinityTy = DeviceInfo::AffinityDomainL4Cache;
-          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL3Cache)
-            AffinityTy = DeviceInfo::AffinityDomainL3Cache;
-          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL2Cache)
-            AffinityTy = DeviceInfo::AffinityDomainL2Cache;
-          else if(ParentCPUDev->AffinityDomains & DeviceInfo::AffinityDomainL1Cache)
-            AffinityTy = DeviceInfo::AffinityDomainL1Cache;
-          else {
-            ErrCode = CL_INVALID_VALUE;
-            return 0;
-          }
-        } else
-          AffinityTy = static_cast<cl_device_affinity_domain>(PartProps[1]);
-
-        if(!ParentCPUDev->Partitions.count(AffinityTy)) {
-          // Marked as supported by the CPUDevice but no partition is found inside
-          // the Partitions container.
-          ErrCode = CL_INVALID_VALUE;
-          return 0;
-        }
-
-        // Get the reference to the pre-calculated partition.
-        llvm::SmallVector<CPUDevice::HardwareCPUsContainer, 4> &Partition = ParentCPUDev->Partitions[AffinityTy];
-        for(unsigned J = 0; J < Partition.size(); ++J) {
-          if(SubDevs)
-            SubDevs->insert(new CPUDevice(*ParentCPUDev, PartProps, Partition[J]));
-          ++NumSubDevs;
-        }
-
-        break;
-      }
+static unsigned getCacheLevel(DeviceInfo::PartitionAffinity Affinity) {
+  switch (Affinity) {
+  case DeviceInfo::AffinityDomainL1Cache: return 1;
+  case DeviceInfo::AffinityDomainL2Cache: return 2;
+  case DeviceInfo::AffinityDomainL3Cache: return 3;
+  case DeviceInfo::AffinityDomainL4Cache: return 4;
+  default: llvm_unreachable(0);
   }
+}
 
-  ErrCode = CL_SUCCESS;
-  return NumSubDevs;
+bool CPUDevice::createSubDevices(const DevicePartition &Part,
+                         llvm::SmallVectorImpl<std::unique_ptr<Device>> &Devs) {
+  if (!isPartitionSupported(Part))
+    return false;
+
+  HardwareCPUsContainer CPUs;
+  GetPinnedCPUs(CPUs);
+
+  switch (Part.getType()) {
+  case PartitionByAffinityDomain: {
+    auto Affinity = Part.getAffinityDomain();
+    if (!computeAffinityDomain(SupportedAffinityDomains, Affinity))
+      return false;
+
+    std::map<sys::HardwareComponent*, HardwareCPUsContainer> Partitions;
+    if (Affinity == AffinityDomainNUMA) {
+      for (auto C : CPUs)
+        if (auto *NUMANode = C->GetNUMANode())
+          Partitions[NUMANode].insert(C);
+    } else {
+      unsigned Level = getCacheLevel(Affinity);
+      for (auto C : CPUs)
+        if (auto *Cache = C->GetCache(Level))
+          Partitions[Cache].insert(C);
+    }
+
+    for (auto &P : Partitions) {
+      std::unique_ptr<Device> D(new CPUDevice(*this, Part, P.second));
+      Devs.push_back(std::move(D));
+    }
+
+    return true;
+  }
+  case PartitionEqually: {
+    unsigned N = Part.getNumComputeUnits();
+    unsigned Groups = CPUs.size() / N;
+
+    assert(Groups > 0);
+
+    auto NextCPU = CPUs.begin();
+    for (unsigned i = 0; i != Groups; ++i) {
+      HardwareCPUsContainer SubDevCPUs;
+      for (unsigned j = 0; j != N; ++j)
+        SubDevCPUs.insert(*NextCPU++);
+      std::unique_ptr<Device> D(new CPUDevice(*this, Part, SubDevCPUs));
+      Devs.push_back(std::move(D));
+    }
+
+    return true;
+  }
+  case PartitionByCounts: {
+    auto NextCPU = CPUs.begin();
+    for (unsigned i = 0, e = Part.getNumCounts(); i != e; ++i) {
+      HardwareCPUsContainer SubDevCPUs;
+      for (unsigned j = 0; j != Part.getCount(i); ++j)
+        SubDevCPUs.insert(*NextCPU++);
+      std::unique_ptr<Device> D(new CPUDevice(*this, Part, SubDevCPUs));
+      Devs.push_back(std::move(D));
+    }
+
+    return true;
+  }
+  default: llvm_unreachable(0);
+  }
 }
 
 //

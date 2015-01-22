@@ -40,9 +40,8 @@ public:
     AcceleratorType = CL_DEVICE_TYPE_ACCELERATOR,
     CustomType = CL_DEVICE_TYPE_CUSTOM
   };
-  typedef llvm::SmallVector<size_t, 4> MaxWorkItemSizesContainer;
 
-  typedef llvm::SmallVector<cl_device_partition_property, 8> PartitionPropertiesContainer;
+  typedef llvm::SmallVector<size_t, 4> MaxWorkItemSizesContainer;
 
   enum {
     FPDenormalization = CL_FP_DENORM,
@@ -76,22 +75,41 @@ public:
     ProfilingEnabled = CL_QUEUE_PROFILING_ENABLE
   };
 
-  enum {
+  enum PartitionType {
     PartitionEqually = CL_DEVICE_PARTITION_EQUALLY,
     PartitionByCounts = CL_DEVICE_PARTITION_BY_COUNTS,
     PartitionByCountsListEnd = CL_DEVICE_PARTITION_BY_COUNTS_LIST_END,
     PartitionByAffinityDomain = CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN,
-
-    PartitionTerminator = 0
   };
 
-  enum {
+  enum PartitionAffinity {
     AffinityDomainNUMA = CL_DEVICE_AFFINITY_DOMAIN_NUMA,
     AffinityDomainL4Cache = CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE,
     AffinityDomainL3Cache = CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE,
     AffinityDomainL2Cache = CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE,
     AffinityDomainL1Cache = CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE,
     AffinityDomainNext = CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE
+  };
+
+  class DevicePartition {
+  public:
+    explicit DevicePartition(const cl_device_partition_property *P = nullptr);
+
+    PartitionType getType() const;
+
+    PartitionAffinity getAffinityDomain() const;
+
+    unsigned getNumComputeUnits() const;
+
+    unsigned getCount(unsigned i) const;
+    unsigned getNumCounts() const;
+    unsigned getTotalComputeUnits() const;
+
+    llvm::ArrayRef<cl_device_partition_property> getRawProperties() const {
+      return Props;
+    }
+  private:
+    llvm::SmallVector<cl_device_partition_property, 8> Props;
   };
 
 public:
@@ -101,7 +119,6 @@ public:
 public:
   // OpenCL properties.
   DeviceType GetType() const { return Type; }
-
   unsigned GetVendorID() const { return VendorID; }
   unsigned GetMaxComputeUnits() const { return MaxComputeUnits; }
   unsigned GetMaxWorkItemDimensions() const { return MaxWorkItemDimensions; }
@@ -228,9 +245,13 @@ public:
   unsigned GetQueueProperties() const { return QueueProperties; }
 
   unsigned GetMaxSubDevices() const { return MaxSubDevices; }
-  PartitionPropertiesContainer GetSupportedPartitionTypes() const { return PartTys; }
+  llvm::ArrayRef<PartitionType> GetSupportedPartitionTypes() const {
+    return SupportedPartitionTypes;
+  }
 
-  unsigned GetSupportedAffinityDomains() const { return AffinityDomains; }
+  unsigned GetSupportedAffinityDomains() const {
+    return SupportedAffinityDomains;
+  }
 
   llvm::StringRef GetVendor() const { return Vendor; }
   llvm::StringRef GetName() const { return Name; }
@@ -340,8 +361,8 @@ protected:
   unsigned QueueProperties;
 
   unsigned MaxSubDevices;
-  PartitionPropertiesContainer PartTys;
-  unsigned AffinityDomains;
+  llvm::SmallVector<PartitionType, 4> SupportedPartitionTypes;
+  unsigned SupportedAffinityDomains;
 
   llvm::StringRef Vendor;
   llvm::StringRef Name;
@@ -370,7 +391,7 @@ public:
 
 protected:
   Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple);
-  Device(Device &Parent, const PartitionPropertiesContainer &Part); 
+  Device(Device &Parent, const DevicePartition &Part); 
 
 public:
   virtual ~Device();
@@ -378,11 +399,16 @@ public:
 public:
   bool IsSubDevice() const { return Parent; }
   Device *GetParent() const { return Parent; }
-  PartitionPropertiesContainer GetPartitionType() const { return PartProps; }
+  const DevicePartition &getPartition() const { return Partition; }
 
-protected:
-  virtual bool IsSupportedPartitionSchema(const PartitionPropertiesContainer &PartProps,
-                                          cl_int &ErrCode) const = 0;
+  virtual bool isPartitionSupported(const DevicePartition &P) const {
+    return false;
+  }
+
+  virtual bool createSubDevices(const DevicePartition &P,
+      llvm::SmallVectorImpl<std::unique_ptr<Device>> &Devs) {
+    return false;
+  }
 
 public:
   virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW, 
@@ -439,11 +465,11 @@ public:
 protected:
   mutable llvm::sys::Mutex ThisLock;
 
-  Device *Parent;
-  PartitionPropertiesContainer PartProps;
-
   llvm::LLVMContext LLVMCtx;
   std::unique_ptr<llvm::Module> BitCodeLibrary;
+
+  Device *Parent;
+  DevicePartition Partition;
 
 private:
   std::string EnvCompilerOpts;
@@ -454,40 +480,6 @@ private:
 
   friend class LLVMOptimizerInterfaceTraits<Device>;
   friend class DeviceBuiltinInfo;
-};
-
-class SubDevicesBuilder {
-public:
-  enum Type {
-    CPUSubDevicesBuilder,
-    GPUSubDevicesBuilder,
-    AcceleratorSubDevicesBuilder
-  };
-
-public:
-  typedef llvm::SmallPtrSet<Device *, 8> SubDevicesContainer;
-
-protected:
-  SubDevicesBuilder(Type BldTy,
-                    Device &Parent,
-                    const DeviceInfo::PartitionPropertiesContainer &PartProps) :
-    BldTy(BldTy),
-    Parent(Parent),
-    PartProps(PartProps) { }
-
-public:
-  virtual ~SubDevicesBuilder() { }
-
-public:
-  Type GetType() const { return BldTy; }
-
-  virtual unsigned Create(SubDevicesContainer *SubDevs, cl_int &ErrCode);
-
-protected:
-  Type BldTy;
-
-  Device &Parent;
-  const DeviceInfo::PartitionPropertiesContainer &PartProps;
 };
 
 template <>

@@ -119,7 +119,7 @@ DeviceInfo::DeviceInfo(DeviceType Ty) : Type(Ty) {
 
   // SubDevices support
   MaxSubDevices = 0;
-  AffinityDomains = 0;
+  SupportedAffinityDomains = 0;
 
   // Other, non OpenCL specific properties.
   SizeTypeMax = (1ull << 32) - 1;
@@ -209,7 +209,8 @@ DeviceInfo::DeviceInfo(const DeviceInfo &DI)
    QueueProperties(DI.QueueProperties),
 
    MaxSubDevices(DI.MaxSubDevices),
-   AffinityDomains(DI.AffinityDomains),
+   SupportedPartitionTypes(DI.SupportedPartitionTypes),
+   SupportedAffinityDomains(DI.SupportedAffinityDomains),
 
    Vendor(DI.Vendor),
    Name(DI.Name),
@@ -225,6 +226,82 @@ DeviceInfo::DeviceInfo(const DeviceInfo &DI)
    PreferredWorkGroupSizeMultiple(DI.PreferredWorkGroupSizeMultiple)
 {
 }
+
+DeviceInfo::
+DevicePartition::DevicePartition(const cl_device_partition_property *P) {
+  if (P) {
+    Props.push_back(P[0]);
+    switch (getType()) {
+    case PartitionByAffinityDomain:
+    case PartitionEqually: {
+      Props.push_back(P[1]);
+      Props.push_back(P[2]);
+      break;
+    }
+    case PartitionByCounts: {
+      int i = 1;
+      for (; P[i] != PartitionByCountsListEnd; ++i)
+        Props.push_back(P[i]);
+      Props.push_back(P[i]);
+      Props.push_back(P[i + 1]);
+      break;
+    }
+    default: llvm_unreachable(0);
+    }
+  }
+}
+
+DeviceInfo::PartitionType DeviceInfo::DevicePartition::getType() const {
+  switch (Props[0]) {
+  case PartitionByAffinityDomain:
+  case PartitionByCounts:
+  case PartitionEqually:
+    return static_cast<DeviceInfo::PartitionType>(Props[0]);
+  default: llvm_unreachable(0);
+  }
+}
+
+DeviceInfo::PartitionAffinity
+DeviceInfo::DevicePartition::getAffinityDomain() const {
+  assert(getType() == PartitionByAffinityDomain);
+
+  switch (Props[1]) {
+  case AffinityDomainNUMA:
+  case AffinityDomainL1Cache:
+  case AffinityDomainL2Cache:
+  case AffinityDomainL3Cache:
+  case AffinityDomainL4Cache:
+  case AffinityDomainNext:
+    return static_cast<DeviceInfo::PartitionAffinity>(Props[1]);
+  default: llvm_unreachable(0);
+  }
+}
+
+unsigned DeviceInfo::DevicePartition::getNumComputeUnits() const {
+  assert(getType() == PartitionEqually);
+  return static_cast<unsigned>(Props[1]);
+}
+
+unsigned DeviceInfo::DevicePartition::getNumCounts() const {
+  assert(getType() == PartitionByCounts);
+  assert(Props.size() > 3);
+  return Props.size() - 3;
+}
+
+unsigned DeviceInfo::DevicePartition::getCount(unsigned i) const {
+  assert(getType() == PartitionByCounts);
+  assert(i < getNumCounts());
+  return Props[i + 1];
+}
+
+unsigned DeviceInfo::DevicePartition::getTotalComputeUnits() const {
+  assert(getType() == PartitionByCounts);
+  unsigned Sum = 0;
+  for (unsigned i = 0; i != Props.size() - 3; ++i)
+    Sum += Props[i + 1];
+  return Sum;
+}
+
 //
 // Device implementation.
 //
@@ -242,16 +319,15 @@ Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
   InitCompiler();
 }
 
-Device::Device(Device &Parent, const PartitionPropertiesContainer &PartProps) :
+Device::Device(Device &Parent, const DevicePartition &Part) :
   DeviceInfo(Parent),
-  Parent(&Parent),
-  PartProps(const_cast<PartitionPropertiesContainer &>(PartProps)),
+  Parent(&Parent), Partition(Part),
   EnvCompilerOpts(Parent.GetEnvCompilerOpts()),
   Triple(Parent.GetTriple()) {
-    this->Name = Parent.GetName();  
+  this->Name = Parent.GetName();  
   
-    InitLibrary();
-    InitCompiler();
+  InitLibrary();
+  InitCompiler();
 }
 
 Device::~Device() {
@@ -393,8 +469,9 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   // Code generation options: emit kernel arg metadata + no optimizations
   clang::CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
   CodeGenOpts.EmitOpenCLArgMetadata = true;
-  CodeGenOpts.DisableLLVMOpts = true;
+  //CodeGenOpts.DisableLLVMOpts = true;
   CodeGenOpts.StackRealignment = true;
+  CodeGenOpts.OptimizationLevel = 2;
 }
 
 sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
@@ -402,16 +479,4 @@ sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
     return ProfilerTraits<CPUDevice>::ReadTime(*CPU);
 
   llvm_unreachable("Unknown device type");
-}
-
-//
-// SubDevicesBuilder implementation.
-//
-
-unsigned SubDevicesBuilder::Create(SubDevicesContainer *SubDevs, cl_int &ErrCode) {
-  // As default device partitioning is not supported and no sub-device is
-  // created.
-  ErrCode = CL_INVALID_VALUE;
-
-  return 0;
 }
