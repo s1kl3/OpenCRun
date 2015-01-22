@@ -108,7 +108,7 @@ clCreateUserEvent(cl_context context,
 
   opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
 
-  opencrun::UserEvent *Ev = new UserEvent(Ctx);
+  opencrun::UserEvent *Ev = new opencrun::UserEvent(Ctx);
 
   if(Ev)
     Ev->Retain();
