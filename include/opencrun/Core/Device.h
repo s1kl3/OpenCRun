@@ -34,6 +34,12 @@ class MemoryObj;
 
 class DeviceInfo {
 public:
+  enum DeviceType {
+    CPUType = CL_DEVICE_TYPE_CPU,
+    GPUType = CL_DEVICE_TYPE_GPU,
+    AcceleratorType = CL_DEVICE_TYPE_ACCELERATOR,
+    CustomType = CL_DEVICE_TYPE_CUSTOM
+  };
   typedef llvm::SmallVector<size_t, 4> MaxWorkItemSizesContainer;
 
   typedef llvm::SmallVector<cl_device_partition_property, 8> PartitionPropertiesContainer;
@@ -89,96 +95,12 @@ public:
   };
 
 public:
-  DeviceInfo() : PreferredCharVectorWidth(0),
-                 PreferredShortVectorWidth(0),
-                 PreferredIntVectorWidth(0),
-                 PreferredLongVectorWidth(0),
-                 PreferredFloatVectorWidth(0),
-                 PreferredDoubleVectorWidth(0),
-                 PreferredHalfVectorWidth(0),
-                 NativeCharVectorWidth(0),
-                 NativeShortVectorWidth(0),
-                 NativeIntVectorWidth(0),
-                 NativeLongVectorWidth(0),
-                 NativeFloatVectorWidth(0),
-                 NativeDoubleVectorWidth(0),
-                 NativeHalfVectorWidth(0),
-                 MaxClockFrequency(0),
-                 AddressBits(0),
-                
-                 SupportImages(false),
-                 MaxReadableImages(0),
-                 MaxWriteableImages(0),
-                 Image2DMaxWidth(0),
-                 Image2DMaxHeight(0),
-                 Image3DMaxWidth(0),
-                 Image3DMaxHeight(0),
-                 Image3DMaxDepth(0),
-                 ImageMaxBufferSize(0),
-                 ImageMaxArraySize(0),
-                 MaxSamplers(0),
-                 ImgFmts(NULL),
-                 NumImgFmts(0),
-                
-                 MaxParameterSize(0),
-
-                 PrintfBufferSize(0),
-                
-                 MemoryBaseAddressAlignment(0),
-                 MinimumDataTypeAlignment(0),
-                
-                 SinglePrecisionFPCapabilities(FPRoundToNearest | FPInfNaN),
-                 DoublePrecisionFPCapabilities(0),
-                 HalfPrecisionFPCapabilities(0),
-                
-                 GlobalMemoryCacheType(NoCache),
-                 GlobalMemoryCachelineSize(0),
-                 GlobalMemoryCacheSize(0),
-                 GlobalMemorySize(0),
-
-                 MaxConstantBufferSize(64 * 1024),
-                 MaxConstantArguments(8),
-
-                 LocalMemoryMapping(PrivateLocal),
-                 LocalMemorySize(32 * 1024),
-                 SupportErrorCorrection(false),
-
-                 HostUnifiedMemory(false),
-
-                 PreferredInteropUserSync(true),
-
-                 ProfilingTimerResolution(0),
-
-                 LittleEndian(true),
-                 // Available is a virtual attribute.
-
-                 CompilerAvailable(false),
-                 LinkerAvailable(false),
-
-                 ExecutionCapabilities(CanExecKernel),
-
-                 QueueProperties(ProfilingEnabled),
-                  
-                 MaxSubDevices(0),
-                 AffinityDomains(0),
-
-                 Vendor(""),
-                 Name(""),
-                 Version(""),
-                 DriverVersion(""),
-                 OpenCLCVersion(""),
-                 Profile(""),
-                 Extensions(""),
-                 BuiltInKernels(""),
-
-                 // Other, non OpenCL specific properties.
-                 SizeTypeMax((1ull << 32) - 1),
-                 PrivateMemorySize(0),
-                 PreferredWorkGroupSizeMultiple(1)
-                 { }
+  DeviceInfo(DeviceType Ty);
+  DeviceInfo(const DeviceInfo &DI);
 
 public:
   // OpenCL properties.
+  DeviceType GetType() const { return Type; }
 
   unsigned GetVendorID() const { return VendorID; }
   unsigned GetMaxComputeUnits() const { return MaxComputeUnits; }
@@ -336,6 +258,7 @@ public:
   }
 
 protected:
+  DeviceType Type;
   unsigned VendorID;
 
   unsigned MaxComputeUnits;
@@ -446,9 +369,10 @@ public:
   static bool classof(const _cl_device_id *Dev) { return true; }
 
 protected:
-  Device(llvm::StringRef Name, llvm::StringRef Triple);
-  Device(Device &Parent, const PartitionPropertiesContainer &PartProps); 
+  Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple);
+  Device(Device &Parent, const PartitionPropertiesContainer &Part); 
 
+public:
   virtual ~Device();
 
 public:
@@ -530,16 +454,6 @@ private:
 
   friend class LLVMOptimizerInterfaceTraits<Device>;
   friend class DeviceBuiltinInfo;
-};
-
-class GPUDevice : public Device {
-public:
-  static bool classof(const Device *Dev) { return true; }
-};
-
-class AcceleratorDevice : public Device {
-public:
-  static bool classof(const Device *Dev) { return true; }
 };
 
 class SubDevicesBuilder {

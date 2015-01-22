@@ -2,8 +2,10 @@
 #include "opencrun/Device/CPU/CPUDevice.h"
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
+#include "opencrun/Core/Platform.h"
 #include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPUPasses/AllPasses.h"
+#include "opencrun/Device/Devices.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
@@ -120,7 +122,7 @@ static const cl_image_format CPUImgFmts[] = {
 //
 
 CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
-  Device("CPU", llvm::sys::getDefaultTargetTriple()),
+  Device(CPUType, "CPU", llvm::sys::getDefaultTargetTriple()),
   Machine(Machine),
   Global(Machine.GetTotalMemorySize()) {
   InitDeviceInfo(Machine);
@@ -1186,3 +1188,12 @@ void SignalJITCallEnd() {
 }
 
 } // End anonymous namespace.
+
+void opencrun::initializeCPUDevice(Platform &P) {
+  sys::Hardware &HW = sys::GetHardware();
+
+  // A device for each Machine in the System (it may be a cluster system).
+  for (sys::Hardware::machine_iterator I = HW.machine_begin(),
+       E = HW.machine_end(); I != E; ++I)
+    P.addDevice(new CPUDevice(*I));
+}

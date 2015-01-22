@@ -2,14 +2,14 @@
 #ifndef OPENCRUN_CORE_PLATFORM_H
 #define OPENCRUN_CORE_PLATFORM_H
 
-#include "opencrun/Device/Devices.h"
-
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
 
 struct _cl_platform_id { };
 
 namespace opencrun {
+
+class Device;
 
 class PlatformInfo {
 public:
@@ -25,37 +25,34 @@ public:
   static bool classof(const _cl_platform_id *Plat) { return true; }
 
 public:
-  typedef llvm::SmallPtrSet<CPUDevice *, 2> CPUsContainer;
-
-  typedef CPUsContainer::iterator cpu_iterator;
-
-  typedef llvm::SmallPtrSet<GPUDevice *, 2> GPUsContainer;
-
-  typedef GPUsContainer::iterator gpu_iterator;
-
-  typedef llvm::SmallPtrSet<AcceleratorDevice *, 2> AcceleratorsContainer;
-
-  typedef AcceleratorsContainer::iterator accelerator_iterator;
-
-public:
-  cpu_iterator cpu_begin() { return CPUs.begin(); }
-  cpu_iterator cpu_end() { return CPUs.end(); }
-
-  gpu_iterator gpu_begin() { return GPUs.begin(); }
-  gpu_iterator gpu_end() { return GPUs.end(); }
-
-  accelerator_iterator accelerator_begin() { return Accelerators.begin(); }
-  accelerator_iterator accelerator_end() { return Accelerators.end(); }
+  typedef llvm::SmallPtrSet<Device *, 2> DevicesContainer;
+  typedef DevicesContainer::iterator device_iterator;
 
 public:
   Platform();
-  Platform(const Platform &That); // Do not implement.
-  void operator=(const Platform &That); // Do not implement.
+  ~Platform();
+  Platform(const Platform &) = delete;
+  void operator=(const Platform &) = delete;
+
+  device_iterator cpu_begin() { return CPUs.begin(); }
+  device_iterator cpu_end() { return CPUs.end(); }
+
+  device_iterator gpu_begin() { return GPUs.begin(); }
+  device_iterator gpu_end() { return GPUs.end(); }
+
+  device_iterator accelerator_begin() { return Accelerators.begin(); }
+  device_iterator accelerator_end() { return Accelerators.end(); }
+
+  device_iterator custom_begin() { return Customs.begin(); }
+  device_iterator custom_end() { return Customs.end(); }
+
+  void addDevice(Device *D);
 
 private:
-  CPUsContainer CPUs;
-  GPUsContainer GPUs;
-  AcceleratorsContainer Accelerators;
+  DevicesContainer CPUs;
+  DevicesContainer GPUs;
+  DevicesContainer Accelerators;
+  DevicesContainer Customs;
 };
 
 Platform &GetOpenCRunPlatform();

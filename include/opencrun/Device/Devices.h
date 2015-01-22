@@ -6,7 +6,7 @@
 
 namespace opencrun {
 
-void GetCPUDevices(llvm::SmallPtrSet<CPUDevice *, 2> &CPUs);
+void initializeCPUDevice(Platform &P);
 
 } // End namespace opencrun.
 

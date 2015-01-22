@@ -4,6 +4,7 @@
 #include "Utils.h"
 
 #include "opencrun/Core/Platform.h"
+#include "opencrun/Device/CPU/CPUDevice.h"
 
 CL_API_ENTRY cl_int CL_API_CALL
 clGetDeviceIDs(cl_platform_id platform,
@@ -23,44 +24,44 @@ clGetDeviceIDs(cl_platform_id platform,
   switch(device_type) {
   case CL_DEVICE_TYPE_DEFAULT:
   case CL_DEVICE_TYPE_CPU:
-    for(opencrun::Platform::cpu_iterator I = Plat.cpu_begin(),
-                                         E = Plat.cpu_end();
-                                         I != E;
-                                         ++I)
+    for(opencrun::Platform::device_iterator I = Plat.cpu_begin(),
+                                            E = Plat.cpu_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
     break;
 
   case CL_DEVICE_TYPE_GPU:
-    for(opencrun::Platform::gpu_iterator I = Plat.gpu_begin(),
-                                         E = Plat.gpu_end();
-                                         I != E;
-                                         ++I)
+    for(opencrun::Platform::device_iterator I = Plat.gpu_begin(),
+                                            E = Plat.gpu_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
     break;
 
   case CL_DEVICE_TYPE_ACCELERATOR:
-    for(opencrun::Platform::accelerator_iterator I = Plat.accelerator_begin(),
-                                                 E = Plat.accelerator_end();
-                                                 I != E;
-                                                 ++I)
+    for(opencrun::Platform::device_iterator I = Plat.accelerator_begin(),
+                                            E = Plat.accelerator_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
     break;
 
   case CL_DEVICE_TYPE_ALL:
-    for(opencrun::Platform::cpu_iterator I = Plat.cpu_begin(),
-                                         E = Plat.cpu_end();
-                                         I != E;
-                                         ++I)
+    for(opencrun::Platform::device_iterator I = Plat.cpu_begin(),
+                                            E = Plat.cpu_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
-    for(opencrun::Platform::gpu_iterator I = Plat.gpu_begin(),
-                                         E = Plat.gpu_end();
-                                         I != E;
-                                         ++I)
+    for(opencrun::Platform::device_iterator I = Plat.gpu_begin(),
+                                            E = Plat.gpu_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
-    for(opencrun::Platform::accelerator_iterator I = Plat.accelerator_begin(),
-                                                 E = Plat.accelerator_end();
-                                                 I != E;
-                                                 ++I)
+    for(opencrun::Platform::device_iterator I = Plat.accelerator_begin(),
+                                            E = Plat.accelerator_end();
+                                            I != E;
+                                            ++I)
       Devs.push_back(*I);
     break;
 
@@ -104,14 +105,7 @@ clGetDeviceInfo(cl_device_id device,
   #undef PROPERTY
 
   case CL_DEVICE_TYPE: {
-    cl_device_type DevTy;
-
-    if(llvm::isa<opencrun::CPUDevice>(&Dev))
-      DevTy = CL_DEVICE_TYPE_CPU | CL_DEVICE_TYPE_DEFAULT;
-    else if(llvm::isa<opencrun::GPUDevice>(&Dev))
-      DevTy = CL_DEVICE_TYPE_GPU;
-    else if(llvm::isa<opencrun::AcceleratorDevice>(&Dev))
-      DevTy = CL_DEVICE_TYPE_ACCELERATOR;
+    cl_device_type DevTy = Dev.GetType();
 
     return clFillValue<cl_device_type, cl_device_type>(
              static_cast<cl_device_type *>(param_value),
