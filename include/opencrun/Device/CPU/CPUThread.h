@@ -35,6 +35,8 @@ public:
 
 private:
   void Dump(void *StartAddr, void *EndAddr) const;
+  size_t getRequiredStackSize(unsigned N) const;
+  size_t getPrivateSize() const;
 
 private:
   void *Stack;

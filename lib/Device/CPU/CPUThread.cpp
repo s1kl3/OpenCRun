@@ -63,10 +63,22 @@ ExecutionStack::~ExecutionStack() {
   sys::Free(Stack);
 }
 
+size_t ExecutionStack::getRequiredStackSize(unsigned N) const {
+  return N * getPrivateSize() + sys::Hardware::GetPageSize();
+}
+
+size_t ExecutionStack::getPrivateSize() const {
+  #ifndef NDEBUG
+  const unsigned K = 1 + 1;
+  #else
+  const unsigned K = 1;
+  #endif
+  return K * sys::Hardware::GetPageSize();
+}
+
 void ExecutionStack::Reset(EntryPoint Entry, void **Args, unsigned N) {
-  size_t PageSize = sys::Hardware::GetPageSize(),
-         PrivateSize = PageSize,
-         RequiredStackSize = N * PrivateSize;
+  size_t RequiredStackSize = getRequiredStackSize(N);
+  size_t PrivateSize = getPrivateSize();
 
   // Stack too small, expand it.
   if(StackSize < RequiredStackSize) {
@@ -76,89 +88,52 @@ void ExecutionStack::Reset(EntryPoint Entry, void **Args, unsigned N) {
     sys::Free(Stack);
     Stack = sys::PageAlignedAlloc(RequiredStackSize);
     StackSize = RequiredStackSize;
+
+    assert(Stack);
   }
 
   #ifndef NDEBUG
-  // Add guard pages between work-item stacks. Add a guard page at the end of
-  // the stack.
-  size_t DebugPrivateSize = PrivateSize + PageSize;
-  size_t DebugStackSize = N * DebugPrivateSize + PageSize;
-
-  // If needed, redo memory allocation, in order to get space for guard page.
-  if(StackSize < DebugStackSize) {
-    sys::MarkPagesReadWrite(Stack, StackSize);
-    sys::Free(Stack);
-    Stack = sys::PageAlignedAlloc(DebugStackSize);
-    StackSize = DebugStackSize;
-  }
-
-  // Remove page protection, reset all pages to R/W.
   sys::MarkPagesReadWrite(Stack, StackSize);
 
   // Zero the memory.
   std::memset(Stack, 0, StackSize);
-  #endif // NDEBUG
+  #endif
 
-  uintptr_t StackAddr = reinterpret_cast<uintptr_t>(Stack),
-            Addr = StackAddr,
-            PrevAddr = 0;
+  uintptr_t BaseAddr = reinterpret_cast<uintptr_t>(Stack);
+  uintptr_t Addr = BaseAddr;
+  uintptr_t PrevAddr = 0;
 
-  // Skip first page.
-  #ifndef NDEBUG
-  Addr += PageSize;
-  #endif // NDEBUG
+  for (unsigned i = 0; i != N; ++i) {
+    InitWorkItemStack(reinterpret_cast<void*>(Addr), PrivateSize, Entry, Args);
 
-  // Initialize all work-item stacks.
-  for(unsigned I = 0; I < N; ++I) {
-    // Mark the guard page.
-    #ifndef NDEBUG
-    sys::MarkPageReadOnly(reinterpret_cast<void *>(Addr - PageSize));
-    #endif // NDEBUG
-
-    InitWorkItemStack(reinterpret_cast<void *>(Addr), PrivateSize, Entry, Args);
-
-    if(PrevAddr)
-      SetWorkItemStackLink(reinterpret_cast<void *>(Addr),
-                           reinterpret_cast<void *>(PrevAddr),
+    if (PrevAddr)
+      SetWorkItemStackLink(reinterpret_cast<void*>(Addr),
+                           reinterpret_cast<void*>(PrevAddr),
                            PrivateSize);
 
-    PrevAddr = Addr;
-
     #ifndef NDEBUG
-    Addr += DebugPrivateSize;
-    #else
+    // Mark first of each private memory as read-only.
+    sys::MarkPageReadOnly(reinterpret_cast<void*>(Addr));
+    #endif
+
+    PrevAddr = Addr;
     Addr += PrivateSize;
-    #endif // NDEBUG
   }
 
-  // Mark last guard page.
-  #ifndef NDEBUG
-  sys::MarkPageReadOnly(reinterpret_cast<void *>(Addr - PageSize));
-  #endif // NDEBUG
-
-  Addr = StackAddr;
-
-  // Skip first page.
-  #ifndef NDEBUG
-  Addr += PageSize;
-  #endif // NDEBUG
-
-  // Link last stack with the first.
-  SetWorkItemStackLink(reinterpret_cast<void *>(Addr),
-                       reinterpret_cast<void *>(PrevAddr),
+  SetWorkItemStackLink(reinterpret_cast<void*>(BaseAddr),
+                       reinterpret_cast<void*>(PrevAddr),
                        PrivateSize);
+
+  #ifndef NDEBUG
+  // Mark page after last stack as read-only.
+  sys::MarkPageReadOnly(reinterpret_cast<void*>(Addr));
+  #endif
 }
 
 void ExecutionStack::Run() {
   uintptr_t StackAddr = reinterpret_cast<uintptr_t>(Stack);
-  size_t PageSize = sys::Hardware::GetPageSize();
 
-  // Skip first page.
-  #ifndef NDEBUG
-  StackAddr += PageSize;
-  #endif // NDEBUG
-
-  RunWorkItems(reinterpret_cast<void *>(StackAddr), PageSize);
+  RunWorkItems(reinterpret_cast<void *>(StackAddr), getPrivateSize());
 }
 
 void ExecutionStack::SwitchToNextWorkItem() {
@@ -168,8 +143,8 @@ void ExecutionStack::SwitchToNextWorkItem() {
 void ExecutionStack::Dump() const {
   llvm::raw_ostream &OS = llvm::errs();
 
-  uintptr_t StartAddr = reinterpret_cast<uintptr_t>(Stack),
-            EndAddr = StartAddr + StackSize;
+  uintptr_t StartAddr = reinterpret_cast<uintptr_t>(Stack);
+  uintptr_t EndAddr = StartAddr + StackSize;
   size_t PageSize = sys::Hardware::GetPageSize();
 
   OS << llvm::format("Stack [%p, %p]", StartAddr, EndAddr)
@@ -181,17 +156,9 @@ void ExecutionStack::Dump() const {
 void ExecutionStack::Dump(unsigned I) const {
   llvm::raw_ostream &OS = llvm::errs();
 
-  uintptr_t StartAddr = reinterpret_cast<uintptr_t>(Stack),
-            EndAddr;
-  size_t PageSize = sys::Hardware::GetPageSize();
-
-  #ifndef NDEBUG
-  StartAddr += PageSize + I * 2 * PageSize;
-  #else
-  StartAddr += StartAddr + I * PageSize;
-  #endif // NDEBUG
-  
-  EndAddr = StartAddr + PageSize;
+  uintptr_t StartAddr = reinterpret_cast<uintptr_t>(Stack) +
+                        I * getPrivateSize();
+  uintptr_t EndAddr = StartAddr + getPrivateSize();
 
   OS << llvm::format("Work-item stack [%p, %p]", StartAddr, EndAddr)
      << ":";
