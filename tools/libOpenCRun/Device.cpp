@@ -207,12 +207,8 @@ clCreateSubDevices(cl_device_id in_device,
   if (num_devices < SubDevs.size())
     return CL_INVALID_VALUE;
 
-  for (auto &D : SubDevs) {
-    D->Retain();
-    if (Dev.IsSubDevice())
-      Dev.Retain();
+  for (auto &D : SubDevs)
     *out_devices++ = D.release();
-  }
 
   return CL_SUCCESS;
 }

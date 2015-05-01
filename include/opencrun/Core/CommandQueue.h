@@ -34,12 +34,8 @@ public:
   typedef std::set<Command *> PendingCommandsContainer;
 
 protected:                     
-  CommandQueue(Type Ty, Context &Ctx, Device &Dev, bool EnableProfile) :
-    Ty(Ty),
-    Ctx(&Ctx),
-    Dev(Dev),
-    EnableProfile(EnableProfile) { }
-  virtual ~CommandQueue() { }
+  CommandQueue(Type Ty, Context &Ctx, Device &Dev, bool EnableProfile);
+  virtual ~CommandQueue();
 
 public:
   llvm::IntrusiveRefCntPtr<Event> Enqueue(Command &Cmd, cl_int *ErrCode = NULL);

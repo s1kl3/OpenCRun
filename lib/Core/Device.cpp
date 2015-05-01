@@ -317,6 +317,9 @@ Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
   // Initialize the device.
   InitLibrary();
   InitCompiler();
+
+  // Reference Counter intiially set to 1.
+  Retain();
 }
 
 Device::Device(Device &Parent, const DevicePartition &Part) :
@@ -328,6 +331,13 @@ Device::Device(Device &Parent, const DevicePartition &Part) :
   
   InitLibrary();
   InitCompiler();
+
+  // Reference Counter intiially set to 1.
+  Retain();
+ 
+  // If the parent is a sub-device then increment its reference counter.
+  if (Parent.IsSubDevice())
+    Parent.Retain();
 }
 
 Device::~Device() {

@@ -19,6 +19,22 @@ using namespace opencrun;
   return NULL;                               \
   }
 
+CommandQueue::CommandQueue(Type Ty, Context &Ctx, Device &Dev, bool EnableProfile) :
+  Ty(Ty),
+  Ctx(&Ctx),
+  Dev(Dev),
+  EnableProfile(EnableProfile) { 
+    // If the associated device is a sub-device do an implicit retain.
+    if(Dev.IsSubDevice())
+        Dev.Retain();
+  }
+
+CommandQueue::~CommandQueue() { 
+  // If the associated device is a sub-device do an implicit release.
+  if(Dev.IsSubDevice())
+      Dev.Release();
+}
+
 llvm::IntrusiveRefCntPtr<Event>
 CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   for(Command::event_iterator I = Cmd.wait_begin(), E = Cmd.wait_end();
