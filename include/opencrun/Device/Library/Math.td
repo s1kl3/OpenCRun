@@ -278,7 +278,7 @@ def blt_cbrt        : MathBuiltin_rr<"cbrt">;
 def blt_ceil        : MathBuiltin_rr<"ceil">;
 def blt_cos         : MathBuiltin_rr<"cos">;
 def blt_cosh        : MathBuiltin_rr<"cosh">;
-def blt_erfc        : MathBuiltin_rr<"ercf">;
+def blt_erfc        : MathBuiltin_rr<"erfc">;
 def blt_erf         : MathBuiltin_rr<"erf">;
 def blt_exp         : MathBuiltin_rr<"exp">;
 def blt_exp2        : MathBuiltin_rr<"exp2">;
