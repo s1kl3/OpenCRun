@@ -157,6 +157,19 @@ MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
 }
 
 //
+// Buffer implementation.
+//
+
+Buffer::~Buffer() {
+  // For sub-buffers the parent's reference count must
+  // be decremented.
+  if (IsSubBuffer())
+    GetParent()->Release();
+}
+
+
+
+//
 // MemoryObjBuilder implementation.
 //
 

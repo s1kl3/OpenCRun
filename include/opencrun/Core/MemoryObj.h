@@ -166,6 +166,8 @@ protected:
   Parent(Parent),
   Offset(0) { }
 
+  ~Buffer();
+
 private:
   // In case of a sub-buffer object, this attribute points to the
   // parent buffer.
