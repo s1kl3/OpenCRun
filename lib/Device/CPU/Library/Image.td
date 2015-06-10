@@ -130,18 +130,15 @@ int4 apply_filter_nearest(const device_image_t *dev_image, const device_sampler_
     else if((dev_sampler & 0x7) == CLK_ADDRESS_MIRRORED_REPEAT) {
       float u = fabs(coord.x - 2.0f * rint(0.5f * coord.x)) * dev_image->width; 
       coord_tmp.x = floor(u);
-      if(coord_tmp.x == dev_image->width)
-        --coord_tmp.x;
+      coord_tmp.x = min(coord_tmp.x, (float)(dev_image->width - 1));
 
       float v = fabs(coord.y - 2.0f * rint(0.5f * coord.y)) * dev_image->height; 
-      coord_tmp.x = floor(v);
-      if(coord_tmp.y == dev_image->height)
-        --coord_tmp.y;
+      coord_tmp.y = floor(v);
+      coord_tmp.y = min(coord_tmp.y, (float)(dev_image->height - 1));
 
       float w = fabs(coord.z - 2.0f * rint(0.5f * coord.z)) * dev_image->depth; 
       coord_tmp.z = floor(w);
-      if(coord_tmp.z == dev_image->depth)
-        --coord_tmp.z;
+      coord_tmp.z = min(coord_tmp.z, (float)(dev_image->depth - 1));
     }
 
   }
