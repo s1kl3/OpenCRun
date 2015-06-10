@@ -32,7 +32,7 @@ typedef _event_t * event_t;
 #define CLK_GLOBAL_MEM_FENCE 0x1
 
 #define CLK_NORMALIZED_COORDS_FALSE 0x0000
-#define CLK_NORMALIZED_COORDS_TRUE  0x0010
+#define CLK_NORMALIZED_COORDS_TRUE  0x0008
 
 #define CLK_ADDRESS_NONE            0x0000
 #define CLK_ADDRESS_MIRRORED_REPEAT 0x0001
@@ -41,7 +41,7 @@ typedef _event_t * event_t;
 #define CLK_ADDRESS_CLAMP           0x0004
 
 #define CLK_FILTER_NEAREST          0x0000
-#define CLK_FILTER_LINEAR           0x0100
+#define CLK_FILTER_LINEAR           0x0010
 
 #define CLK_R                       0x10B0
 #define CLK_A                       0x10B1

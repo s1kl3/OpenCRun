@@ -82,7 +82,7 @@ def address_mode : OCLCodeBlock<[{
 int4 address_mode(const device_image_t *dev_image, const device_sampler_t dev_sampler, const int4 coord) {
   int4 coord_out;
 
-  switch(dev_sampler & 0x0f) {
+  switch(dev_sampler & 0x07) {
   case CLK_ADDRESS_NONE:
     coord_out = coord;
     break;
@@ -110,7 +110,7 @@ int4 apply_filter_nearest(const device_image_t *dev_image, const device_sampler_
   if(dev_sampler & CLK_NORMALIZED_COORDS_TRUE) {
     coord_tmp = (float4)(coord.x * dev_image->width, coord.y * dev_image->height, coord.z * dev_image->depth, 0);
     
-    if(dev_sampler & CLK_ADDRESS_REPEAT) {
+    if((dev_sampler & 0x7) == CLK_ADDRESS_REPEAT) {
       float u = (coord.x - floor(coord.x)) * dev_image->width;
       coord_tmp.x = floor(u);
       if(coord_tmp.x > dev_image->width - 1)
@@ -127,7 +127,7 @@ int4 apply_filter_nearest(const device_image_t *dev_image, const device_sampler_
         coord_tmp.z -= dev_image->depth;
     }
 
-    else if(dev_sampler & CLK_ADDRESS_MIRRORED_REPEAT) {
+    else if((dev_sampler & 0x7) == CLK_ADDRESS_MIRRORED_REPEAT) {
       float u = fabs(coord.x - 2.0f * rint(0.5f * coord.x)) * dev_image->width; 
       coord_tmp.x = floor(u);
       if(coord_tmp.x == dev_image->width)
@@ -146,7 +146,7 @@ int4 apply_filter_nearest(const device_image_t *dev_image, const device_sampler_
 
   }
 
-  switch(dev_sampler & 0x0f) {
+  switch(dev_sampler & 0x07) {
   case CLK_ADDRESS_NONE:
   case CLK_ADDRESS_CLAMP:
   case CLK_ADDRESS_CLAMP_TO_EDGE:
@@ -171,7 +171,7 @@ float4 apply_filter_linear(const device_image_t *dev_image,
   int i1, j1, k1;
   float a, b, c;
 
-  switch(dev_sampler & 0x0f) {
+  switch(dev_sampler & 0x07) {
   case CLK_ADDRESS_NONE:
   case CLK_ADDRESS_CLAMP:
   case CLK_ADDRESS_CLAMP_TO_EDGE:
