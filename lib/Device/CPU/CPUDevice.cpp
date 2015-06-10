@@ -916,14 +916,14 @@ void CPUDevice::LocateMemoryObjArgAddresses(
                            E = Kern.arg_end();
                            I != E;
                            ++I)
-    if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(*I)) {
+    if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(I->get())) {
       unsigned I = Arg->GetPosition();
 
       if(Buffer *Buf = Arg->GetBuffer())
         GlobalArgs[I] = Global[*Buf];
       else
         GlobalArgs[I] = NULL;
-    } else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(*I)) {
+    } else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(I->get())) {
       // Images are always allocated in __global AS.
       unsigned I = Arg->GetPosition();
 

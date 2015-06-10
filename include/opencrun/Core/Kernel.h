@@ -30,11 +30,15 @@ public:
 
 protected:
   KernelArg(Type Ty, unsigned Position) : Ty(Ty), Position(Position) {}
-  KernelArg(const KernelArg &Arg) : Ty(Arg.Ty), Position(Arg.Position) {}
+  KernelArg(const KernelArg &Arg) = delete;
 
 public:
+  virtual ~KernelArg();
+
   Type GetType() const { return Ty; }
   unsigned GetPosition() const { return Position; }
+
+  virtual std::unique_ptr<KernelArg> clone() const = 0;
 
 private:
   Type Ty;
@@ -53,8 +57,7 @@ public:
    : KernelArg(KernelArg::BufferArg, Position), Buf(Buf),
      AddrSpace(AddrSpace) {}
 
-  BufferKernelArg(const BufferKernelArg &Arg)
-   : KernelArg(Arg), Buf(Arg.Buf), AddrSpace(Arg.AddrSpace) {}
+  BufferKernelArg(const BufferKernelArg &Arg) = delete;
 
 public:
   Buffer *GetBuffer() { return Buf.getPtr(); }
@@ -67,9 +70,7 @@ public:
     return AddrSpace == opencl::AS_Constant;
   }
 
-  bool OnLocalAddressSpace() const {
-    return AddrSpace == opencl::AS_Local;
-  }
+  std::unique_ptr<KernelArg> clone() const override;
 
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Buf;
@@ -86,9 +87,12 @@ public:
   LocalBufferKernelArg(unsigned Position, size_t Size)
    : KernelArg(KernelArg::LocalBufferArg, Position), Size(Size) {}
 
+  LocalBufferKernelArg(const LocalBufferKernelArg &Arg) = delete;
 
 public:
   size_t getSize() const { return Size; }
+
+  std::unique_ptr<KernelArg> clone() const override;
 
 private:
   size_t Size;
@@ -105,8 +109,7 @@ public:
    : KernelArg(KernelArg::ImageArg, Position), Img(Img),
      ImgAccess(ImgAccess) {}
 
-  ImageKernelArg(const ImageKernelArg &Arg)
-   : KernelArg(Arg), Img(Arg.Img), ImgAccess(Arg.ImgAccess) {}
+  ImageKernelArg(const ImageKernelArg &Arg) = delete;
 
 public:
   Image *GetImage() { return Img.getPtr(); }
@@ -118,6 +121,8 @@ public:
   bool IsWriteOnly() const {
     return ImgAccess == opencl::IA_WriteOnly;
   }
+
+  std::unique_ptr<KernelArg> clone() const override;
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Img;
@@ -135,11 +140,12 @@ public:
    : KernelArg(KernelArg::SamplerArg, Position),
      Smplr(Smplr) {}
 
-  SamplerKernelArg(const SamplerKernelArg &Arg)
-   : KernelArg(Arg), Smplr(Arg.Smplr) {}
+  SamplerKernelArg(const SamplerKernelArg &Arg) = delete;
 
 public:
   Sampler *GetSampler() { return Smplr.getPtr(); }
+
+  std::unique_ptr<KernelArg> clone() const override;
 
 private:
   llvm::IntrusiveRefCntPtr<Sampler> Smplr;
@@ -165,11 +171,14 @@ public:
     std::memcpy(this->Arg, Arg, Size);
   }
 
-  ByValueKernelArg(const ByValueKernelArg &A)
-   : KernelArg(A), Arg(A.Arg), Size(A.Size) {}
+  ByValueKernelArg(const ByValueKernelArg &A) = delete;
+
+  ~ByValueKernelArg();
 
 public:
   void *GetArg() { return Arg; }
+
+  std::unique_ptr<KernelArg> clone() const override;
 
 private:
   void *Arg;
@@ -231,7 +240,7 @@ private:
 
 class Kernel : public _cl_kernel, public MTRefCountedBase<Kernel> {
 public:
-  typedef llvm::SmallVector<KernelArg *, 8> ArgumentsContainer;
+  typedef std::vector<std::unique_ptr<KernelArg>> ArgumentsContainer;
   typedef ArgumentsContainer::iterator arg_iterator;
 
 public:

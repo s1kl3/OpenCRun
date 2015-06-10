@@ -40,12 +40,12 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
                            I != E;
                            ++I) {
     // A buffer can be allocated by the CPUDevice.
-    if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(*I)) {
+    if(llvm::isa<BufferKernelArg>(I->get())) {
       Args[J] = GlobalArgs[J];
     } 
     
     // An image can be allocated by the CPUDevice.
-    else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(*I)) {
+    else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(I->get())) {
       Image *Img = Arg->GetImage();
       DeviceImage *DevImg = new DeviceImage(*Img, GlobalArgs[J]);
       DevImgs.push_back(DevImg);
@@ -53,7 +53,7 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
       // Store image descriptor address.
       Args[J] = DevImg; 
 
-    } else if(SamplerKernelArg *Arg = llvm::dyn_cast<SamplerKernelArg>(*I)) {
+    } else if(SamplerKernelArg *Arg = llvm::dyn_cast<SamplerKernelArg>(I->get())) {
       Sampler *Smplr = Arg->GetSampler();
       DeviceSampler *DevSmplr = new DeviceSampler(GetDeviceSampler(*Smplr));
       DevSmplrs.push_back(DevSmplr);
@@ -62,7 +62,7 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
       Args[J] = DevSmplr;
 
     // For arguments passed by copy, we need to setup a pointer for the stub.
-    } else if(ByValueKernelArg *Arg = llvm::dyn_cast<ByValueKernelArg>(*I))
+    } else if(ByValueKernelArg *Arg = llvm::dyn_cast<ByValueKernelArg>(I->get()))
       Args[J] = Arg->GetArg();
 
     ++J;
@@ -87,7 +87,7 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(
                            E = Kern.arg_end();
                            I != E;
                            ++I) {
-    if(LocalBufferKernelArg *Arg = llvm::dyn_cast<LocalBufferKernelArg>(*I))
+    if(LocalBufferKernelArg *Arg = llvm::dyn_cast<LocalBufferKernelArg>(I->get()))
       Args[J] = Local.Alloc(Arg->getSize());
 
     ++J;

@@ -10,6 +10,37 @@
 
 using namespace opencrun;
 
+KernelArg::~KernelArg() {}
+
+std::unique_ptr<KernelArg> BufferKernelArg::clone() const {
+  return std::unique_ptr<KernelArg>(
+    new BufferKernelArg(GetPosition(), Buf.getPtr(), AddrSpace));
+}
+
+std::unique_ptr<KernelArg> LocalBufferKernelArg::clone() const {
+  return std::unique_ptr<KernelArg>(
+    new LocalBufferKernelArg(GetPosition(), Size));
+}
+
+std::unique_ptr<KernelArg> ImageKernelArg::clone() const {
+  return std::unique_ptr<KernelArg>(
+    new ImageKernelArg(GetPosition(), Img.getPtr(), ImgAccess));
+}
+
+std::unique_ptr<KernelArg> SamplerKernelArg::clone() const {
+  return std::unique_ptr<KernelArg>(
+    new SamplerKernelArg(GetPosition(), Smplr.getPtr()));
+}
+
+ByValueKernelArg::~ByValueKernelArg() {
+  sys::Free(Arg);
+}
+
+std::unique_ptr<KernelArg> ByValueKernelArg::clone() const {
+  return std::unique_ptr<KernelArg>(
+    new ByValueKernelArg(GetPosition(), this->Arg, Size));
+}
+
 #define RETURN_WITH_ERROR(ERR, MSG)   \
   {                                   \
   GetContext().ReportDiagnostic(MSG); \
@@ -93,33 +124,11 @@ getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const {
 
 Kernel::Kernel(const Kernel &K) : Desc(K.Desc) {
   Arguments.reserve(K.Arguments.size());
-  for (unsigned I = 0, E = K.Arguments.size(); I != E; ++I) {
-    KernelArg *Arg = K.Arguments[I];
-    switch (Arg->GetType()) {
-    default: llvm_unreachable(0);
-    case KernelArg::BufferArg:
-      Arg = new BufferKernelArg(llvm::cast<BufferKernelArg>(*Arg));
-      break;
-    case KernelArg::LocalBufferArg:
-      Arg = new LocalBufferKernelArg(llvm::cast<LocalBufferKernelArg>(*Arg));
-      break;
-    case KernelArg::ImageArg:
-      Arg = new ImageKernelArg(llvm::cast<ImageKernelArg>(*Arg));
-      break;
-    case KernelArg::SamplerArg:
-      Arg = new SamplerKernelArg(llvm::cast<SamplerKernelArg>(*Arg));
-      break;
-    case KernelArg::ByValueArg:
-      Arg = new ByValueKernelArg(llvm::cast<ByValueKernelArg>(*Arg));
-      break;
-    }
-    Arguments.push_back(Arg);
-  }
+  for (const auto &Arg : K.Arguments)
+    Arguments.push_back(Arg->clone());
 } 
 
-Kernel::~Kernel() {
-  //llvm::DeleteContainerPointers(Arguments);
-}
+Kernel::~Kernel() {}
 
 llvm::StringRef Kernel::GetArgName(unsigned I) const {
   KernelArgInfo ArgsName = Desc->getKernelInfo().getArgsName();
@@ -284,7 +293,7 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
   }
 
   ThisLock.acquire();
-  Arguments[I] = new BufferKernelArg(I, Buf, AddrSpace);
+  Arguments[I].reset(new BufferKernelArg(I, Buf, AddrSpace));
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -298,7 +307,7 @@ cl_int Kernel::SetLocalBufferArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
 
   ThisLock.acquire();
-  Arguments[I] = new LocalBufferKernelArg(I, Size);
+  Arguments[I].reset(new LocalBufferKernelArg(I, Size));
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -329,7 +338,7 @@ cl_int Kernel::SetImageArg(unsigned I, size_t Size, const void *Arg) {
   }
 
   ThisLock.acquire();
-  Arguments[I] = new ImageKernelArg(I, Img, ImgAccess);
+  Arguments[I].reset(new ImageKernelArg(I, Img, ImgAccess));
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -355,7 +364,7 @@ cl_int Kernel::SetSamplerArg(unsigned I, size_t Size, const void *Arg) {
   }
 
   ThisLock.acquire();
-  Arguments[I] = new SamplerKernelArg(I, Smplr);
+  Arguments[I].reset(new SamplerKernelArg(I, Smplr));
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -384,7 +393,7 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
                       "kernel argument size does not match");
 
   ThisLock.acquire();
-  Arguments[I] = new ByValueKernelArg(I, Arg, Size);
+  Arguments[I].reset(new ByValueKernelArg(I, Arg, Size));
   ThisLock.release();
 
   return CL_SUCCESS;
