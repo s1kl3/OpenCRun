@@ -100,6 +100,9 @@ Kernel::Kernel(const Kernel &K) : Desc(K.Desc) {
     case KernelArg::BufferArg:
       Arg = new BufferKernelArg(llvm::cast<BufferKernelArg>(*Arg));
       break;
+    case KernelArg::LocalBufferArg:
+      Arg = new LocalBufferKernelArg(llvm::cast<LocalBufferKernelArg>(*Arg));
+      break;
     case KernelArg::ImageArg:
       Arg = new ImageKernelArg(llvm::cast<ImageKernelArg>(*Arg));
       break;
@@ -195,7 +198,19 @@ cl_kernel_arg_type_qualifier Kernel::GetArgTypeQualifier(unsigned I) const {
 }
 
 static bool isBufferArg(opencl::Type Ty) {
-  return Ty.isPointer();
+  if (!Ty.isPointer())
+    return false;
+
+  auto Q = Ty.getElementType().getQualifiers();
+  return Q.getAddressSpace() != opencl::AS_Local;
+}
+
+static bool isLocalBufferArg(opencl::Type Ty) {
+  if (!Ty.isPointer())
+    return false;
+
+  auto Q = Ty.getElementType().getQualifiers();
+  return Q.getAddressSpace() == opencl::AS_Local;
 }
 
 static bool isByValueArg(opencl::Type Ty) {
@@ -219,6 +234,9 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
 
   if (isBufferArg(ArgTy))
     return SetBufferArg(I, Size, Arg);
+
+  if (isLocalBufferArg(ArgTy))
+    return SetLocalBufferArg(I, Size, Arg);
 
   if (isImageArg(ArgTy))
     return SetImageArg(I, Size, Arg);
@@ -255,21 +273,6 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
 
     break;
 
-  case opencl::AS_Local:
-    if (Arg)
-      RETURN_WITH_ERROR(CL_INVALID_ARG_VALUE, "cannot set a local pointer");
-
-    if (!Size)
-      RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
-
-    Buf = Ctx.CreateVirtualBuffer(Size, 
-                                  MemoryObj::ReadWrite, 
-                                  MemoryObj::HostNoProtection);
-
-    // Update the amount of __local memory allocated for kernel arguments.
-    Desc->addLocalArgsSize(Size);
-    break;
-
   default:
     llvm_unreachable("Invalid address space");
   }
@@ -282,6 +285,20 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
 
   ThisLock.acquire();
   Arguments[I] = new BufferKernelArg(I, Buf, AddrSpace);
+  ThisLock.release();
+
+  return CL_SUCCESS;
+}
+
+cl_int Kernel::SetLocalBufferArg(unsigned I, size_t Size, const void *Arg) {
+  if (Arg)
+    RETURN_WITH_ERROR(CL_INVALID_ARG_VALUE, "cannot set a local pointer");
+
+  if (!Size)
+    RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
+
+  ThisLock.acquire();
+  Arguments[I] = new LocalBufferKernelArg(I, Size);
   ThisLock.release();
 
   return CL_SUCCESS;

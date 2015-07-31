@@ -917,10 +917,6 @@ void CPUDevice::LocateMemoryObjArgAddresses(
                            I != E;
                            ++I)
     if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(*I)) {
-      // Local mappings handled by Multiprocessor.
-      if(Arg->OnLocalAddressSpace())
-        continue;
-
       unsigned I = Arg->GetPosition();
 
       if(Buffer *Buf = Arg->GetBuffer())

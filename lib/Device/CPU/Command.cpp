@@ -41,11 +41,7 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
                            ++I) {
     // A buffer can be allocated by the CPUDevice.
     if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(*I)) {
-      // Only global and constant buffers are handled here. Local buffers are
-      // handled later.
-      if(Arg->OnGlobalAddressSpace() || Arg->OnConstantAddressSpace())
-        Args[J] = GlobalArgs[J];
-
+      Args[J] = GlobalArgs[J];
     } 
     
     // An image can be allocated by the CPUDevice.
@@ -91,9 +87,8 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(
                            E = Kern.arg_end();
                            I != E;
                            ++I) {
-    BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(*I);
-    if(Arg && Arg->OnLocalAddressSpace())
-      Args[J] = Local.Alloc(*Arg->GetBuffer());
+    if(LocalBufferKernelArg *Arg = llvm::dyn_cast<LocalBufferKernelArg>(*I))
+      Args[J] = Local.Alloc(Arg->getSize());
 
     ++J;
   }

@@ -22,6 +22,7 @@ class KernelArg {
 public:
   enum Type {
     BufferArg,
+    LocalBufferArg,
     ImageArg,
     SamplerArg,
     ByValueArg
@@ -73,6 +74,24 @@ public:
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Buf;
   opencl::AddressSpace AddrSpace;
+};
+
+class LocalBufferKernelArg : public KernelArg {
+public:
+  static bool classof(const KernelArg *Arg) {
+    return Arg->GetType() == KernelArg::LocalBufferArg;
+  }
+
+public:
+  LocalBufferKernelArg(unsigned Position, size_t Size)
+   : KernelArg(KernelArg::LocalBufferArg, Position), Size(Size) {}
+
+
+public:
+  size_t getSize() const { return Size; }
+
+private:
+  size_t Size;
 };
 
 class ImageKernelArg : public KernelArg {
@@ -247,6 +266,7 @@ public:
 
 private:
   cl_int SetBufferArg(unsigned I, size_t Size, const void *Arg);
+  cl_int SetLocalBufferArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetImageArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetSamplerArg(unsigned I, size_t Size, const void *Arg);
   cl_int SetByValueArg(unsigned I, size_t Size, const void *Arg);

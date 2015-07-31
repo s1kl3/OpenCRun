@@ -96,10 +96,6 @@ public:
                                    MemoryObj::AccessProtection AccessProt,
                                    MemoryObj::HostAccessProtection HostAccessProt,
                                    cl_int *ErrCode = NULL);
-  Buffer *CreateVirtualBuffer(size_t Size,
-                              MemoryObj::AccessProtection AccessProt,
-                              MemoryObj::HostAccessProtection HostAccessProt,
-                              cl_int *ErrCode = NULL);
 
   HostImage *CreateHostImage(size_t Size,
                              void *HostPtr,

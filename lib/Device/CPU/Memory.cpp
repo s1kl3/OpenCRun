@@ -242,10 +242,10 @@ void LocalMemory::Reset(size_t StaticSize) {
   Next = reinterpret_cast<void *>(NextAddr);
 }
 
-void *LocalMemory::Alloc(MemoryObj &MemObj) {
+void *LocalMemory::Alloc(size_t ObjSize) {
   void *Addr = Next;
 
-  uintptr_t NextAddr = reinterpret_cast<uintptr_t>(Next) + MemObj.GetSize();
+  uintptr_t NextAddr = reinterpret_cast<uintptr_t>(Next) + ObjSize;
   Next = reinterpret_cast<void *>(NextAddr);
 
   assert(NextAddr - reinterpret_cast<uintptr_t>(Base) <= Size &&

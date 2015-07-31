@@ -206,21 +206,6 @@ DeviceBuffer *Context::CreateDeviceBuffer(
   return Buf;
 }
 
-Buffer *Context::CreateVirtualBuffer(size_t Size,
-                                     MemoryObj::AccessProtection AccessProt,
-                                     MemoryObj::HostAccessProtection HostAccessProt,
-                                     cl_int *ErrCode) {
-  if(!Size)
-    RETURN_WITH_ERROR(ErrCode, CL_INVALID_BUFFER_SIZE, "buffer size is zero");
-
-  VirtualBuffer *Buf = new VirtualBuffer(*this, Size, AccessProt, HostAccessProt);
-
-  if(ErrCode)
-    *ErrCode = CL_SUCCESS;
-
-  return Buf;
-}
-
 HostImage *Context::CreateHostImage(
     size_t Size,
     void *Storage,
@@ -429,8 +414,7 @@ DeviceImage *Context::CreateDeviceImage(
 
 void Context::DestroyMemoryObj(MemoryObj &MemObj) {
   for(device_iterator I = Devices.begin(), E = Devices.end(); I != E; ++I)
-    if(!llvm::isa<VirtualBuffer>(MemObj))
-      (*I)->DestroyMemoryObj(MemObj);
+    (*I)->DestroyMemoryObj(MemObj);
 }
 
 void Context::ReportDiagnostic(llvm::StringRef Msg) {

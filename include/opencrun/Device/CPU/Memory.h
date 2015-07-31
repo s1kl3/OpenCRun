@@ -70,7 +70,7 @@ public:
 public:
   void Reset(size_t StaticSize = 0);
 
-  void *Alloc(MemoryObj &MemObj);
+  void *Alloc(size_t ObjSize);
 
   void *GetStaticPtr() const { return Static; }
 

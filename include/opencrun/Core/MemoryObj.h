@@ -26,7 +26,6 @@ public:
     HostBuffer,
     HostAccessibleBuffer,
     DeviceBuffer,
-    VirtualBuffer,
     LastBuffer,
     HostImage,
     HostAccessibleImage,
@@ -437,25 +436,6 @@ private:
 
   DeviceBuffer(const DeviceBuffer &That); // Do not implement.
   void operator=(const DeviceBuffer &That); // Do not implement.
-
-  friend class Context;
-};
-
-class VirtualBuffer : public Buffer {
-public:
-  static bool classof(const MemoryObj *MemObj) {
-    return MemObj->GetType() == MemoryObj::VirtualBuffer;
-  }
-  
-private:
-  VirtualBuffer(Context &Ctx,
-                size_t Size,
-                MemoryObj::AccessProtection AccessProt,
-                MemoryObj::HostAccessProtection HostAccessProt)
-    : Buffer(MemoryObj::VirtualBuffer, Ctx, NULL, 0, Size, NULL, MemoryObj::NoHostPtrUsage, AccessProt, HostAccessProt) { }
-
-  VirtualBuffer(const VirtualBuffer &That); // Do not implement.
-  void operator=(const VirtualBuffer &That); // Do not implement.
 
   friend class Context;
 };
