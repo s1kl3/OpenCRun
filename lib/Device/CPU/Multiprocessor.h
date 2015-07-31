@@ -59,18 +59,9 @@ private:
 private:
   CPUDevice &Dev;
   CPUThreadsContainer Threads;
-
-  friend class ProfilerTraits<Multiprocessor>;
 };
 
 } // End namespace cpu.
-
-template <>
-class ProfilerTraits<Multiprocessor> {
-public:
-  static sys::Time ReadTime(cpu::Multiprocessor &Profilable);
-};
-
 } // End namespace opencrun.
 
 #endif // OPENCRUN_DEVICE_CPU_MULTIPROCESSOR_H

@@ -53,8 +53,7 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   ThisLock.acquire();
 
   unsigned Cnts = EnableProfile ? Profiler::Time : Profiler::None;
-  ProfileSample *Sample = GetProfilerSample(Dev,
-                                            Cnts,
+  ProfileSample *Sample = GetProfilerSample(Cnts,
                                             ProfileSample::CommandEnqueued);
   llvm::IntrusiveRefCntPtr<InternalEvent> Ev;
   Ev = new InternalEvent(*this, Cmd.GetType(), Sample);

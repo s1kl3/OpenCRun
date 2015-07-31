@@ -198,11 +198,3 @@ CPUThread &Multiprocessor::GetLesserLoadedThread() {
 
   return *Thr;
 }
-
-//
-// ProfilerTraits<Multiprocessor> implementation.
-//
-
-sys::Time ProfilerTraits<Multiprocessor>::ReadTime(Multiprocessor &Profilable) {
-  return ProfilerTraits<CPUDevice>::ReadTime(Profilable.Dev);
-}

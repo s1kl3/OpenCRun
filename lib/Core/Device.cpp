@@ -482,11 +482,3 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   CodeGenOpts.StackRealignment = true;
   CodeGenOpts.OptimizationLevel = 2;
 }
-
-sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
-// TODO: CPUDevice is not a public class!
-//  if(CPUDevice *CPU = llvm::dyn_cast<CPUDevice>(&Profilable))
-//    return ProfilerTraits<CPUDevice>::ReadTime(*CPU);
-
-  llvm_unreachable("Unknown device type");
-}

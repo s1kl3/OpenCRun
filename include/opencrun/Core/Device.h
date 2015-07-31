@@ -482,12 +482,6 @@ private:
   friend class DeviceBuiltinInfo;
 };
 
-template <>
-class ProfilerTraits<Device> {
-public:
-  static sys::Time ReadTime(Device &Profilable);
-};
-
 } // End namespace opencrun.
 
 #endif // OPENCRUN_CORE_DEVICE_H

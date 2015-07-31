@@ -367,16 +367,14 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
 
   // Command started.
   if(Cmd->RegisterStarted()) {
-    ProfileSample *Sample = GetProfilerSample(MP,
-                                              Counters,
+    ProfileSample *Sample = GetProfilerSample(Counters,
                                               ProfileSample::CommandRunning);
     Ev.MarkRunning(Sample);
   }
 
   // This command is part of a large OpenCL command. Register partial execution.
   if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd)) {
-    ProfileSample *Sample = GetProfilerSample(MP,
-                                              Counters,
+    ProfileSample *Sample = GetProfilerSample(Counters,
                                               ProfileSample::CommandRunning,
                                               MultiCmd->GetId());
     Ev.MarkSubRunning(Sample);

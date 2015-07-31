@@ -3,6 +3,7 @@
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
 #include "opencrun/System/Env.h"
+#include "opencrun/System/Time.h"
 #include "opencrun/Util/Table.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -31,6 +32,25 @@ Profiler::Profiler() : ProfileStream(STDERR_FILENO, false, true),
     ToProfile |= llvm::StringSwitch<Counter>(*I)
                    .Case("time", Time)
                    .Default(None);
+}
+
+ProfileSample *Profiler::GetSample(unsigned Counters,
+                                   ProfileSample::Label Label,
+                                   int SubLabelId) {
+  Counters |= ToProfile;
+
+  // Fast path for non-profiled runs.
+  if(Counters == None)
+    return NULL;
+
+  ProfileSample *Sample = new ProfileSample(Label, SubLabelId);
+
+  if(Counters & Time) {
+    sys::Time TM = sys::Time::GetWallClock();
+    Sample->SetTime(TM);
+  }
+
+  return Sample;
 }
 
 void Profiler::DumpTrace(unsigned CmdType,

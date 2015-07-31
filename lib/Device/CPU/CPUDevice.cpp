@@ -156,8 +156,7 @@ bool CPUDevice::Submit(Command &Cmd) {
   // Take the profiling information here, in order to force this sample
   // happening before the subsequents samples.
   unsigned Counters = Cmd.IsProfiled() ? Profiler::Time : Profiler::None;
-  Sample.reset(GetProfilerSample(*this, Counters,
-                                 ProfileSample::CommandSubmitted));
+  Sample.reset(GetProfilerSample(Counters, ProfileSample::CommandSubmitted));
 
 #define DISPATCH(CmdType)                                          \
   case Command::CmdType:                                           \
@@ -226,8 +225,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   // This command does not directly translate to an OpenCL command. Register
   // partial acknowledgment.
   if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd)) {
-    ProfileSample *Sample = GetProfilerSample(*this,
-                                              Counters,
+    ProfileSample *Sample = GetProfilerSample(Counters,
                                               ProfileSample::CommandCompleted,
                                               MultiCmd->GetId());
     Ev.MarkSubCompleted(Sample);
@@ -235,8 +233,7 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
 
   // All acknowledgment received.
   if(Cmd->RegisterCompleted(ExitStatus)) {
-    ProfileSample *Sample = GetProfilerSample(*this,
-                                              Counters,
+    ProfileSample *Sample = GetProfilerSample(Counters,
                                               ProfileSample::CommandCompleted);
     Ev.MarkCompleted(Cmd->GetExitStatus(), Sample);
     Queue.CommandDone(QueueCmd);

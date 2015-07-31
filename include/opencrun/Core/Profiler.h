@@ -49,12 +49,6 @@ private:
   friend class Profiler;
 };
 
-template <typename Ty>
-class ProfilerTraits {
-public:
-  static sys::Time ReadTime(Ty &Profilable);
-};
-
 class ProfileTrace {
 public:
   typedef std::vector<ProfileSample *> SamplesContainer;
@@ -116,26 +110,9 @@ public:
   void operator=(const Profiler &That); // Do not implement.
 
 public:
-  template <typename Ty>
-  ProfileSample *GetSample(Ty &Profilable,
-                           unsigned Counters,
+  ProfileSample *GetSample(unsigned Counters,
                            ProfileSample::Label Label = ProfileSample::Unknown,
-                           int SubLabelId = -1) {
-    Counters |= ToProfile;
-
-    // Fast path for non-profiled runs.
-    if(Counters == None)
-      return NULL;
-
-    ProfileSample *Sample = new ProfileSample(Label, SubLabelId);
-
-    if(Counters & Time) {
-      sys::Time TM = ProfilerTraits<Ty>::ReadTime(Profilable);
-      Sample->SetTime(TM);
-    }
-
-    return Sample;
-  }
+                           int SubLabelId = -1);
 
   bool IsProfilingForcedFromEnvironment() const { return ToProfile; }
 
@@ -159,13 +136,12 @@ private:
 
 Profiler &GetProfiler();
 
-template <typename Ty>
+static inline
 ProfileSample *GetProfilerSample(
-                 Ty &Profilable,
                  unsigned Counters,
                  ProfileSample::Label Label = ProfileSample::Unknown,
                  int SubLabelId = -1) {
-  return GetProfiler().GetSample(Profilable, Counters, Label, SubLabelId);
+  return GetProfiler().GetSample(Counters, Label, SubLabelId);
 }
 
 } // End namespace opencrun.

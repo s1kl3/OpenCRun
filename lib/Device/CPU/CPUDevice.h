@@ -151,14 +151,6 @@ private:
 
 void *LibLinker(const std::string &Name);
 
-template <>
-class ProfilerTraits<CPUDevice> {
-public:
-  static sys::Time ReadTime(CPUDevice &Profilable) {
-    return sys::Time::GetWallClock();
-  }
-};
-
 } // End namespace cpu.
 } // End namespace opencrun.
 
