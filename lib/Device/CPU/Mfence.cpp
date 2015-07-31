@@ -1,5 +1,5 @@
 
-#include "opencrun/Device/CPU/InternalCalls.h"
+#include "InternalCalls.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;

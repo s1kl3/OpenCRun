@@ -1,5 +1,5 @@
 
-#include "opencrun/Device/CPU/AsyncCopyThread.h"
+#include "AsyncCopyThread.h"
 
 using namespace opencrun::cpu;
 

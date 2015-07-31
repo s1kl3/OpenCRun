@@ -1,5 +1,4 @@
 #include "opencrun/Core/Device.h"
-#include "opencrun/Device/CPU/CPUDevice.h"
 #include "opencrun/Util/LLVMCodeGenAction.h"
 #include "opencrun/Util/LLVMOptimizer.h"
 
@@ -485,8 +484,9 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
 }
 
 sys::Time ProfilerTraits<Device>::ReadTime(Device &Profilable) {
-  if(CPUDevice *CPU = llvm::dyn_cast<CPUDevice>(&Profilable))
-    return ProfilerTraits<CPUDevice>::ReadTime(*CPU);
+// TODO: CPUDevice is not a public class!
+//  if(CPUDevice *CPU = llvm::dyn_cast<CPUDevice>(&Profilable))
+//    return ProfilerTraits<CPUDevice>::ReadTime(*CPU);
 
   llvm_unreachable("Unknown device type");
 }

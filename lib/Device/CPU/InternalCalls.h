@@ -2,8 +2,6 @@
 #ifndef OPENCRUN_DEVICE_CPU_INTERNALCALLS_H
 #define OPENCRUN_DEVICE_CPU_INTERNALCALLS_H
 
-#include "opencrun/Device/CPU/AsyncCopyThread.h"
-
 #include "llvm/ADT/SmallVector.h"
 
 // With the CPU device the accellerator and the host are on the same computed
@@ -15,6 +13,14 @@
 // However, some types are used only inside the OpenCL C language and they are
 // not available on the host. Define them here.
 typedef cl_uint cl_mem_fence_flags;
+
+namespace opencrun {
+namespace cpu {
+
+class AsyncCopyThread;
+
+}
+}
 
 // Event type used to identify asynchronous copies from local to global memory
 // and vice-versa.

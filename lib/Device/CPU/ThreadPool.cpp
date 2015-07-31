@@ -1,5 +1,5 @@
 
-#include "opencrun/Device/CPU/ThreadPool.h"
+#include "ThreadPool.h"
 
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/ADT/STLExtras.h"

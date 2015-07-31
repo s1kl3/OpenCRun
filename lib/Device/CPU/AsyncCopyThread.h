@@ -2,7 +2,7 @@
 #ifndef OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 #define OPENCRUN_DEVICE_CPU_ASYNCCOPYTHREAD_H
 
-#include "opencrun/Device/CPU/ThreadPool.h"
+#include "ThreadPool.h"
 
 namespace opencrun {
 namespace cpu {

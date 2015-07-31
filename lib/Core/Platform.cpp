@@ -1,7 +1,9 @@
 
 #include "opencrun/Core/Platform.h"
+#include "opencrun/Core/Device.h"
 #include "opencrun/Device/Devices.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ManagedStatic.h"
 
 using namespace opencrun;

@@ -4,7 +4,6 @@
 
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
-#include "opencrun/Device/CPU/Memory.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
@@ -12,6 +11,8 @@
 
 namespace opencrun {
 namespace cpu {
+
+class LocalMemory;
 
 class CPUCommand {
 public:

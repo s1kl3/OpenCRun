@@ -2,15 +2,15 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
+#include "Memory.h"
+#include "Multiprocessor.h"
+
 #include "opencrun/Core/Device.h"
-#include "opencrun/Device/CPU/Memory.h"
-#include "opencrun/Device/CPU/Multiprocessor.h"
 
 #include "llvm/ExecutionEngine/JIT.h"
 
-using namespace opencrun::cpu;
-
 namespace opencrun {
+namespace cpu {
 
 class CPUDevice : public Device {
 public:
@@ -159,6 +159,7 @@ public:
   }
 };
 
+} // End namespace cpu.
 } // End namespace opencrun.
 
 #endif // OPENCRUN_DEVICE_CPU_CPUDEVICE_H

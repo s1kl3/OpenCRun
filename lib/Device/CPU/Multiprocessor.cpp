@@ -1,6 +1,6 @@
 
-#include "opencrun/Device/CPU/Multiprocessor.h"
-#include "opencrun/Device/CPU/CPUDevice.h"
+#include "Multiprocessor.h"
+#include "CPUDevice.h"
 #include "opencrun/System/OS.h"
 
 #include <float.h>

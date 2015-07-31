@@ -2,8 +2,8 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUTHREAD_H
 #define OPENCRUN_DEVICE_CPU_CPUTHREAD_H
 
-#include "opencrun/Device/CPU/Command.h"
-#include "opencrun/Device/CPU/Memory.h"
+#include "Command.h"
+#include "Memory.h"
 #include "opencrun/System/Hardware.h"
 #include "opencrun/System/Monitor.h"
 #include "opencrun/System/Thread.h"

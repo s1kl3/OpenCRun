@@ -1,5 +1,5 @@
 
-#include "opencrun/Device/CPU/Memory.h"
+#include "Memory.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;

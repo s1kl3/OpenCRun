@@ -1,8 +1,9 @@
 
-#include "opencrun/Device/CPU/Command.h"
-#include "opencrun/Device/CPU/InternalCalls.h"
-#include "opencrun/System/OS.h"
+#include "Command.h"
 #include "CPUKernelInfo.h"
+#include "InternalCalls.h"
+#include "Memory.h"
+#include "opencrun/System/OS.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;

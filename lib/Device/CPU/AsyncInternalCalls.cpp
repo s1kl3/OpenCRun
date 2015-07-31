@@ -1,7 +1,7 @@
 
-#include "opencrun/Device/CPU/InternalCalls.h"
-#include "opencrun/Device/CPU/Multiprocessor.h"
-#include "opencrun/Device/CPU/AsyncCopyThread.h"
+#include "InternalCalls.h"
+#include "AsyncCopyThread.h"
+#include "Multiprocessor.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;

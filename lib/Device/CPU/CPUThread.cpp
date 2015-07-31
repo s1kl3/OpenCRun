@@ -1,7 +1,8 @@
 
-#include "opencrun/Device/CPU/CPUThread.h"
+#include "CPUThread.h"
+#include "Multiprocessor.h"
+
 #include "opencrun/Core/Event.h"
-#include "opencrun/Device/CPU/Multiprocessor.h"
 #include "opencrun/System/OS.h"
 
 #include "llvm/Support/Format.h"

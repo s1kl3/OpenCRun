@@ -1,16 +1,17 @@
 
-#include "opencrun/Device/CPU/CPUDevice.h"
+#include "CPUDevice.h"
+#include "CPUKernelInfo.h"
+#include "InternalCalls.h"
+
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/Core/Platform.h"
-#include "opencrun/Device/CPU/InternalCalls.h"
 #include "opencrun/Device/CPUPasses/AllPasses.h"
 #include "opencrun/Device/Devices.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
 
-#include "CPUKernelInfo.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Linker/Linker.h"
@@ -22,6 +23,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace opencrun;
+using namespace opencrun::cpu;
 
 namespace {
 

@@ -1,6 +1,6 @@
 
-#include "opencrun/Device/CPU/InternalCalls.h"
-#include "opencrun/Device/CPU/Multiprocessor.h"
+#include "InternalCalls.h"
+#include "Multiprocessor.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;

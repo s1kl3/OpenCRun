@@ -2,18 +2,17 @@
 #ifndef OPENCRUN_DEVICE_CPU_MULTIPROCESSOR_H
 #define OPENCRUN_DEVICE_CPU_MULTIPROCESSOR_H
 
+#include "Command.h"
+#include "CPUThread.h"
 #include "opencrun/Core/Profiler.h"
-#include "opencrun/Device/CPU/Command.h"
-#include "opencrun/Device/CPU/CPUThread.h"
 #include "opencrun/System/Hardware.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace opencrun {
+namespace cpu {
 
 class CPUDevice;
-
-namespace cpu {
 
 class Multiprocessor {
 public:
@@ -65,16 +64,11 @@ private:
 };
 
 } // End namespace cpu.
-} // End namespace opencrun.
-
-using namespace opencrun::cpu;
-
-namespace opencrun {
 
 template <>
 class ProfilerTraits<Multiprocessor> {
 public:
-  static sys::Time ReadTime(Multiprocessor &Profilable);
+  static sys::Time ReadTime(cpu::Multiprocessor &Profilable);
 };
 
 } // End namespace opencrun.
