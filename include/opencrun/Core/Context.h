@@ -10,6 +10,7 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Mutex.h"
 
@@ -57,6 +58,9 @@ public:
 public:
   device_iterator device_begin() { return Devices.begin(); }
   device_iterator device_end() { return Devices.end(); }
+  llvm::iterator_range<device_iterator> devices() {
+    return { device_begin(), device_end()  };
+  }
 
 public:
   DevicesContainer::size_type device_size() const { return Devices.size(); }
