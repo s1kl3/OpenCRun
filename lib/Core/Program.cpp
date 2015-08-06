@@ -34,7 +34,7 @@ void CompilerCallbackClojure::CompilerDone(Program &Prog) {
 
 Program::Program(Context &Ctx, llvm::MemoryBuffer &Src) : Ctx(&Ctx),
                                                           Src(&Src) {
-  Devices.resize(Ctx.devices_size());
+  Devices.resize(Ctx.device_size());
   std::copy(Ctx.device_begin(), Ctx.device_end(), Devices.begin());
 }
 

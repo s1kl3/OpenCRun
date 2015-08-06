@@ -59,7 +59,7 @@ public:
   device_iterator device_end() { return Devices.end(); }
 
 public:
-  DevicesContainer::size_type devices_size() const { return Devices.size(); }
+  DevicesContainer::size_type device_size() const { return Devices.size(); }
 
 public:
   Context(Platform &Plat,

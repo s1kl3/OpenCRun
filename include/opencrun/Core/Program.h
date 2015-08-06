@@ -163,7 +163,7 @@ public:
   buildinfo_iterator buildinfo_end() { return BuildInfo.end(); }
 
 public:
-  DevicesContainer::size_type devices_size() const { return Devices.size(); }
+  DevicesContainer::size_type device_size() const { return Devices.size(); }
   BuildInformationContainer::size_type buildinfo_size() const { return BuildInfo.size(); }
 
 public:

@@ -1,7 +1,7 @@
 
 PROPERTY(CL_PROGRAM_REFERENCE_COUNT, GetReferenceCount, cl_uint, unsigned)
 PROPERTY(CL_PROGRAM_CONTEXT, GetContext, cl_context, opencrun::Context &)
-PROPERTY(CL_PROGRAM_NUM_DEVICES, devices_size, cl_uint, size_t)
+PROPERTY(CL_PROGRAM_NUM_DEVICES, device_size, cl_uint, size_t)
 // CL_PROGRAM_DEVICES manually implemented.
 PROPERTY(CL_PROGRAM_SOURCE, GetSource, char, llvm::StringRef)
 // CL_PROGRAM_BINARY_SIZES manually implemented.
