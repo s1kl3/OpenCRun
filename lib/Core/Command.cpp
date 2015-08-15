@@ -450,46 +450,22 @@ EnqueueNDRangeKernel::EnqueueNDRangeKernel(const Kernel &Kern,
 // EnqueueNativeKernel implementation.
 //
 
-EnqueueNativeKernel::EnqueueNativeKernel(Signature &Func,
-                                         Arguments &RawArgs,
-                                         MappingsContainer &Mappings,
+EnqueueNativeKernel::EnqueueNativeKernel(Signature Func,
+                                         Arguments RawArgs,
+                                         const MemoryLocations &Locs,
                                          EventsContainer &WaitList) :
   Command(Command::NativeKernel, WaitList),
-  Func(Func) {
+  Func(Func), Locs(Locs) {
   void *ArgCopy = sys::Alloc(RawArgs.second);
 
   // Copy arguments.
   std::memcpy(ArgCopy, RawArgs.first, RawArgs.second);
   
-  // Re-base pointers.
-  uintptr_t Base = reinterpret_cast<uintptr_t>(ArgCopy);
-  for(MappingsContainer::iterator I = Mappings.begin(),
-                                  E = Mappings.end();
-                                  I != E;
-                                  ++I) {
-    ptrdiff_t Offset = reinterpret_cast<uintptr_t>(I->second) -
-                       reinterpret_cast<uintptr_t>(RawArgs.first);
-    this->Mappings[I->first] = reinterpret_cast<void *>(Base + Offset);
-  }
-
   this->RawArgs = std::make_pair(ArgCopy, RawArgs.second);
 }
 
 EnqueueNativeKernel::~EnqueueNativeKernel() {
   sys::Free(RawArgs.first);
-}
-
-void EnqueueNativeKernel::RemapMemoryObjAddresses(
-                            const MappingsContainer &GlobalMappings) {
-  MappingsContainer::const_iterator J, T = GlobalMappings.end();
-
-  for(MappingsContainer::iterator I = Mappings.begin(),
-                                  E = Mappings.end();
-                                  I != E;
-                                  ++I) {
-    J = GlobalMappings.find(I->first);
-    *static_cast<void **>(I->second) = J != T ? J->second : NULL;
-  }
 }
 
 //
@@ -2854,7 +2830,7 @@ EnqueueNativeKernelBuilder::EnqueueNativeKernelBuilder(
     NotifyError(CL_INVALID_VALUE, "expected arguments size");
 }
 
-EnqueueNativeKernelBuilder &EnqueueNativeKernelBuilder::SetMemoryMappings(
+EnqueueNativeKernelBuilder &EnqueueNativeKernelBuilder::SetMemoryLocations(
   unsigned N,
   const cl_mem *MemObjs,
   const void **MemLocs) {
@@ -2868,8 +2844,9 @@ EnqueueNativeKernelBuilder &EnqueueNativeKernelBuilder::SetMemoryMappings(
     if(!MemObjs[I])
       return NotifyError(CL_INVALID_MEM_OBJECT, "invalid memory object");
 
-    MemoryObj *MemObj = llvm::cast<MemoryObj>(MemObjs[I]);
-    Mappings[MemObj] = const_cast<void *>(MemLocs[I]);
+    ptrdiff_t Offset = reinterpret_cast<const uint8_t*>(MemLocs[I]) -
+                       reinterpret_cast<const uint8_t*>(RawArgs.first);
+    Locs[Offset] = llvm::cast<MemoryObj>(MemObjs[I]);
   }
 
   return *this;
@@ -2890,7 +2867,7 @@ EnqueueNativeKernel *EnqueueNativeKernelBuilder::Create(cl_int *ErrCode) {
   if(ErrCode)
     *ErrCode = CL_SUCCESS;
 
-  return new EnqueueNativeKernel(Func, RawArgs, Mappings, WaitList);
+  return new EnqueueNativeKernel(Func, RawArgs, Locs, WaitList);
 }
 
 //

@@ -802,9 +802,9 @@ clEnqueueNativeKernel(cl_command_queue command_queue,
   opencrun::EnqueueNativeKernelBuilder Bld(Queue->GetContext(),
                                            user_func,
                                            RawArgs);
-  opencrun::Command *Cmd = Bld.SetMemoryMappings(num_mem_objects,
-                                                 mem_list,
-                                                 args_mem_loc)
+  opencrun::Command *Cmd = Bld.SetMemoryLocations(num_mem_objects,
+                                                  mem_list,
+                                                  args_mem_loc)
                               .SetWaitList(num_events_in_wait_list,
                                            event_wait_list)
                               .Create(&ErrCode);

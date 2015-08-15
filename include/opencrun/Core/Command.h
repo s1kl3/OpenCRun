@@ -738,26 +738,22 @@ public:
 public:
   typedef void (*Signature)(void*);
   typedef std::pair<void *, size_t> Arguments;
-  typedef std::map<MemoryObj *, void *> MappingsContainer;
+  typedef std::map<ptrdiff_t, MemoryObj *> MemoryLocations;
 
 private:
-  EnqueueNativeKernel(Signature &Func,
-                      Arguments &RawArgs,
-                      MappingsContainer &Mappings,
-                      EventsContainer &WaitList);
+  EnqueueNativeKernel(Signature Func, Arguments RawArgs,
+                      const MemoryLocations &Locs, EventsContainer &WaitList);
   ~EnqueueNativeKernel();
 
 public:
-  void RemapMemoryObjAddresses(const MappingsContainer &GlobalMappings);
-
-public:
-  Signature &GetFunction() { return Func; }
+  Signature GetFunction() { return Func; }
   void *GetArgumentsPointer() { return RawArgs.first; }
+  const MemoryLocations &GetMemoryLocations() const { return Locs; }
 
 private:
   Signature Func;
   Arguments RawArgs;
-  MappingsContainer Mappings;
+  MemoryLocations Locs;
 
   friend class EnqueueNativeKernelBuilder;
 };
@@ -1535,9 +1531,9 @@ public:
                              EnqueueNativeKernel::Arguments &RawArgs);
 
 public:
-  EnqueueNativeKernelBuilder &SetMemoryMappings(unsigned N,
-                                                const cl_mem *MemObjs,
-                                                const void **MemLocs);
+  EnqueueNativeKernelBuilder &SetMemoryLocations(unsigned N,
+                                                 const cl_mem *MemObjs,
+                                                 const void **MemLocs);
   EnqueueNativeKernelBuilder &SetWaitList(unsigned N, const cl_event *Evs);
 
   EnqueueNativeKernel *Create(cl_int *ErrCode);
@@ -1552,7 +1548,7 @@ private:
 private:
   EnqueueNativeKernel::Signature Func;
   EnqueueNativeKernel::Arguments RawArgs;
-  EnqueueNativeKernel::MappingsContainer Mappings;
+  EnqueueNativeKernel::MemoryLocations Locs;
 };
 
 } // End namespace opencrun.

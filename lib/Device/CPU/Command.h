@@ -1022,7 +1022,7 @@ public:
     : CPUExecCommand(CPUCommand::NativeKernel, Cmd) { }
 
 public:
-  Signature &GetFunction() const {
+  Signature GetFunction() const {
     return GetQueueCommandAs<EnqueueNativeKernel>().GetFunction();
   }
 

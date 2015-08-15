@@ -681,10 +681,13 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  Memory::MappingsContainer Mappings;
-  Global.GetMappings(Mappings);
+  auto Base = reinterpret_cast<uintptr_t>(Cmd.GetArgumentsPointer());
 
-  Cmd.RemapMemoryObjAddresses(Mappings);
+  // Patching arguments buffer copy.
+  for (const auto &P : Cmd.GetMemoryLocations()) {
+    auto Addr = reinterpret_cast<void**>(Base + P.first);
+    *Addr = Global[*P.second];
+  }
 
   return MP.Submit(new NativeKernelCPUCommand(Cmd));
 }
