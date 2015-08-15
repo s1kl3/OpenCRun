@@ -4,7 +4,7 @@
 
 #include "CL/cl.h"
 
-#include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/MemoryObject.h"
 #include "opencrun/Core/Sampler.h"
 #include "opencrun/Core/Program.h"
 #include "opencrun/Passes/FootprintEstimate.h"

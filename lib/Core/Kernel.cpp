@@ -322,7 +322,7 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
 
   Buffer *Buf = Arg ? *reinterpret_cast<Buffer* const*>(Arg) : nullptr;
 
-  if (Buf && Buf->GetContext() != GetContext())
+  if (Buf && Buf->getContext() != GetContext())
     RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
                       "buffer and kernel contexts do not match");
 
@@ -354,7 +354,7 @@ cl_int Kernel::SetImageArg(unsigned I, size_t Size, const void *Arg) {
 
   Image *Img = Arg ? *reinterpret_cast<Image* const*>(Arg) : nullptr;
 
-  if (Img && Img->GetContext() != GetContext())
+  if (Img && Img->getContext() != GetContext())
     RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
                       "image and kernel contexts do not match");
 

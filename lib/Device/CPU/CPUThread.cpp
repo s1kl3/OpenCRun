@@ -552,9 +552,9 @@ int CPUThread::Execute(MapImageCPUCommand &Cmd) {
 
 int CPUThread::Execute(UnmapMemObjectCPUCommand &Cmd) {
   EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
-  MemoryObj &MemObj = CmdUnmap.GetMemObj();
+  MemoryObject &MemObj = CmdUnmap.GetMemObj();
   
-  MemObj.RemoveMapping(Cmd.GetMappedPtr());
+  MemObj.removeMapping(Cmd.GetMappedPtr());
   
   return CPUCommand::NoError;
 }

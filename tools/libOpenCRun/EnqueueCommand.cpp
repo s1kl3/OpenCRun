@@ -6,7 +6,7 @@
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
-#include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/MemoryObject.h"
 
 #define CL_MAP_FIELD_ALL   \
   (CL_MAP_READ |     \
@@ -677,14 +677,14 @@ clEnqueueUnmapMemObject(cl_command_queue command_queue,
     return CL_INVALID_VALUE;
   
   opencrun::CommandQueue *Queue;
-  opencrun::MemoryObj *MemObj;
+  opencrun::MemoryObject *MemObj;
   
   Queue = llvm::cast<opencrun::CommandQueue>(command_queue);
-  MemObj = llvm::cast<opencrun::MemoryObj>(memobj);
+  MemObj = llvm::cast<opencrun::MemoryObject>(memobj);
   
   cl_int ErrCode;
   
-  if(!MemObj->IsValidMappingPtr(mapped_ptr))
+  if(!MemObj->isValidMapping(mapped_ptr))
     return CL_INVALID_VALUE;
   
   opencrun::EnqueueUnmapMemObjectBuilder Bld(Queue->GetContext(), memobj, mapped_ptr);

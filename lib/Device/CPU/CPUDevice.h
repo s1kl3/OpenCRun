@@ -49,19 +49,14 @@ public:
 
   virtual const Footprint &getKernelFootprint(const KernelDescriptor &Kern) const;
 
-  virtual bool CreateHostBuffer(HostBuffer &Buf);
-  virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf);
-  virtual bool CreateDeviceBuffer(DeviceBuffer &Buf);
+  virtual bool CreateBuffer(Buffer &Buf);
   
-  virtual bool CreateHostImage(HostImage &Img);
-  virtual bool CreateHostAccessibleImage(HostAccessibleImage &Img);
-  virtual bool CreateDeviceImage(DeviceImage &Img);
+  virtual bool CreateImage(Image &Img);
 
-  virtual void DestroyMemoryObj(MemoryObj &MemObj);
+  virtual void DestroyMemoryObj(MemoryObject &MemObj);
 
-  virtual bool MappingDoesAllocation(MemoryObj::Type MemObjTy);
-  virtual void *CreateMapBuffer(MemoryObj &MemObj, 
-                                MemoryObj::MappingInfo &MapInfo);
+  virtual void *CreateMapBuffer(MemoryObject &MemObj, 
+                                MemoryObject::MemMappingInfo &MapInfo);
   virtual void FreeMapBuffer(void *MapBuf);
 
   virtual bool Submit(Command &Cmd);

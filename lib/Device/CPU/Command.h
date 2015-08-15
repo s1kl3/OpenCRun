@@ -893,11 +893,11 @@ public:
   }
 
   size_t GetTargetElementSize() {
-    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().GetElementSize();
+    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().getElementSize();
   }
 
   cl_image_format GetTargetImageFormat() {
-    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().GetImageFormat();
+    return GetQueueCommandAs<EnqueueFillImage>().GetTarget().getImageFormat();
   }
   
 private:
@@ -909,18 +909,18 @@ public:
   class DeviceImage {
   public:
     DeviceImage(const Image &Img, void *ImgData)
-      : image_channel_order(Img.GetImageFormat().image_channel_order),
-        image_channel_data_type(Img.GetImageFormat().image_channel_data_type),
-        num_channels(Img.GetNumChannels()),
-        element_size(Img.GetElementSize()),
-        width(Img.GetWidth()),
-        height(Img.GetHeight()),
-        depth(Img.GetDepth()),
-        row_pitch(Img.GetRowPitch()),
-        slice_pitch(Img.GetSlicePitch()),
-        array_size(Img.GetArraySize()),
-        num_mip_levels(Img.GetNumMipLevels()),
-        num_samples(Img.GetNumSamples()),
+      : image_channel_order(Img.getImageFormat().image_channel_order),
+        image_channel_data_type(Img.getImageFormat().image_channel_data_type),
+        num_channels(Img.getNumChannels()),
+        element_size(Img.getElementSize()),
+        width(Img.getWidth()),
+        height(Img.getHeight()),
+        depth(Img.getDepth()),
+        row_pitch(Img.getRowPitch()),
+        slice_pitch(Img.getSlicePitch()),
+        array_size(Img.getArraySize()),
+        num_mip_levels(0),
+        num_samples(0),
         data(ImgData) { }
 
   private:

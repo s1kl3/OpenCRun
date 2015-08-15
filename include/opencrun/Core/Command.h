@@ -20,7 +20,7 @@ class CommandQueue;
 class Buffer;
 class Image;
 class Device;
-class MemoryObj;
+class MemoryObject;
 
 template<class ImgCmdBuilderType>
 ImgCmdBuilderType &CheckDevImgSupport(
@@ -215,8 +215,8 @@ public:
   size_t GetSourceOffset() { return SourceOffset; }
   size_t GetTargetRowPitch() { return TargetPitches[0]; }
   size_t GetTargetSlicePitch() { return TargetPitches[1]; }
-  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
-  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+  size_t GetSourceRowPitch() { return Source->getRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->getSlicePitch(); }
 
 private:
   void *Target;
@@ -250,8 +250,8 @@ public:
   const size_t *GetTargetOrigin() { return TargetOrigin; }
   const size_t *GetRegion() { return Region; }
   size_t GetTargetOffset() { return TargetOffset; }
-  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
-  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  size_t GetTargetRowPitch() { return Target->getRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->getSlicePitch(); }
   size_t GetSourceRowPitch() { return SourcePitches[0]; }
   size_t GetSourceSlicePitch() { return SourcePitches[1]; }
 
@@ -288,10 +288,10 @@ public:
   const size_t *GetTargetOrigin() { return TargetOrigin; }
   const size_t *GetSourceOrigin() { return SourceOrigin; }
   const size_t *GetRegion() { return Region; }
-  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
-  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
-  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
-  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+  size_t GetTargetRowPitch() { return Target->getRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->getSlicePitch(); }
+  size_t GetSourceRowPitch() { return Source->getRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->getSlicePitch(); }
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
@@ -326,8 +326,8 @@ public:
   size_t GetSourceOffset() { return SourceOffset; }
   const size_t *GetSourceOrigin() { return SourceOrigin; }
   const size_t *GetRegion() { return Region; }
-  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
-  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+  size_t GetSourceRowPitch() { return Source->getRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->getSlicePitch(); }
 
 private:
   llvm::IntrusiveRefCntPtr<Buffer> Target;
@@ -361,8 +361,8 @@ public:
   const size_t *GetRegion() { return Region; }
   size_t GetTargetOffset() { return TargetOffset; }
   size_t GetSourceOffset() { return SourceOffset; }
-  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
-  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  size_t GetTargetRowPitch() { return Target->getRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->getSlicePitch(); }
 
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
@@ -437,14 +437,14 @@ public:
   cl_map_flags GetMapFlags() { return MapFlags; }
   const size_t *GetOrigin() { return Origin; }
   const size_t *GetRegion() { return Region; }
-  size_t GetOffset() { return Origin[0] * Source->GetElementSize() +
-                              Origin[1] * Source->GetRowPitch() +
-                              Origin[2] * Source->GetSlicePitch(); }
+  size_t GetOffset() { return Origin[0] * Source->getElementSize() +
+                              Origin[1] * Source->getRowPitch() +
+                              Origin[2] * Source->getSlicePitch(); }
   void *GetMapBuffer() { return MapBuf; }
   size_t GetMapRowPitch() { return MapPitches[0]; }
   size_t GetMapSlicePitch() { return MapPitches[1]; }
-  size_t GetSourceRowPitch() { return Source->GetRowPitch(); }
-  size_t GetSourceSlicePitch() { return Source->GetSlicePitch(); }
+  size_t GetSourceRowPitch() { return Source->getRowPitch(); }
+  size_t GetSourceSlicePitch() { return Source->getSlicePitch(); }
 
 public:
   bool IsMapRead() const { return MapFlags & CL_MAP_READ; }
@@ -473,16 +473,16 @@ public:
   }
   
 private:
-  EnqueueUnmapMemObject(MemoryObj &MemObj,
+  EnqueueUnmapMemObject(MemoryObject &MemObj,
                         void *MappedPtr,
                         EventsContainer &WaitList);
   
 public:
-  MemoryObj &GetMemObj() { return *MemObj; }
+  MemoryObject &GetMemObj() { return *MemObj; }
   void *GetMappedPtr() { return MappedPtr; }
 
 private:
-  llvm::IntrusiveRefCntPtr<MemoryObj> MemObj;
+  llvm::IntrusiveRefCntPtr<MemoryObject> MemObj;
   void *MappedPtr;
   
   friend class EnqueueUnmapMemObjectBuilder;
@@ -687,8 +687,8 @@ public:
   size_t *GetTargetOrigin() { return TargetOrigin; }
   size_t *GetTargetRegion() { return TargetRegion; }
   size_t GetTargetOffset() { return TargetOffset; }
-  size_t GetTargetRowPitch() { return Target->GetRowPitch(); }
-  size_t GetTargetSlicePitch() { return Target->GetSlicePitch(); }
+  size_t GetTargetRowPitch() { return Target->getRowPitch(); }
+  size_t GetTargetSlicePitch() { return Target->getSlicePitch(); }
   
 private:
   llvm::IntrusiveRefCntPtr<Image> Target;
@@ -738,7 +738,7 @@ public:
 public:
   typedef void (*Signature)(void*);
   typedef std::pair<void *, size_t> Arguments;
-  typedef std::map<ptrdiff_t, MemoryObj *> MemoryLocations;
+  typedef std::map<ptrdiff_t, MemoryObject *> MemoryLocations;
 
 private:
   EnqueueNativeKernel(Signature Func, Arguments RawArgs,
@@ -1232,7 +1232,7 @@ private:
   }
 
 private:
-  MemoryObj *MemObj;
+  MemoryObject *MemObj;
   void *MappedPtr;
 };
 

@@ -22,15 +22,11 @@ class PassManagerBuilder;
 
 namespace opencrun {
 
-class DeviceBuffer;
-class DeviceImage;
-class HostAccessibleBuffer;
-class HostAccessibleImage;
-class HostBuffer;
-class HostImage;
+class Buffer;
+class Image;
 class LLVMOptimizerParams;
 template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
-class MemoryObj;
+class MemoryObject;
 
 class DeviceInfo {
 public:
@@ -188,6 +184,8 @@ public:
   llvm::ArrayRef<cl_image_format> GetSupportedImageFormats() const { 
     return llvm::ArrayRef<cl_image_format>(ImgFmts, NumImgFmts); 
   }
+
+  bool isImageFormatSupported(const cl_image_format *Fmt) const;
 
   size_t GetMaxParameterSize() const { return MaxParameterSize; }
 
@@ -418,19 +416,14 @@ public:
 
   virtual const Footprint &getKernelFootprint(const KernelDescriptor &KD) const = 0;
 
-  virtual bool CreateHostBuffer(HostBuffer &Buf) = 0;
-  virtual bool CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) = 0;
-  virtual bool CreateDeviceBuffer(DeviceBuffer &Buf) = 0;
+  virtual bool CreateBuffer(Buffer &Buf) = 0;
 
-  virtual bool CreateHostImage(HostImage &Img) = 0;
-  virtual bool CreateHostAccessibleImage(HostAccessibleImage &Img) = 0;
-  virtual bool CreateDeviceImage(DeviceImage &Img) = 0;
+  virtual bool CreateImage(Image &Img) = 0;
 
-  virtual void DestroyMemoryObj(MemoryObj &MemObj) = 0;
+  virtual void DestroyMemoryObj(MemoryObject &MemObj) = 0;
 
-  virtual bool MappingDoesAllocation(MemoryObj::Type MemObjTy) = 0;
-  virtual void *CreateMapBuffer(MemoryObj &MemObj,
-                                MemoryObj::MappingInfo &MapInfo) = 0;
+  virtual void *CreateMapBuffer(MemoryObject &Obj,
+                                MemoryObject::MemMappingInfo &Info) = 0;
   virtual void FreeMapBuffer(void *MapBuf) = 0;
   
   virtual bool Submit(Command &Cmd) = 0;

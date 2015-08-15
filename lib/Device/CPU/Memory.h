@@ -3,7 +3,7 @@
 #define OPENCRUN_DEVICE_CPU_MEMORY_H
 
 #include "opencrun/Core/Context.h"
-#include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/MemoryObject.h"
 #include "opencrun/System/Hardware.h"
 #include "opencrun/System/OS.h"
 
@@ -18,7 +18,7 @@ namespace cpu {
 
 class Memory {
 public:
-  typedef std::map<MemoryObj *, void *> MappingsContainer;
+  typedef std::map<MemoryObject *, void *> MappingsContainer;
 };
 
 class GlobalMemory : public Memory {
@@ -27,14 +27,10 @@ public:
   ~GlobalMemory();
 
 public:
-  void *Alloc(HostBuffer &Buf);
-  void *Alloc(HostAccessibleBuffer &Buf);
-  void *Alloc(DeviceBuffer &Buf);
-  void *Alloc(HostImage &Img);
-  void *Alloc(HostAccessibleImage &Img);
-  void *Alloc(DeviceImage &Img);
+  void *Alloc(Buffer &Buf);
+  void *Alloc(Image &Img);
 
-  void Free(MemoryObj &MemObj);
+  void Free(MemoryObject &MemObj);
 
 public:
   void GetMappings(MappingsContainer &Mappings) {
@@ -43,14 +39,14 @@ public:
     Mappings = this->Mappings;
   }
 
-  void *operator[](MemoryObj &MemObj) {
+  void *operator[](MemoryObject &MemObj) {
     llvm::sys::ScopedLock Lock(ThisLock);
 
     return Mappings.count(&MemObj) ? Mappings[&MemObj] : NULL;
   }
 
 private:
-  void *Alloc(MemoryObj &MemObj);
+  void *Alloc(MemoryObject &MemObj);
   void *AllocBufferStorage(Buffer &Buf);
   void *AllocImageStorage(Image &Img);
 

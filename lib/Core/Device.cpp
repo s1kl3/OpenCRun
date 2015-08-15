@@ -301,6 +301,13 @@ unsigned DeviceInfo::DevicePartition::getTotalComputeUnits() const {
   return Sum;
 }
 
+bool DeviceInfo::isImageFormatSupported(const cl_image_format *Fmt) const {
+  for (auto &CurFmt : GetSupportedImageFormats())
+    if (!memcmp(&CurFmt, Fmt, sizeof(cl_image_format)))
+      return true;
+  return false;
+}
+
 //
 // Device implementation.
 //

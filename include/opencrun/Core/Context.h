@@ -4,7 +4,7 @@
 
 #include "CL/opencl.h"
 
-#include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/MemoryObject.h"
 #include "opencrun/Util/MTRefCounted.h"
 
 #include "clang/Basic/Diagnostic.h"
@@ -78,89 +78,18 @@ public:
                                   bool EnableProfile,
                                   cl_int *ErrCode = NULL);
 
-  HostBuffer *CreateHostBuffer(Buffer *Parent,
-                               size_t Offset, 
-                               size_t Size,
-                               void *HostPtr,
-                               MemoryObj::AccessProtection AccessProt,
-                               MemoryObj::HostAccessProtection HostAccessProt,
-                               cl_int *ErrCode = NULL);
-  HostAccessibleBuffer *CreateHostAccessibleBuffer(
-                          Buffer *Parent,
-                          size_t Offset,
-                          size_t Size,
-                          void *HostPtr,
-                          MemoryObj::AccessProtection AccessProt,
-                          MemoryObj::HostAccessProtection HostAccessProt,
-                          cl_int *ErrCode = NULL);
-  DeviceBuffer *CreateDeviceBuffer(Buffer *Parent,
-                                   size_t Offset,  
-                                   size_t Size,
-                                   void *HostPtr,
-                                   MemoryObj::AccessProtection AccessProt,
-                                   MemoryObj::HostAccessProtection HostAccessProt,
-                                   cl_int *ErrCode = NULL);
+  std::unique_ptr<Buffer> createBuffer(size_t Size,
+                                       void *HostPtr, uint16_t Flags);
+  std::unique_ptr<Buffer> createSubBuffer(Buffer &Buf, size_t Origin,
+                                          size_t Size, uint16_t Flags);
+  std::unique_ptr<Image> createImage(size_t Size, void *HostPtr, uint16_t Flags,
+                                     Image::Type Ty,
+                                     Image::ChannelOrder CO,
+                                     Image::ChannelDataType CDT,
+                                     const Image::Descriptor &Desc,
+                                     Buffer *Buf);
 
-  HostImage *CreateHostImage(size_t Size,
-                             void *HostPtr,
-                             Image::TargetDevices &TargetDevs,
-                             Image::ChannelOrder ChOrder,
-                             Image::ChannelType ChDataType,
-                             size_t ElementSize,
-                             Image::ImgType ImgTy,
-                             size_t Width,
-                             size_t Height,
-                             size_t Depth,
-                             size_t ArraySize,
-                             size_t RowPitch,
-                             size_t SlicePitch,
-                             unsigned NumMipLevels,
-                             unsigned NumSamples,
-                             Buffer *Buf,
-                             MemoryObj::AccessProtection AccessProt,
-                             MemoryObj::HostAccessProtection HostAccessProt,
-                             cl_int *ErrCode = NULL);
-  HostAccessibleImage *CreateHostAccessibleImage(
-                          size_t Size,
-                          void *HostPtr,
-                          Image::TargetDevices &TargetDevs,
-                          Image::ChannelOrder ChOrder,
-                          Image::ChannelType ChDataType,
-                          size_t ElementSize,
-                          Image::ImgType ImgTy,
-                          size_t Width,
-                          size_t Height,
-                          size_t Depth,
-                          size_t ArraySize,
-                          size_t RowPitch,
-                          size_t SlicePitch,
-                          unsigned NumMipLevels,
-                          unsigned NumSamples,
-                          Buffer *Buf,
-                          MemoryObj::AccessProtection AccessProt,
-                          MemoryObj::HostAccessProtection HostAccessProt,
-                          cl_int *ErrCode = NULL);
-  DeviceImage *CreateDeviceImage(size_t Size,
-                                 void *HostPtr,
-                                 Image::TargetDevices &TargetDevs,
-                                 Image::ChannelOrder ChOrder,
-                                 Image::ChannelType ChDataType,
-                                 size_t ElementSize,
-                                 Image::ImgType ImgTy,
-                                 size_t Width,
-                                 size_t Height,
-                                 size_t Depth,
-                                 size_t ArraySize,
-                                 size_t RowPitch,
-                                 size_t SlicePitch,
-                                 unsigned NumMipLevels,
-                                 unsigned NumSamples,
-                                 Buffer *Buf,
-                                 MemoryObj::AccessProtection AccessProt,
-                                 MemoryObj::HostAccessProtection HostAccessProt,
-                                 cl_int *ErrCode = NULL);
-
-  void DestroyMemoryObj(MemoryObj &MemObj);
+  void destroyMemoryObject(MemoryObject &Obj);
 
   void ReportDiagnostic(llvm::StringRef Msg);
   void ReportDiagnostic(clang::TextDiagnosticBuffer &DiagInfo);

@@ -3,7 +3,7 @@
 
 #include "Utils.h"
 
-#include "opencrun/Core/MemoryObj.h"
+#include "opencrun/Core/MemoryObject.h"
 
 #include <algorithm>
 
@@ -53,32 +53,18 @@ clCreateBuffer(cl_context context,
                size_t size,
                void *host_ptr,
                cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_0 {
-  if(!context)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_CONTEXT);
+  using MemObjBuilder = opencrun::MemoryObjectBuilder;
 
-  opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
+  MemObjBuilder Bld(MemObjBuilder::K_Buffer);
+  Bld.setContext(context);
+  Bld.setBufferSize(size);
+  Bld.setGenericFlags(flags, host_ptr);
+  auto Buf = Bld.create(errcode_ret);
 
-  if(!clValidMemField(flags))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-
-  opencrun::BufferBuilder Bld(Ctx, size);
-  opencrun::Buffer *Buf;
-    
-  Buf = Bld.SetUseHostMemory(flags & CL_MEM_USE_HOST_PTR, host_ptr)
-           .SetAllocHostMemory(flags & CL_MEM_ALLOC_HOST_PTR)
-           .SetCopyHostMemory(flags & CL_MEM_COPY_HOST_PTR, host_ptr)
-           .SetReadWrite(flags & CL_MEM_READ_WRITE)
-           .SetWriteOnly(flags & CL_MEM_WRITE_ONLY)
-           .SetReadOnly(flags & CL_MEM_READ_ONLY)
-           .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
-           .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
-           .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
-           .Create(errcode_ret);
-
-  if(Buf)
+  if (Buf)
     Buf->Retain();
 
-  return Buf;
+  return Buf.release();
 }
 
 CL_API_ENTRY cl_mem CL_API_CALL
@@ -87,74 +73,17 @@ clCreateSubBuffer(cl_mem buffer,
                   cl_buffer_create_type buffer_create_type,
                   const void *buffer_create_info,
                   cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_1 {
-  if(!buffer)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_MEM_OBJECT);
+  using MemObjBuilder = opencrun::MemoryObjectBuilder;
 
-  opencrun::MemoryObj &Buf = *llvm::cast<opencrun::MemoryObj>(buffer);
-  if(!llvm::isa<opencrun::Buffer>(Buf))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_MEM_OBJECT);
+  MemObjBuilder Bld(MemObjBuilder::K_Buffer);
+  Bld.setSubBufferParams(buffer, buffer_create_type, buffer_create_info);
+  Bld.setSubBufferFlags(flags);
+  auto SubBuf = Bld.create(errcode_ret);
 
-  if(!clValidMemField(flags))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-
-  if(flags & (CL_MEM_USE_HOST_PTR | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-  
-  flags |= Buf.GetHostPtrUsageMode();
-
-  if(!(flags & (CL_MEM_READ_WRITE | CL_MEM_WRITE_ONLY | CL_MEM_READ_ONLY)))
-    flags |= Buf.GetAccessProtection();
-  else {
-    if((Buf.GetAccessProtection() == CL_MEM_WRITE_ONLY && (flags & (CL_MEM_READ_WRITE | CL_MEM_READ_ONLY))) || 
-       (Buf.GetAccessProtection() == CL_MEM_READ_ONLY && (flags & (CL_MEM_READ_WRITE | CL_MEM_WRITE_ONLY))))
-      RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-  }
-
-  if(!(flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS)))
-    flags |= Buf.GetHostAccessProtection();
-  else {
-    if((Buf.GetHostAccessProtection() == CL_MEM_HOST_WRITE_ONLY && (flags & CL_MEM_HOST_READ_ONLY)) ||
-       (Buf.GetHostAccessProtection() == CL_MEM_HOST_READ_ONLY && (flags & CL_MEM_HOST_WRITE_ONLY)) ||
-       (Buf.GetHostAccessProtection() == CL_MEM_HOST_NO_ACCESS && (flags & (CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_WRITE_ONLY))))
-      RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-  }
-
-  opencrun::Buffer *SubBuf;
-
-  switch(buffer_create_type) {
-  case CL_BUFFER_CREATE_TYPE_REGION: {
-      if(buffer_create_info == NULL)
-        RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-
-      const cl_buffer_region *Region = (const cl_buffer_region *)buffer_create_info;
-      size_t Offset = Region->origin;
-      size_t Size = Region->size;
-      opencrun::BufferBuilder Bld(llvm::cast<opencrun::Buffer>(Buf), Offset, Size);
-
-      SubBuf = Bld.SetUseHostMemory(flags & CL_MEM_USE_HOST_PTR, Buf.GetHostPtr())
-                  .SetAllocHostMemory(flags & CL_MEM_ALLOC_HOST_PTR)
-                  .SetCopyHostMemory(flags & CL_MEM_COPY_HOST_PTR, Buf.GetHostPtr())
-                  .SetReadWrite(flags & CL_MEM_READ_WRITE)
-                  .SetWriteOnly(flags & CL_MEM_WRITE_ONLY)
-                  .SetReadOnly(flags & CL_MEM_READ_ONLY)
-                  .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
-                  .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
-                  .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
-                  .Create(errcode_ret);
-    }
-    break;
-  default:
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-  }
- 
-  // Parent's reference count is increased to avoid destruction in
-  // case one of its sub-buffer objects is still alive.
-  if(SubBuf) {
+  if (SubBuf)
     SubBuf->Retain();
-    SubBuf->GetParent()->Retain();
-  }
 
-  return SubBuf;
+  return SubBuf.release();
 }
 
 CL_API_ENTRY cl_mem CL_API_CALL
@@ -164,48 +93,18 @@ clCreateImage(cl_context context,
               const cl_image_desc *image_desc, 
               void *host_ptr,
               cl_int *errcode_ret) CL_API_SUFFIX__VERSION_1_2 {
-  if(!context)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_CONTEXT);
+  using MemObjBuilder = opencrun::MemoryObjectBuilder;
 
-  opencrun::Context &Ctx = *llvm::cast<opencrun::Context>(context);
+  MemObjBuilder Bld(MemObjBuilder::K_Image);
+  Bld.setContext(context);
+  Bld.setImage(image_format, image_desc);
+  Bld.setGenericFlags(flags, host_ptr);
+  auto Img = Bld.create(errcode_ret);
 
-  bool IsInvalidOp = true;
-  for(opencrun::Context::device_iterator I = Ctx.device_begin(),
-                                         E = Ctx.device_end(); 
-                                         I != E;
-                                         ++I) {
-    if((*I)->HasImageSupport()) {
-      IsInvalidOp = false;
-      break;
-    }
-  }
-  
-  if(IsInvalidOp)
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_OPERATION);
-
-  if(!clValidMemField(flags))
-    RETURN_WITH_ERROR(errcode_ret, CL_INVALID_VALUE);
-
-  opencrun::ImageBuilder Bld(Ctx);
-  opencrun::Image *Img;
-
-  Img = Bld.SetUseHostMemory(flags & CL_MEM_USE_HOST_PTR, host_ptr)
-           .SetAllocHostMemory(flags & CL_MEM_ALLOC_HOST_PTR)
-           .SetCopyHostMemory(flags & CL_MEM_COPY_HOST_PTR, host_ptr)
-           .SetReadWrite(flags & CL_MEM_READ_WRITE)
-           .SetWriteOnly(flags & CL_MEM_WRITE_ONLY)
-           .SetReadOnly(flags & CL_MEM_READ_ONLY)
-           .SetHostWriteOnly(flags & CL_MEM_HOST_WRITE_ONLY)
-           .SetHostReadOnly(flags & CL_MEM_HOST_READ_ONLY)
-           .SetHostNoAccess(flags & CL_MEM_HOST_NO_ACCESS)
-           .SetFormat(image_format)
-           .SetDesc(image_desc)
-           .Create(errcode_ret);
-
-  if(Img)
+  if (Img)
     Img->Retain();
 
-  return Img;
+  return Img.release();
 }
 
 CL_API_ENTRY CL_EXT_PREFIX__VERSION_1_1_DEPRECATED cl_mem CL_API_CALL
@@ -275,7 +174,7 @@ clRetainMemObject(cl_mem memobj) CL_API_SUFFIX__VERSION_1_0 {
   if(!memobj)
     return CL_INVALID_MEM_OBJECT;
 
-  opencrun::MemoryObj &MemObj = *llvm::cast<opencrun::MemoryObj>(memobj);
+  opencrun::MemoryObject &MemObj = *llvm::cast<opencrun::MemoryObject>(memobj);
   MemObj.Retain();
 
   return CL_SUCCESS;
@@ -286,7 +185,7 @@ clReleaseMemObject(cl_mem memobj) CL_API_SUFFIX__VERSION_1_0 {
   if(!memobj)
     return CL_INVALID_MEM_OBJECT;
 
-  opencrun::MemoryObj &MemObj = *llvm::cast<opencrun::MemoryObj>(memobj);
+  opencrun::MemoryObject &MemObj = *llvm::cast<opencrun::MemoryObject>(memobj);
   MemObj.Release();
 
   return CL_SUCCESS;
@@ -361,7 +260,7 @@ clGetMemObjectInfo(cl_mem memobj,
   if(!memobj)
     return CL_INVALID_MEM_OBJECT;
 
-  opencrun::MemoryObj &MemObj = *llvm::cast<opencrun::MemoryObj>(memobj);
+  opencrun::MemoryObject &MemObj = *llvm::cast<opencrun::MemoryObject>(memobj);
   switch(param_name) {
   #define PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)   \
   case PARAM:                                      \
@@ -384,36 +283,28 @@ clGetMemObjectInfo(cl_mem memobj,
                param_value_size_ret);
 
     if(opencrun::Image *Img = llvm::dyn_cast<opencrun::Image>(&MemObj))
-      return clFillValue<cl_mem_object_type, opencrun::Image::ImgType>(
+      return clFillValue<cl_mem_object_type, opencrun::Image::Type>(
                static_cast<cl_mem_object_type *>(param_value),
-               Img->GetImageType(),
+               Img->getType(),
                param_value_size,
                param_value_size_ret);
 
   case CL_MEM_HOST_PTR:
-    if(llvm::isa<opencrun::HostBuffer>(MemObj) ||
-       llvm::isa<opencrun::HostImage>(MemObj))
-      return clFillValue<void *, void *>(
-               static_cast<void **>(param_value),
-               MemObj.GetHostPtr(),
-               param_value_size,
-               param_value_size_ret);
-
     return clFillValue<void *, void *>(
              static_cast<void **>(param_value),
-             NULL,
+             MemObj.getHostPtr(),
              param_value_size,
              param_value_size_ret);
 
   case CL_MEM_ASSOCIATED_MEMOBJECT:
     if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
-      return clFillValue<cl_mem, opencrun::MemoryObj *>(
+      return clFillValue<cl_mem, opencrun::MemoryObject *>(
                static_cast<cl_mem *>(param_value),
-               Buf->GetParent(),
+               Buf->getParent(),
                param_value_size,
                param_value_size_ret);
 
-    return clFillValue<cl_mem, opencrun::MemoryObj *>(
+    return clFillValue<cl_mem, opencrun::MemoryObject *>(
              static_cast<cl_mem *>(param_value),
              NULL,
              param_value_size,
@@ -423,7 +314,7 @@ clGetMemObjectInfo(cl_mem memobj,
     if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
       return clFillValue<size_t, size_t>(
                static_cast<size_t *>(param_value),
-               Buf->GetOffset(),
+               Buf->getOrigin(),
                param_value_size,
                param_value_size_ret);
 
@@ -447,8 +338,7 @@ clGetImageInfo(cl_mem image,
   if(!image)
     return CL_INVALID_MEM_OBJECT;
 
-  opencrun::Image &Img = *llvm::cast<opencrun::Image>(
-      llvm::cast<opencrun::MemoryObj>(image));
+  opencrun::Image &Img = *llvm::cast<opencrun::Image>(image);
   switch(param_name) {
   #define IMG_PROPERTY(PARAM, FUN, PARAM_TY, FUN_TY)    \
   case PARAM:                                           \

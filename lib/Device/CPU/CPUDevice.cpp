@@ -85,58 +85,36 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
   return true;
 }
 
-bool CPUDevice::CreateHostBuffer(HostBuffer &Buf) {
+bool CPUDevice::CreateBuffer(Buffer &Buf) {
   return Global.Alloc(Buf);
 }
 
-bool CPUDevice::CreateHostAccessibleBuffer(HostAccessibleBuffer &Buf) {
-  return Global.Alloc(Buf);
-}
-
-bool CPUDevice::CreateDeviceBuffer(DeviceBuffer &Buf) {
-  return Global.Alloc(Buf);
-}
-
-bool CPUDevice::CreateHostImage(HostImage &Img) {
+bool CPUDevice::CreateImage(Image &Img) {
   return Global.Alloc(Img);
 }
 
-bool CPUDevice::CreateHostAccessibleImage(HostAccessibleImage &Img) {
-  return Global.Alloc(Img);
-}
-
-bool CPUDevice::CreateDeviceImage(DeviceImage &Img) {
-  return Global.Alloc(Img);
-}
-
-void CPUDevice::DestroyMemoryObj(MemoryObj &MemObj) {
+void CPUDevice::DestroyMemoryObj(MemoryObject &MemObj) {
   Global.Free(MemObj);
 }
 
-bool CPUDevice::MappingDoesAllocation(MemoryObj::Type MemObjTy) {
-  // Memory objects are directly accessible by the host, so mapping
-  // nevere requires memory allocation on the host side.
-  return false;
-}
-
-void *CPUDevice::CreateMapBuffer(MemoryObj &MemObj, 
-                                 MemoryObj::MappingInfo &MapInfo) {
+void *CPUDevice::CreateMapBuffer(MemoryObject &MemObj, 
+                                 MemoryObject::MemMappingInfo &MapInfo) {
   void *MapBuf;
  
   // A CPU device has only one physical address space so host-side
   // code can access directly to memory object's storage area.
   if(llvm::isa<Buffer>(MemObj)) {
     MapBuf = reinterpret_cast<void *>(
-        reinterpret_cast<uintptr_t>(Global[MemObj]) + MapInfo.Offset);
+        reinterpret_cast<uintptr_t>(Global[MemObj]) + MapInfo.Offset[0]);
   } else if(Image *Img = llvm::dyn_cast<Image>(&MemObj)) {
     MapBuf = reinterpret_cast<void *>(
         reinterpret_cast<uintptr_t>(Global[MemObj]) +
-        Img->GetElementSize() * MapInfo.Origin[0] +
-        Img->GetRowPitch() * MapInfo.Origin[1] +
-        Img->GetSlicePitch() * MapInfo.Origin[2]);
+        Img->getElementSize() * MapInfo.Offset[0] +
+        Img->getRowPitch() * MapInfo.Offset[1] +
+        Img->getSlicePitch() * MapInfo.Offset[2]);
   }
 
-  if(!MemObj.AddNewMapping(MapBuf, MapInfo))
+  if(!MemObj.addMapping(MapBuf, MapInfo))
     MapBuf = NULL;
 
   return MapBuf;

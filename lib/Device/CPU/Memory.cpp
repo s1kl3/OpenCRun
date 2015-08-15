@@ -15,8 +15,8 @@ GlobalMemory::~GlobalMemory() {
     sys::Free(I->second);
 }
 
-void *GlobalMemory::Alloc(MemoryObj &MemObj) {
-  size_t RequestedSize = MemObj.GetSize();
+void *GlobalMemory::Alloc(MemoryObject &MemObj) {
+  size_t RequestedSize = MemObj.getSize();
 
   llvm::sys::ScopedLock Lock(ThisLock);
 
@@ -38,21 +38,21 @@ void *GlobalMemory::Alloc(MemoryObj &MemObj) {
 void *GlobalMemory::AllocBufferStorage(Buffer &Buf) {
   void *Addr;
 
-  if(Buf.IsSubBuffer()) {
+  if(Buf.isSubBuffer()) {
     llvm::sys::ScopedLock Lock(ThisLock);
 
-    Buffer *Parent = Buf.GetParent();
+    Buffer *Parent = Buf.getParent();
     Addr = reinterpret_cast<void *>(
-            reinterpret_cast<uintptr_t>(Mappings[llvm::cast<MemoryObj>(Parent)]) + Buf.GetOffset()
+            reinterpret_cast<uintptr_t>(Mappings[Parent]) + Buf.getOrigin()
            );
 
-    if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
+    if(Addr) Mappings[&Buf] = Addr;
   } else {
-    Addr = Alloc(llvm::cast<MemoryObj>(Buf));
+    Addr = Alloc(llvm::cast<MemoryObject>(Buf));
 
     // CL_MEM_COPY_HOST_PTR
-    if(Buf.HasHostPtr())
-      std::memcpy(Addr, Buf.GetHostPtr(), Buf.GetSize());
+    if(Buf.getFlags() & Buffer::CopyHostPtr)
+      std::memcpy(Addr, Buf.getHostPtr(), Buf.getSize());
   }
 
   return Addr;
@@ -63,9 +63,9 @@ void *GlobalMemory::AllocBufferStorage(Buffer &Buf) {
 void *GlobalMemory::AllocImageStorage(Image &Img) {
   void *Addr;
 
-  if(Img.GetImageType() == Image::Image1D_Buffer) {
+  if(Img.getType() == Image::Image1D_Buffer) {
     llvm::sys::ScopedLock Lock(ThisLock);
-    Buffer *Buf = Img.GetBuffer();
+    Buffer *Buf = Img.getBuffer();
     if(!Buf)
       return NULL;
     
@@ -74,32 +74,32 @@ void *GlobalMemory::AllocImageStorage(Image &Img) {
       return NULL;
 
     Addr = It->second;
-    Mappings[llvm::cast<MemoryObj>(&Img)] = Addr;
+    Mappings[&Img] = Addr;
     Buf->Retain();
     return Addr;
   }
 
-  Addr = Alloc(llvm::cast<MemoryObj>(Img));
+  Addr = Alloc(llvm::cast<MemoryObject>(Img));
 
   // CL_MEM_COPY_HOST_PTR
-  if(Img.HasHostPtr()) {
-    size_t FreeBytes = Img.GetSize();
-    size_t RowSize = Img.GetWidth() * Img.GetElementSize();
-    for(size_t I = 0; I < Img.GetArraySize(); ++I)
-      for(size_t Z = 0; Z < Img.GetDepth(); ++Z)
-        for(size_t Y = 0; Y < Img.GetHeight() && FreeBytes >= RowSize; ++Y, FreeBytes -= RowSize)
+  if(Img.getFlags() & Image::CopyHostPtr) {
+    size_t FreeBytes = Img.getSize();
+    size_t RowSize = Img.getWidth() * Img.getElementSize();
+    for(size_t I = 0; I < Img.getArraySize(); ++I)
+      for(size_t Z = 0; Z < Img.getDepth(); ++Z)
+        for(size_t Y = 0; Y < Img.getHeight() && FreeBytes >= RowSize; ++Y, FreeBytes -= RowSize)
           std::memcpy(
               reinterpret_cast<void *>(
                 reinterpret_cast<uintptr_t>(Addr) + 
-                Img.GetWidth() * Img.GetHeight() * Img.GetElementSize() * I +
-                Img.GetWidth() * Img.GetElementSize() * Y + 
-                Img.GetHeight() * Img.GetElementSize() * Z
+                Img.getWidth() * Img.getHeight() * Img.getElementSize() * I +
+                Img.getWidth() * Img.getElementSize() * Y + 
+                Img.getHeight() * Img.getElementSize() * Z
                 ),
               reinterpret_cast<const void *>(
-                reinterpret_cast<uintptr_t>(Img.GetHostPtr()) + 
-                Img.GetSlicePitch() * I +
-                Img.GetRowPitch() * Y + 
-                Img.GetSlicePitch() * Z
+                reinterpret_cast<uintptr_t>(Img.getHostPtr()) + 
+                Img.getSlicePitch() * I +
+                Img.getRowPitch() * Y + 
+                Img.getSlicePitch() * Z
                 ),
               RowSize
               );
@@ -108,47 +108,27 @@ void *GlobalMemory::AllocImageStorage(Image &Img) {
   return Addr;
 }
 
-// For the CPU target, the device memory and host memory share the
-// same physical AS, so the model is simplified, if compared to a
-// generic device with separated ASs:
-
-// 1b) CL_MEM_USE_HOST_PTR - In this case no new memory allocation
-// is requiered and the provided host_ptr is returned; the buffer
-// object will be stored at the location pointed by host_ptr, which
-// is assumed to be already allocated in host code.
-void *GlobalMemory::Alloc(HostBuffer &Buf) {
-  llvm::sys::ScopedLock Lock(ThisLock);
+void *GlobalMemory::Alloc(Buffer &Buf) {
   
   // If Buf is a sub-buffer object the GetHostPtr method returns
   // host_ptr + origin, where host_ptr is the argument value specified
   // when the parent memory object was created.
-  void *Addr = Buf.GetHostPtr();
-  
-  if(Addr) Mappings[llvm::cast<MemoryObj>(&Buf)] = Addr;
-  
-  return Addr;
-}
+  if (Buf.getFlags() & Buffer::UseHostPtr) {
+    void *Addr = Buf.getHostPtr();
+    llvm::sys::ScopedLock Lock(ThisLock);
+    
+    if (Addr)
+      Mappings[&Buf] = Addr;
+    
+    return Addr;
+  }
 
-// 2b) CL_MEM_ALLOC_HOST_PTR - In this case new memory is allocated as
-// the storage area for the buffer object, and it will be accessible
-// to the host code too, since the ASs are the same.
-void *GlobalMemory::Alloc(HostAccessibleBuffer &Buf) {
   return AllocBufferStorage(Buf);
 }
 
-// 3b) As in the previous case, since all device memory is physically 
-// undistinct from host memory.
-void *GlobalMemory::Alloc(DeviceBuffer &Buf) {
-  return AllocBufferStorage(Buf);
-}
-
-// 1i) See (1b).
-void *GlobalMemory::Alloc(HostImage &Img) {
-  llvm::sys::ScopedLock Lock(ThisLock);
-  void *Addr;
-
-  if(Img.GetImageType() == Image::Image1D_Buffer) {
-    Buffer *Buf = Img.GetBuffer();
+void *GlobalMemory::Alloc(Image &Img) {
+  if(Img.getType() == Image::Image1D_Buffer) {
+    Buffer *Buf = Img.getBuffer();
     if(!Buf)
       return NULL;
     
@@ -157,29 +137,24 @@ void *GlobalMemory::Alloc(HostImage &Img) {
       return NULL;
     
     Buf->Retain();
-    Addr = It->second;
-    Mappings[llvm::cast<MemoryObj>(&Img)] = Addr;
+    llvm::sys::ScopedLock Lock(ThisLock);
+    void *Addr = It->second;
+    Mappings[&Img] = Addr;
     return Addr;
   }
 
-  Addr = Img.GetHostPtr();
-  
-  if(Addr) Mappings[llvm::cast<MemoryObj>(&Img)] = Addr;
+  if (Img.getFlags() & Buffer::UseHostPtr) {
+    void *Addr = Img.getHostPtr();
+    if (Addr)
+      Mappings[&Img] = Addr;
 
-  return Addr;
-}
+    return Addr;
+  }
 
-// 2i) See (2b).
-void *GlobalMemory::Alloc(HostAccessibleImage &Img) {
   return AllocImageStorage(Img);
 }
 
-// 3i) See (3b).
-void *GlobalMemory::Alloc(DeviceImage &Img) {
-  return AllocImageStorage(Img);
-}
-
-void GlobalMemory::Free(MemoryObj &MemObj) {
+void GlobalMemory::Free(MemoryObject &MemObj) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
   auto It = Mappings.find(&MemObj);
@@ -190,29 +165,22 @@ void GlobalMemory::Free(MemoryObj &MemObj) {
   // the container and return. The effective deallocation of memory is done when
   // its parent buffer will be released.
   if(Buffer *Buf = llvm::dyn_cast<Buffer>(&MemObj))
-    if(Buf->IsSubBuffer()) {
+    if(Buf->isSubBuffer()) {
       Mappings.erase(It);
       return;
     }
 
-  // For other memory objects (except HostBuffer and HostImages types) we need 
-  // to account for available memory increase.
-  if(MemObj.GetType() != MemoryObj::HostBuffer &&
-     MemObj.GetType() != MemoryObj::HostImage)
-    Available += MemObj.GetSize();
-
-  // For an HostBuffer and and HostImages the memory allocation/deallocation is
-  // under the control and responsability of the host code.
-  if(!llvm::isa<HostBuffer>(MemObj) && !llvm::isa<HostImage>(MemObj)) {
+  if(!(MemObj.getFlags() & MemoryObject::UseHostPtr)) {
     // The storage aread of an Image1D_Buffer belongs to the
     // associated buffer so it will be freed by the buffer itself.
     if(Image *Img = llvm::dyn_cast<Image>(&MemObj))
-      if(Img->GetImageType() == Image::Image1D_Buffer) {
+      if(Img->getType() == Image::Image1D_Buffer) {
         Mappings.erase(It);
-        Img->GetBuffer()->Release();
+        Img->getBuffer()->Release();
       }
 
     sys::Free(It->second);
+    Available += MemObj.getSize();
   }
     
   Mappings.erase(It);
