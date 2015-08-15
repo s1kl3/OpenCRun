@@ -22,8 +22,6 @@ class PassManagerBuilder;
 
 namespace opencrun {
 
-class Buffer;
-class Image;
 class LLVMOptimizerParams;
 template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
 class MemoryObject;
@@ -416,15 +414,8 @@ public:
 
   virtual const Footprint &getKernelFootprint(const KernelDescriptor &KD) const = 0;
 
-  virtual bool CreateBuffer(Buffer &Buf) = 0;
-
-  virtual bool CreateImage(Image &Img) = 0;
-
-  virtual void DestroyMemoryObj(MemoryObject &MemObj) = 0;
-
-  virtual void *CreateMapBuffer(MemoryObject &Obj,
-                                MemoryObject::MemMappingInfo &Info) = 0;
-  virtual void FreeMapBuffer(void *MapBuf) = 0;
+  virtual std::unique_ptr<MemoryDescriptor>
+    createMemoryDescriptor(const MemoryObject &Obj) = 0;
   
   virtual bool Submit(Command &Cmd) = 0;
 

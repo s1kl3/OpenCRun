@@ -72,11 +72,24 @@ std::unique_ptr<Buffer> Context::createBuffer(size_t Size, void *HostPtr,
   std::unique_ptr<Buffer> Buf;
   Buf.reset(new Buffer(*this, Size, HostPtr, Flags));
 
-  for(device_iterator I = Devices.begin(),
-                      E = Devices.end();
-                      I != E;
-                      ++I)
-    (*I)->CreateBuffer(*Buf);
+  if (!Buf || !Buf->initForDevices())
+    return nullptr;
+
+  for (const auto *Dev : devices())
+    if (!Buf->getDescriptorFor(*Dev).allocate())
+      return nullptr;
+
+  if (Buf->getFlags() & Buffer::CopyHostPtr)
+    for (const auto *Dev : devices()) {
+      auto &DevEntry = Buf->getDescriptorFor(*Dev);
+      void *Ptr = DevEntry.map();
+      if (!Ptr)
+        return nullptr;
+
+      std::memcpy(Ptr, HostPtr, Size);
+
+      DevEntry.unmap();
+    }
 
   return Buf;
 }
@@ -85,54 +98,38 @@ std::unique_ptr<Buffer> Context::createSubBuffer(Buffer &Buf, size_t Origin,
                                         size_t Size, uint16_t Flags) {
   std::unique_ptr<Buffer> SubBuf;
   SubBuf.reset(new Buffer(*this, Buf, Origin, Size, Flags));
-
-  for(device_iterator I = Devices.begin(),
-                      E = Devices.end();
-                      I != E;
-                      ++I)
-    (*I)->CreateBuffer(*SubBuf);
-
   return SubBuf;
 }
 
-std::unique_ptr<Image> Context::createImage(size_t Size, void *HostPtr, uint16_t Flags,
-                                   Image::Type Ty,
-                                   Image::ChannelOrder CO,
-                                   Image::ChannelDataType CDT,
-                                   const Image::Descriptor &Desc,
-                                   Buffer *Buf) {
+std::unique_ptr<Image> Context::createImage(size_t Size, void *HostPtr,
+                                            uint16_t Flags, Image::Type Ty,
+                                            Image::ChannelOrder CO,
+                                            Image::ChannelDataType CDT,
+                                            const Image::Descriptor &Desc,
+                                            Buffer *Buf) {
   std::unique_ptr<Image> Img;
   Img.reset(new Image(*this, Size, HostPtr, Flags, Ty, CO, CDT, Desc, Buf));
 
-  bool Failure = false;
+  if (!Img || !Img->initForDevices())
+    return nullptr;
 
-  for(device_iterator I = Devices.begin(),
-                      E = Devices.end();
-                      I != E;
-                      ++I)
-    if (!(*I)->CreateImage(*Img)) {
-      Failure = true;
+  for (const auto *Dev : devices())
+    if (!Img->getDescriptorFor(*Dev).allocate())
+      return nullptr;
+
+  if (Img->getFlags() & Buffer::CopyHostPtr)
+    for (const auto *Dev : devices()) {
+      auto &DevEntry = Img->getDescriptorFor(*Dev);
+      void *Ptr = DevEntry.map();
+      if (!Ptr)
+        return nullptr;
+
+      std::memcpy(Ptr, HostPtr, Size);
+
+     DevEntry.unmap();
     }
 
-  if (Failure) {
-    for(device_iterator I = Devices.begin(),
-                        E = Devices.end();
-                        I != E;
-                        ++I)
-      (*I)->DestroyMemoryObj(*Img);
-
-    Img.reset(nullptr);
-  }
-
   return Img;
-}
-
-void Context::destroyMemoryObject(MemoryObject &Obj) {
-  for(device_iterator I = Devices.begin(),
-                      E = Devices.end();
-                      I != E;
-                      ++I)
-      (*I)->DestroyMemoryObj(Obj);
 }
 
 void Context::ReportDiagnostic(llvm::StringRef Msg) {

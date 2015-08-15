@@ -2,7 +2,6 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
-#include "Memory.h"
 #include "Multiprocessor.h"
 
 #include "opencrun/Core/Device.h"
@@ -49,15 +48,8 @@ public:
 
   virtual const Footprint &getKernelFootprint(const KernelDescriptor &Kern) const;
 
-  virtual bool CreateBuffer(Buffer &Buf);
-  
-  virtual bool CreateImage(Image &Img);
-
-  virtual void DestroyMemoryObj(MemoryObject &MemObj);
-
-  virtual void *CreateMapBuffer(MemoryObject &MemObj, 
-                                MemoryObject::MemMappingInfo &MapInfo);
-  virtual void FreeMapBuffer(void *MapBuf);
+  std::unique_ptr<MemoryDescriptor>
+    createMemoryDescriptor(const MemoryObject &Obj) override;
 
   virtual bool Submit(Command &Cmd);
 
@@ -127,12 +119,13 @@ private:
     return Prefix.str() + Name.str();
   }
 
+  MemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
+
 private:
   // A CPUDevice is associated to an hardware machine (i.e. a single node in
   // a cluster system). In general it uses a subset of its logical cores.
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
-  GlobalMemory Global;
 
   std::unique_ptr<llvm::ExecutionEngine> JIT;
 
@@ -142,6 +135,25 @@ private:
   mutable FootprintsContainer KernelFootprints;
 
   friend void *LibLinker(const std::string &);
+};
+
+class CPUMemoryDescriptor : public MemoryDescriptor {
+public:
+  CPUMemoryDescriptor(const Device &Dev, const MemoryObject &Obj)
+    : MemoryDescriptor(Dev, Obj), Ptr(nullptr) {}
+  virtual ~CPUMemoryDescriptor();
+
+  bool allocate() override;
+
+  bool aliasWithHostPtr() const override;
+
+  void *map() override;
+  void unmap() override;
+
+  void *ptr() override { return map(); }
+
+private:
+  void *Ptr;
 };
 
 void *LibLinker(const std::string &Name);

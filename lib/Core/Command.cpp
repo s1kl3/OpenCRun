@@ -1494,15 +1494,16 @@ EnqueueMapBufferBuilder &EnqueueMapBufferBuilder::SetMapBuffer(void **MapBuf) {
     return *this;
 
   MemoryObject::MemMappingInfo MapInfo;
-
   MapInfo.Offset[0] = Offset;
   MapInfo.Size[0] = Size;
   MapInfo.Flags = MapFlags;
 
-  void *MapPtr = Queue.GetDevice().CreateMapBuffer(*Source, MapInfo);
-  if(!MapPtr)
-    return NotifyError(CL_INVALID_OPERATION, "cannot get host pointer to mapped data");
-    
+  void *MapPtr = Source->acquireMappingAddrFor(Queue.GetDevice());
+  if (!Source->addMapping(MapPtr, MapInfo)) {
+    Source->releaseMappingAddrFor(Queue.GetDevice());
+    return NotifyError(CL_MAP_FAILURE, "cannot get host pointer to mapped data");
+  }
+
   this->MapBuf = MapPtr;
   *MapBuf = MapPtr;
 
@@ -1687,9 +1688,11 @@ EnqueueMapImageBuilder &EnqueueMapImageBuilder::SetMapBuffer(void **MapBuf) {
 
   MapInfo.Flags = MapFlags;
 
-  void *MapPtr = Queue.GetDevice().CreateMapBuffer(*Source, MapInfo);
-  if(!MapPtr)
-    return NotifyError(CL_INVALID_OPERATION, "cannot get host pointer to mapped data");
+  void *MapPtr = Source->acquireMappingAddrFor(Queue.GetDevice());
+  if (!Source->addMapping(MapPtr, MapInfo)) {
+    Source->releaseMappingAddrFor(Queue.GetDevice());
+    return NotifyError(CL_MAP_FAILURE, "cannot get host pointer to mapped data");
+  }
     
   this->MapBuf = MapPtr;
   *MapBuf = MapPtr;

@@ -18,6 +18,7 @@ namespace opencrun {
 class Context;
 class Device;
 class Image;
+class MemoryDescriptor;
 
 class MemoryObject : public _cl_mem, public MTRefCountedBaseVPTR<MemoryObject> {
 public:
@@ -84,6 +85,12 @@ public:
   bool isValidMapping(void *Ptr) const;
   unsigned getNumMappings() const;
 
+  void *acquireMappingAddrFor(const Device &Dev) const;
+  void releaseMappingAddrFor(const Device &Dev) const;
+
+  bool initForDevices();
+  MemoryDescriptor &getDescriptorFor(const Device &Dev) const;
+
 protected:
   MemoryObject(Context &Ctx, Kind K, size_t Size, void *HostPtr, unsigned Flags,
                MemoryObject *ParentObj, size_t ParentOffset)
@@ -100,6 +107,8 @@ protected:
 
 private:
   mutable llvm::sys::Mutex ThisLock;
+
+  std::vector<std::unique_ptr<MemoryDescriptor>> Descriptors;
 
   Kind MemObjKind;
   size_t Size;
@@ -254,7 +263,64 @@ private:
   uint8_t ElementSize;
   uint8_t NumChannels;
   Descriptor Desc;
+};
 
+class MemoryDescriptor {
+public:
+  explicit MemoryDescriptor(const Device &Dev, const MemoryObject &Obj)
+   : Allocated(false), Dev(Dev), Obj(Obj) {}
+  virtual ~MemoryDescriptor();
+
+  const Device &getDevice() const { return Dev; }
+  const MemoryObject &getMemoryObject() const { return Obj; }
+
+  virtual bool allocate() = 0;
+  bool isAllocated() const { return Allocated; }
+
+  bool tryAllocate() {
+    if (!isAllocated())
+      return allocate();
+    return true;
+  }
+
+  virtual bool aliasWithHostPtr() const = 0;
+
+  /// Map the device storage and return the host-accessible pointer.
+  /// It must be paired with \c unmap to properly release the mapping if
+  /// necessary. The implementation may cache the pointer value to avoid
+  /// multiple mapping of the same storage.
+  virtual void *map() = 0;
+
+  /// Unmap the device storage.
+  virtual void unmap() = 0;
+
+  /// Device specific pointer. This method must be used only within device code!
+  virtual void *ptr() = 0;
+
+protected:
+  bool Allocated;
+
+private:
+  const Device &Dev;
+  const MemoryObject &Obj;
+};
+
+class SubObjectDescriptor final : public MemoryDescriptor {
+public:
+  explicit SubObjectDescriptor(const Device &Dev, const MemoryObject &Obj);
+  virtual ~SubObjectDescriptor() = default;
+
+  bool allocate() override;
+
+  bool aliasWithHostPtr() const override;
+
+  void *map() override;
+  void unmap() override;
+
+  void *ptr() override;
+
+private:
+  MemoryDescriptor &Parent;
 };
 
 class MemoryObjectBuilder {

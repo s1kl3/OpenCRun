@@ -585,14 +585,12 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
                               .Create(errcode_ret);
 
   if(!Cmd) {
-    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
 
   llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, errcode_ret);
 
   if(!Ev) {
-    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
   
@@ -644,14 +642,12 @@ clEnqueueMapImage(cl_command_queue command_queue,
                               .Create(errcode_ret);
 
   if(!Cmd) {
-    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
 
   llvm::IntrusiveRefCntPtr<opencrun::Event> Ev = Queue->Enqueue(*Cmd, errcode_ret);
 
   if(!Ev) {
-    Queue->GetDevice().FreeMapBuffer(MapBuf);
     return NULL;
   }
   

@@ -553,7 +553,8 @@ int CPUThread::Execute(MapImageCPUCommand &Cmd) {
 int CPUThread::Execute(UnmapMemObjectCPUCommand &Cmd) {
   EnqueueUnmapMemObject &CmdUnmap = Cmd.GetQueueCommandAs<EnqueueUnmapMemObject>();
   MemoryObject &MemObj = CmdUnmap.GetMemObj();
-  
+
+  // FIXME: this should be device-independent!
   MemObj.removeMapping(Cmd.GetMappedPtr());
   
   return CPUCommand::NoError;

@@ -33,13 +33,51 @@ void SignalJITCallEnd();
 } // End anonymous namespace.
 
 //
+// CPUMemoryDescriptor implementation.
+//
+
+CPUMemoryDescriptor::~CPUMemoryDescriptor() {
+  // If UseHostPtr is set, we do not own the storage.
+  if (getMemoryObject().getFlags() & MemoryObject::UseHostPtr)
+    return;
+
+  sys::Free(Ptr);
+}
+
+bool CPUMemoryDescriptor::allocate() {
+  assert(!isAllocated());
+
+  // If UseHostPtr is set, do not duplicate the storage.
+  if (getMemoryObject().getFlags() & MemoryObject::UseHostPtr) {
+    Ptr = getMemoryObject().getHostPtr();
+    return Allocated = true;
+  }
+
+  Ptr = sys::CacheAlignedAlloc(getMemoryObject().getSize());
+  return Allocated = Ptr != nullptr;
+}
+
+bool CPUMemoryDescriptor::aliasWithHostPtr() const {
+  return isAllocated() &&
+         getMemoryObject().getFlags() & MemoryObject::UseHostPtr;
+}
+
+void *CPUMemoryDescriptor::map() {
+  tryAllocate();
+
+  return Ptr;
+}
+
+void CPUMemoryDescriptor::unmap() {
+}
+
+//
 // CPUDevice implementation.
 //
 
 CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
   Device(CPUType, "CPU", llvm::sys::getDefaultTargetTriple()),
-  Machine(Machine),
-  Global(Machine.GetTotalMemorySize()) {
+  Machine(Machine) {
   HardwareCPUsContainer CPUs;
   for(auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
     CPUs.insert(&*I);
@@ -54,8 +92,7 @@ CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
 CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
                      const HardwareCPUsContainer &CPUs) :
   Device(Parent, Part),
-  Machine(Parent.GetHardwareMachine()),
-  Global(Parent.GetHardwareMachine().GetTotalMemorySize()) {
+  Machine(Parent.GetHardwareMachine()) {
   InitSubDeviceInfo(CPUs);
   InitMultiprocessors(CPUs);
   InitJIT();
@@ -85,46 +122,9 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
   return true;
 }
 
-bool CPUDevice::CreateBuffer(Buffer &Buf) {
-  return Global.Alloc(Buf);
-}
-
-bool CPUDevice::CreateImage(Image &Img) {
-  return Global.Alloc(Img);
-}
-
-void CPUDevice::DestroyMemoryObj(MemoryObject &MemObj) {
-  Global.Free(MemObj);
-}
-
-void *CPUDevice::CreateMapBuffer(MemoryObject &MemObj, 
-                                 MemoryObject::MemMappingInfo &MapInfo) {
-  void *MapBuf;
- 
-  // A CPU device has only one physical address space so host-side
-  // code can access directly to memory object's storage area.
-  if(llvm::isa<Buffer>(MemObj)) {
-    MapBuf = reinterpret_cast<void *>(
-        reinterpret_cast<uintptr_t>(Global[MemObj]) + MapInfo.Offset[0]);
-  } else if(Image *Img = llvm::dyn_cast<Image>(&MemObj)) {
-    MapBuf = reinterpret_cast<void *>(
-        reinterpret_cast<uintptr_t>(Global[MemObj]) +
-        Img->getElementSize() * MapInfo.Offset[0] +
-        Img->getRowPitch() * MapInfo.Offset[1] +
-        Img->getSlicePitch() * MapInfo.Offset[2]);
-  }
-
-  if(!MemObj.addMapping(MapBuf, MapInfo))
-    MapBuf = NULL;
-
-  return MapBuf;
-}
-
-void CPUDevice::FreeMapBuffer(void *MapBuf) {
-  // This method does nothing in particular for CPU target, but for
-  // those target having separated physical address spaces it would be
-  // used inside clEnqueueMapBuffer and clEnqueueMapImage to free
-  // host allocated memory in case of errors before returning to the caller.
+std::unique_ptr<MemoryDescriptor>
+CPUDevice::createMemoryDescriptor(const MemoryObject &Obj) {
+  return llvm::make_unique<CPUMemoryDescriptor>(*this, Obj);
 }
 
 bool CPUDevice::Submit(Command &Cmd) {
@@ -534,116 +534,144 @@ void CPUDevice::GetPinnedCPUs(HardwareCPUsContainer &CPUs) const {
     (*I)->GetPinnedCPUs(CPUs);
 }
 
+MemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {
+  return Obj.getDescriptorFor(*this);
+}
+
 bool CPUDevice::Submit(EnqueueReadBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new ReadBufferCPUCommand(Cmd, Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  return MP.Submit(new ReadBufferCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new WriteBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new WriteBufferCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new CopyBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueReadImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new ReadImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  return MP.Submit(new ReadImageCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new WriteImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new WriteImageCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyImageCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new CopyImageCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyImageToBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyImageToBufferCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new CopyImageToBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferToImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyBufferToImageCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new CopyBufferToImageCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new MapBufferCPUCommand(Cmd, Global[Cmd.GetSource()]));
+  // FIXME: Map operations are no-op!
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  return MP.Submit(new MapBufferCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueMapImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new MapImageCPUCommand(Cmd, Global[Cmd.GetSource()]));
+  // FIXME: Map operations are no-op!
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  return MP.Submit(new MapImageCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, Global[Cmd.GetMemObj()], Cmd.GetMappedPtr()));
+  // FIXME: Unmap operations are no-op!
+  void *DataPtr = getMemoryDescriptor(Cmd.GetMemObj()).ptr();
+  return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, DataPtr, Cmd.GetMappedPtr()));
 }
 
 bool CPUDevice::Submit(EnqueueReadBufferRect &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  return MP.Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteBufferRect &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new WriteBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Cmd.GetSource()));
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new WriteBufferRectCPUCommand(Cmd, TgtPtr, Cmd.GetSource()));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferRect &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new CopyBufferRectCPUCommand(Cmd, Global[Cmd.GetTarget()], Global[Cmd.GetSource()]));
+  void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new CopyBufferRectCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueFillBuffer &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new FillBufferCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new FillBufferCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
   // TODO: implement a smarter selection policy.
   Multiprocessor &MP = **Multiprocessors.begin();
 
-  return MP.Submit(new FillImageCPUCommand(Cmd, Global[Cmd.GetTarget()]));
+  void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
+  return MP.Submit(new FillImageCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
@@ -664,7 +692,7 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
   // Patching arguments buffer copy.
   for (const auto &P : Cmd.GetMemoryLocations()) {
     auto Addr = reinterpret_cast<void**>(Base + P.first);
-    *Addr = Global[*P.second];
+    *Addr = getMemoryDescriptor(*P.second).ptr();
   }
 
   return MP.Submit(new NativeKernelCPUCommand(Cmd));
@@ -898,11 +926,11 @@ void CPUDevice::LocateMemoryObjArgAddresses(
     default: break;
     case KernelArg::BufferArg:
       if (auto *Buf = I->getBuffer())
-        Ptr = Global[*Buf];
+        Ptr = getMemoryDescriptor(*Buf).ptr();
       break;
     case KernelArg::ImageArg:
       if (auto *Img = I->getImage())
-        Ptr = Global[*Img];
+        Ptr = getMemoryDescriptor(*Img).ptr();
       break;
     }
     GlobalArgs[I->getIndex()] = Ptr;
