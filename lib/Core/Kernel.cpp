@@ -10,35 +10,94 @@
 
 using namespace opencrun;
 
-KernelArg::~KernelArg() {}
+KernelArg::KernelArg(unsigned Index, Buffer *Buf)
+ : Kind(BufferArg), Index(Index), Buf(Buf) {}
 
-std::unique_ptr<KernelArg> BufferKernelArg::clone() const {
-  return std::unique_ptr<KernelArg>(
-    new BufferKernelArg(GetPosition(), Buf.getPtr(), AddrSpace));
+KernelArg::KernelArg(unsigned Index, Image *Img)
+ : Kind(ImageArg), Index(Index), Img(Img) {}
+
+KernelArg::KernelArg(unsigned Index, Sampler *Smplr)
+ : Kind(SamplerArg), Index(Index), Smplr(Smplr) {}
+
+KernelArg::KernelArg(unsigned Index, const void *ByValPtr, size_t ByValSize)
+ : Kind(ByValueArg), Index(Index) {
+  this->ByVal.Ptr = sys::NaturalAlignedAlloc(ByValSize);
+  this->ByVal.Size = ByValSize;
+  memcpy(this->ByVal.Ptr, ByValPtr, ByValSize);
 }
 
-std::unique_ptr<KernelArg> LocalBufferKernelArg::clone() const {
-  return std::unique_ptr<KernelArg>(
-    new LocalBufferKernelArg(GetPosition(), Size));
+KernelArg::KernelArg(unsigned Index, size_t LocalSize)
+ : Kind(LocalBufferArg), Index(Index), LocalSize(LocalSize) {}
+
+KernelArg::KernelArg(const KernelArg &Arg)
+ : Kind(Arg.Kind), Index(Arg.Index) {
+  switch (Kind) {
+  default: break;
+  case BufferArg:
+    new (&Buf) llvm::IntrusiveRefCntPtr<Buffer>(Arg.Buf);
+    break;
+  case ImageArg:
+    new (&Img) llvm::IntrusiveRefCntPtr<Image>(Arg.Img);
+    break;
+  case SamplerArg:
+    new (&Smplr) llvm::IntrusiveRefCntPtr<Sampler>(Arg.Smplr);
+    break;
+  case ByValueArg:
+    ByVal.Size = Arg.ByVal.Size;
+    ByVal.Ptr = sys::NaturalAlignedAlloc(ByVal.Size);
+    memcpy(ByVal.Ptr, Arg.ByVal.Ptr, ByVal.Size);
+    break;
+  case LocalBufferArg:
+    LocalSize = Arg.LocalSize;
+    break;
+  }
 }
 
-std::unique_ptr<KernelArg> ImageKernelArg::clone() const {
-  return std::unique_ptr<KernelArg>(
-    new ImageKernelArg(GetPosition(), Img.getPtr(), ImgAccess));
+KernelArg::KernelArg(KernelArg &&Arg)
+ : Kind(Arg.Kind), Index(Arg.Index) {
+  switch (Kind) {
+  default: break;
+  case BufferArg:
+    new (&Buf) llvm::IntrusiveRefCntPtr<Buffer>(std::move(Arg.Buf));
+    break;
+  case ImageArg:
+    new (&Img) llvm::IntrusiveRefCntPtr<Image>(std::move(Arg.Img));
+    break;
+  case SamplerArg:
+    new (&Smplr) llvm::IntrusiveRefCntPtr<Sampler>(std::move(Arg.Smplr));
+    break;
+  case ByValueArg:
+    ByVal.Size = Arg.ByVal.Size;
+    ByVal.Ptr = Arg.ByVal.Ptr;
+    break;
+  case LocalBufferArg:
+    LocalSize = Arg.LocalSize;
+    break;
+  }
+  Arg.Kind = NoArg;
 }
 
-std::unique_ptr<KernelArg> SamplerKernelArg::clone() const {
-  return std::unique_ptr<KernelArg>(
-    new SamplerKernelArg(GetPosition(), Smplr.getPtr()));
+KernelArg &KernelArg::operator=(KernelArg &&Arg) {
+  this->~KernelArg();
+  return *new (this) KernelArg(std::move(Arg));
 }
 
-ByValueKernelArg::~ByValueKernelArg() {
-  sys::Free(Arg);
-}
-
-std::unique_ptr<KernelArg> ByValueKernelArg::clone() const {
-  return std::unique_ptr<KernelArg>(
-    new ByValueKernelArg(GetPosition(), this->Arg, Size));
+KernelArg::~KernelArg() {
+  switch (Kind) {
+  default: break;
+  case BufferArg:
+    Buf.~IntrusiveRefCntPtr();
+    break;
+  case ImageArg:
+    Img.~IntrusiveRefCntPtr();
+    break;
+  case SamplerArg:
+    Smplr.~IntrusiveRefCntPtr();
+    break;
+  case ByValueArg:
+    sys::Free(ByVal.Ptr);
+    break;
+  }
 }
 
 #define RETURN_WITH_ERROR(ERR, MSG)   \
@@ -122,11 +181,7 @@ getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const {
   return true;
 }
 
-Kernel::Kernel(const Kernel &K) : Desc(K.Desc) {
-  Arguments.reserve(K.Arguments.size());
-  for (const auto &Arg : K.Arguments)
-    Arguments.push_back(Arg->clone());
-} 
+Kernel::Kernel(const Kernel &K) : Desc(K.Desc), Arguments(K.Arguments) {}
 
 Kernel::~Kernel() {}
 
@@ -261,39 +316,18 @@ cl_int Kernel::SetArg(unsigned I, size_t Size, const void *Arg) {
 
 
 cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
-  Buffer *Buf;
+  if (Size != sizeof(cl_mem))
+    RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
+                      "kernel argument size does not match");
 
-  Context &Ctx = GetContext();
+  Buffer *Buf = Arg ? *reinterpret_cast<Buffer* const*>(Arg) : nullptr;
 
-  KernelSignature Sign = Desc->getKernelInfo().getSignature();
-
-  opencl::Type PointeeTy = Sign.getArgument(I).getElementType();
-
-  opencl::AddressSpace AddrSpace = PointeeTy.getQualifiers().getAddressSpace();
-
-  switch(AddrSpace) {
-  case opencl::AS_Global:
-  case opencl::AS_Constant:
-    if (Size != sizeof(cl_mem))
-      RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
-                        "kernel argument size does not match");
-
-    std::memcpy(&Buf, Arg, Size);
-
-    break;
-
-  default:
-    llvm_unreachable("Invalid address space");
-  }
-
-  if (Buf) {
-    if (Buf->GetContext() != Ctx)
-      RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
-                        "buffer and kernel contexts do not match");
-  }
+  if (Buf && Buf->GetContext() != GetContext())
+    RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
+                      "buffer and kernel contexts do not match");
 
   ThisLock.acquire();
-  Arguments[I].reset(new BufferKernelArg(I, Buf, AddrSpace));
+  Arguments[I] = KernelArg(I, Buf);
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -307,64 +341,43 @@ cl_int Kernel::SetLocalBufferArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
 
   ThisLock.acquire();
-  Arguments[I].reset(new LocalBufferKernelArg(I, Size));
+  Arguments[I] = KernelArg(I, Size);
   ThisLock.release();
 
   return CL_SUCCESS;
 }
 
 cl_int Kernel::SetImageArg(unsigned I, size_t Size, const void *Arg) {
-  Image *Img;
-
-  Context &Ctx = GetContext();
-
-  opencl::Type ImgTy = Desc->getKernelInfo().getSignature().getArgument(I);
-
-  opencl::ImageAccess ImgAccess = ImgTy.getQualifiers().getImageAccess(); 
-  
-  // Function arguments of type image2d_t, image3d_t, image2d_array_t, 
-  // image1d_t, image1d_buffer_t, and image1d_array_t refer to image 
-  // memory objects allocated in the __global address space.
-  if(Size != sizeof(cl_mem))
+  if (Size != sizeof(cl_mem))
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
                       "kernel argument size does not match");
 
-  std::memcpy(&Img, Arg, Size);
+  Image *Img = Arg ? *reinterpret_cast<Image* const*>(Arg) : nullptr;
 
-  if(Img) {
-    if(Img->GetContext() != Ctx)
-      RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
-                        "image and kernel contexts do not match");
-  }
+  if (Img && Img->GetContext() != GetContext())
+    RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
+                      "image and kernel contexts do not match");
 
   ThisLock.acquire();
-  Arguments[I].reset(new ImageKernelArg(I, Img, ImgAccess));
+  Arguments[I] = KernelArg(I, Img);
   ThisLock.release();
 
   return CL_SUCCESS;
 }
 
 cl_int Kernel::SetSamplerArg(unsigned I, size_t Size, const void *Arg) {
-  Sampler *Smplr;
-
-  Context &Ctx = GetContext();
-
-  // The sampler type cannot be used with the __local and __global 
-  // address space qualifiers.
-  if(Size != sizeof(cl_sampler))
+  if (Size != sizeof(cl_sampler))
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
                       "kernel argument size does not match");
-  
-  std::memcpy(&Smplr, Arg, Size);
 
-  if(Smplr) {
-    if(Smplr->GetContext() != Ctx)
-      RETURN_WITH_ERROR(CL_INVALID_SAMPLER,
-                        "sampler and kernel contexts do not match");
-  }
+  Sampler *Smplr = Arg ? *reinterpret_cast<Sampler* const*>(Arg) : nullptr;
+
+  if (Smplr && Smplr->GetContext() != GetContext())
+    RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
+                      "sampler and kernel contexts do not match");
 
   ThisLock.acquire();
-  Arguments[I].reset(new SamplerKernelArg(I, Smplr));
+  Arguments[I] = KernelArg(I, Smplr);
   ThisLock.release();
 
   return CL_SUCCESS;
@@ -393,7 +406,7 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
                       "kernel argument size does not match");
 
   ThisLock.acquire();
-  Arguments[I].reset(new ByValueKernelArg(I, Arg, Size));
+  Arguments[I] = KernelArg(I, Arg, Size);
   ThisLock.release();
 
   return CL_SUCCESS;

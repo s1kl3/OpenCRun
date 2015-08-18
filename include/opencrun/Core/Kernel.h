@@ -20,7 +20,8 @@ namespace opencrun {
 
 class KernelArg {
 public:
-  enum Type {
+  enum KernelArgKind {
+    NoArg,
     BufferArg,
     LocalBufferArg,
     ImageArg,
@@ -28,161 +29,68 @@ public:
     ByValueArg
   };
 
-protected:
-  KernelArg(Type Ty, unsigned Position) : Ty(Ty), Position(Position) {}
-  KernelArg(const KernelArg &Arg) = delete;
-
 public:
-  virtual ~KernelArg();
+  KernelArg() : Kind(NoArg) {}
+  KernelArg(unsigned Index, Buffer *Buf);
+  KernelArg(unsigned Index, Image *Img);
+  KernelArg(unsigned Index, Sampler *Smplr);
+  KernelArg(unsigned Index, const void *ByValPtr, size_t ByValSize);
+  KernelArg(unsigned Index, size_t LocalSize);
 
-  Type GetType() const { return Ty; }
-  unsigned GetPosition() const { return Position; }
+  KernelArg(const KernelArg &Arg);
+  KernelArg(KernelArg &&Arg) noexcept;
 
-  virtual std::unique_ptr<KernelArg> clone() const = 0;
+  ~KernelArg();
+
+  KernelArg &operator=(const KernelArg &Arg) {
+    KernelArg CopyArg(Arg);
+    *this = std::move(CopyArg);
+    return *this;
+  }
+  KernelArg &operator=(KernelArg &&Arg) noexcept;
+
+  bool isValid() const { return Kind != NoArg; }
+  KernelArgKind getKind() const { return Kind; }
+  unsigned getIndex() const { return Index; }
+
+  Buffer *getBuffer() const {
+    assert(Kind == BufferArg);
+    return Buf.getPtr();
+  }
+  Image *getImage() const {
+    assert(Kind == ImageArg);
+    return Img.getPtr();
+  }
+  Sampler *getSampler() const {
+    assert(Kind == SamplerArg);
+    return Smplr.getPtr();
+  }
+  void *getByValPtr() const {
+    assert(Kind == ByValueArg);
+    return ByVal.Ptr;
+  }
+  size_t getByValSize() const {
+    assert(Kind == ByValueArg);
+    return ByVal.Size;
+  }
+  size_t getLocalSize() const {
+    assert(Kind == LocalBufferArg);
+    return LocalSize;
+  }
 
 private:
-  Type Ty;
-  unsigned Position;
-};
-
-class BufferKernelArg : public KernelArg {
-public:
-  static bool classof(const KernelArg *Arg) {
-    return Arg->GetType() == KernelArg::BufferArg;
-  }
-
-public:
-  BufferKernelArg(unsigned Position, Buffer *Buf,
-                  opencl::AddressSpace AddrSpace)
-   : KernelArg(KernelArg::BufferArg, Position), Buf(Buf),
-     AddrSpace(AddrSpace) {}
-
-  BufferKernelArg(const BufferKernelArg &Arg) = delete;
-
-public:
-  Buffer *GetBuffer() { return Buf.getPtr(); }
-
-  bool OnGlobalAddressSpace() const {
-    return AddrSpace == opencl::AS_Global;
-  }
-
-  bool OnConstantAddressSpace() const {
-    return AddrSpace == opencl::AS_Constant;
-  }
-
-  std::unique_ptr<KernelArg> clone() const override;
-
-private:
-  llvm::IntrusiveRefCntPtr<Buffer> Buf;
-  opencl::AddressSpace AddrSpace;
-};
-
-class LocalBufferKernelArg : public KernelArg {
-public:
-  static bool classof(const KernelArg *Arg) {
-    return Arg->GetType() == KernelArg::LocalBufferArg;
-  }
-
-public:
-  LocalBufferKernelArg(unsigned Position, size_t Size)
-   : KernelArg(KernelArg::LocalBufferArg, Position), Size(Size) {}
-
-  LocalBufferKernelArg(const LocalBufferKernelArg &Arg) = delete;
-
-public:
-  size_t getSize() const { return Size; }
-
-  std::unique_ptr<KernelArg> clone() const override;
-
-private:
-  size_t Size;
-};
-
-class ImageKernelArg : public KernelArg {
-public:
-  static bool classof(const KernelArg *Arg) {
-    return Arg->GetType() == KernelArg::ImageArg;
-  }
-
-public:
-  ImageKernelArg(unsigned Position, Image *Img, opencl::ImageAccess ImgAccess)
-   : KernelArg(KernelArg::ImageArg, Position), Img(Img),
-     ImgAccess(ImgAccess) {}
-
-  ImageKernelArg(const ImageKernelArg &Arg) = delete;
-
-public:
-  Image *GetImage() { return Img.getPtr(); }
-
-  bool IsReadOnly() const {
-    return ImgAccess == opencl::IA_ReadOnly;
-  }
-
-  bool IsWriteOnly() const {
-    return ImgAccess == opencl::IA_WriteOnly;
-  }
-
-  std::unique_ptr<KernelArg> clone() const override;
-
-private:
-  llvm::IntrusiveRefCntPtr<Image> Img;
-  opencl::ImageAccess ImgAccess;
-};
-
-class SamplerKernelArg : public KernelArg {
-public:
-  static bool classof(const KernelArg *Arg) {
-    return Arg->GetType() == KernelArg::SamplerArg;
-  }
-
-public:
-  SamplerKernelArg(unsigned Position, Sampler *Smplr)
-   : KernelArg(KernelArg::SamplerArg, Position),
-     Smplr(Smplr) {}
-
-  SamplerKernelArg(const SamplerKernelArg &Arg) = delete;
-
-public:
-  Sampler *GetSampler() { return Smplr.getPtr(); }
-
-  std::unique_ptr<KernelArg> clone() const override;
-
-private:
-  llvm::IntrusiveRefCntPtr<Sampler> Smplr;
-};
-
-class ByValueKernelArg : public KernelArg {
-public:
-  static bool classof(const KernelArg *Arg) {
-    return Arg->GetType() == KernelArg::ByValueArg;
-  }
-
-public:
-  ByValueKernelArg(unsigned Position, const void *Arg, size_t Size)
-   : KernelArg(KernelArg::ByValueArg, Position), Size(Size) {
-    // We need to allocate a chunk of memory for holding the parameter -- it is
-    // passed by copy. Generally speaking, we do not have alignment
-    // requirements. However, the CPU backed generates loads from this memory
-    // location, and since this parameter may be a vector type we can incur into
-    // alignment hazards! Force using the maximum natural alignment.
-    this->Arg = sys::NaturalAlignedAlloc(Size);
-
-    // Copy the parameter.
-    std::memcpy(this->Arg, Arg, Size);
-  }
-
-  ByValueKernelArg(const ByValueKernelArg &A) = delete;
-
-  ~ByValueKernelArg();
-
-public:
-  void *GetArg() { return Arg; }
-
-  std::unique_ptr<KernelArg> clone() const override;
-
-private:
-  void *Arg;
-  size_t Size;
+  KernelArgKind Kind;
+  unsigned Index;
+  union {
+    llvm::IntrusiveRefCntPtr<Buffer> Buf;
+    llvm::IntrusiveRefCntPtr<Image> Img;
+    llvm::IntrusiveRefCntPtr<Sampler> Smplr;
+    struct { 
+      void *Ptr;
+      size_t Size;
+    } ByVal;
+    size_t LocalSize;
+  };
 };
 
 class KernelDescriptor : public MTRefCountedBase<KernelDescriptor> {
@@ -240,8 +148,8 @@ private:
 
 class Kernel : public _cl_kernel, public MTRefCountedBase<Kernel> {
 public:
-  typedef std::vector<std::unique_ptr<KernelArg>> ArgumentsContainer;
-  typedef ArgumentsContainer::iterator arg_iterator;
+  typedef std::vector<KernelArg> ArgumentsContainer;
+  typedef ArgumentsContainer::const_iterator arg_iterator;
 
 public:
   Kernel(KernelDescriptor *KD) : Desc(KD), Arguments(GetArgCount()) {}

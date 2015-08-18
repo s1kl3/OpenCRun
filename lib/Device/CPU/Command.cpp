@@ -36,37 +36,37 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
   // We can start filling some arguments: global/constant buffers, images and arguments
   // passed by value.
   unsigned J = 0;
-  for(Kernel::arg_iterator I = Kern.arg_begin(),
-                           E = Kern.arg_end();
-                           I != E;
-                           ++I) {
-    // A buffer can be allocated by the CPUDevice.
-    if(llvm::isa<BufferKernelArg>(I->get())) {
+  for (auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I, ++J) {
+    Args[J] = nullptr;
+    switch (I->getKind()) {
+    default: break;
+    case KernelArg::BufferArg:
+      // A buffer can be allocated by the CPUDevice.
       Args[J] = GlobalArgs[J];
-    } 
-    
-    // An image can be allocated by the CPUDevice.
-    else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(I->get())) {
-      Image *Img = Arg->GetImage();
-      DeviceImage *DevImg = new DeviceImage(*Img, GlobalArgs[J]);
-      DevImgs.push_back(DevImg);
+      break;
+    case KernelArg::ImageArg:
+      // An image can be allocated by the CPUDevice.
+      if (auto *Img = I->getImage()) {
+        DeviceImage *DevImg = new DeviceImage(*Img, GlobalArgs[J]);
+        DevImgs.push_back(DevImg);
 
-      // Store image descriptor address.
-      Args[J] = DevImg; 
+        // Store image descriptor address.
+        Args[J] = DevImg;
+      }
+      break;
+    case KernelArg::SamplerArg:
+      if (auto *Smplr = I->getSampler()) {
+        DeviceSampler *DevSmplr = new DeviceSampler(GetDeviceSampler(*Smplr));
+        DevSmplrs.push_back(DevSmplr);
 
-    } else if(SamplerKernelArg *Arg = llvm::dyn_cast<SamplerKernelArg>(I->get())) {
-      Sampler *Smplr = Arg->GetSampler();
-      DeviceSampler *DevSmplr = new DeviceSampler(GetDeviceSampler(*Smplr));
-      DevSmplrs.push_back(DevSmplr);
-
-      // Store sampler address.
-      Args[J] = DevSmplr;
-
-    // For arguments passed by copy, we need to setup a pointer for the stub.
-    } else if(ByValueKernelArg *Arg = llvm::dyn_cast<ByValueKernelArg>(I->get()))
-      Args[J] = Arg->GetArg();
-
-    ++J;
+        // Store sampler address.
+        Args[J] = DevSmplr;
+      }
+      break;
+    case KernelArg::ByValueArg:
+      Args[J] = I->getByValPtr();
+      break;
+    }
   }
 }
 
@@ -84,15 +84,9 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(
   Kernel &Kern = GetKernel();
 
   unsigned J = 0;
-  for(Kernel::arg_iterator I = Kern.arg_begin(),
-                           E = Kern.arg_end();
-                           I != E;
-                           ++I) {
-    if(LocalBufferKernelArg *Arg = llvm::dyn_cast<LocalBufferKernelArg>(I->get()))
-      Args[J] = Local.Alloc(Arg->getSize());
-
-    ++J;
-  }
+  for (auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I, ++J)
+    if (I->getKind() == KernelArg::LocalBufferArg)
+      Args[J] = Local.Alloc(I->getLocalSize());
 
   if (StaticLocalSize) {
     CPUKernelInfo Info(Kern.getDescriptor().getKernelInfo());

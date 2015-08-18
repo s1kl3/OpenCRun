@@ -914,26 +914,21 @@ void *CPUDevice::LinkLibFunction(const std::string &Name) {
 void CPUDevice::LocateMemoryObjArgAddresses(
                   Kernel &Kern,
                   GlobalArgMappingsContainer &GlobalArgs) {
-  for(Kernel::arg_iterator I = Kern.arg_begin(),
-                           E = Kern.arg_end();
-                           I != E;
-                           ++I)
-    if(BufferKernelArg *Arg = llvm::dyn_cast<BufferKernelArg>(I->get())) {
-      unsigned I = Arg->GetPosition();
-
-      if(Buffer *Buf = Arg->GetBuffer())
-        GlobalArgs[I] = Global[*Buf];
-      else
-        GlobalArgs[I] = NULL;
-    } else if(ImageKernelArg *Arg = llvm::dyn_cast<ImageKernelArg>(I->get())) {
-      // Images are always allocated in __global AS.
-      unsigned I = Arg->GetPosition();
-
-      if(Image *Img = Arg->GetImage())
-        GlobalArgs[I] = Global[*Img];
-      else
-        GlobalArgs[I] = NULL;
+  for(auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I) {
+    void *Ptr = nullptr;
+    switch (I->getKind()) {
+    default: break;
+    case KernelArg::BufferArg:
+      if (auto *Buf = I->getBuffer())
+        Ptr = Global[*Buf];
+      break;
+    case KernelArg::ImageArg:
+      if (auto *Img = I->getImage())
+        Ptr = Global[*Img];
+      break;
     }
+    GlobalArgs[I->getIndex()] = Ptr;
+  }
 }
 
 static void createAutoLocalVarsPass(const llvm::PassManagerBuilder &PMB,
