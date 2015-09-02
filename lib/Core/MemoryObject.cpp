@@ -114,6 +114,18 @@ bool MemoryObject::initForDevices() {
       return false;
 
   Descriptors.swap(Descs);
+
+  if (getFlags() & CopyHostPtr)
+    for (auto &Desc : Descriptors) {
+      if (void *Ptr = Desc->map()) {
+        if (Desc->aliasWithHostPtr())
+          memcpy(Ptr, getHostPtr(), getSize());
+        Desc->unmap();
+        continue;
+      }
+      return false;
+    }
+
   return true;
 }
 
@@ -754,18 +766,19 @@ std::unique_ptr<MemoryObject> MemoryObjectBuilder::create(cl_int *ErrCode) {
 
   switch (ObjKind) {
   case K_Buffer:
-    Obj = Ctx->createBuffer(Buf.Size, HostPtr, Flags);
+    Obj.reset(new Buffer(*Ctx, Buf.Size, HostPtr, Flags));
     break;
   case K_SubBuffer:
-    Obj = Ctx->createSubBuffer(*SubBuf.Parent, SubBuf.Origin, SubBuf.Size, Flags);
+    Obj.reset(new Buffer(*Ctx, *SubBuf.Parent, SubBuf.Origin, SubBuf.Size,
+                         Flags));
     break;
   case K_Image:
-    Obj = Ctx->createImage(Img.Size, HostPtr, Flags, Img.Type,
-                           Img.ChOrder, Img.ChDataType, Img.Desc, Img.Buf);
+    Obj.reset(new Image(*Ctx, Img.Size, HostPtr, Flags, Img.Type, Img.ChOrder,
+                        Img.ChDataType, Img.Desc, Img.Buf));
     break;
   }
 
-  if (!Obj)
+  if (!Obj || !Obj->initForDevices())
     error(CL_OUT_OF_HOST_MEMORY, "out of host memory");
 
   return Obj;

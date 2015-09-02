@@ -78,19 +78,6 @@ public:
                                   bool EnableProfile,
                                   cl_int *ErrCode = NULL);
 
-  std::unique_ptr<Buffer> createBuffer(size_t Size,
-                                       void *HostPtr, uint16_t Flags);
-  std::unique_ptr<Buffer> createSubBuffer(Buffer &Buf, size_t Origin,
-                                          size_t Size, uint16_t Flags);
-  std::unique_ptr<Image> createImage(size_t Size, void *HostPtr, uint16_t Flags,
-                                     Image::Type Ty,
-                                     Image::ChannelOrder CO,
-                                     Image::ChannelDataType CDT,
-                                     const Image::Descriptor &Desc,
-                                     Buffer *Buf);
-
-  void destroyMemoryObject(MemoryObject &Obj);
-
   void ReportDiagnostic(llvm::StringRef Msg);
   void ReportDiagnostic(clang::TextDiagnosticBuffer &DiagInfo);
 
