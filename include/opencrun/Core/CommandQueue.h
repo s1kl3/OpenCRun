@@ -55,6 +55,10 @@ public:
   bool ProfilingEnabled() const { return EnableProfile; }
 
 protected:
+  bool submit(Command &Cmd);
+  bool ensureMemoryCoherency(Command &Cmd);
+
+protected:
   Type Ty;
 
   llvm::IntrusiveRefCntPtr<Context> Ctx;

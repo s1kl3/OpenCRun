@@ -63,6 +63,8 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
 
   ThisLock.release();
 
+  // TODO: This should be avoided, the queue should notify the device that at
+  // least one command is available so that it can start the processing.
   RunScheduler();
 
   if(ErrCode)
@@ -114,6 +116,157 @@ void CommandQueue::Finish() {
     (*I)->Wait();
 }
 
+bool CommandQueue::ensureMemoryCoherency(Command &Cmd) {
+  using SM = MemoryObject::SynchronizeMode;
+
+  switch (Cmd.GetType()) {
+  default: return true;
+  case Command::ReadBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueReadBuffer>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    break;
+  }
+  case Command::WriteBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueWriteBuffer>(&Cmd);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::CopyBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueCopyBuffer>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::ReadImage: {
+    auto &TheCmd = *llvm::cast<EnqueueReadImage>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    break;
+  }
+  case Command::WriteImage: {
+    auto &TheCmd = *llvm::cast<EnqueueWriteImage>(&Cmd);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::CopyImage: {
+    auto &TheCmd = *llvm::cast<EnqueueCopyImage>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::CopyImageToBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueCopyImageToBuffer>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::CopyBufferToImage: {
+    auto &TheCmd = *llvm::cast<EnqueueCopyBufferToImage>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::MapBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueMapBuffer>(&Cmd);
+    unsigned Mode = SM::SyncMap;
+    if (TheCmd.GetMapFlags() & CL_MAP_READ)
+      Mode |= SM::SyncRead;
+    if (TheCmd.GetMapFlags() & CL_MAP_WRITE)
+      Mode |= SM::SyncWrite;
+    TheCmd.GetSource().synchronizeFor(GetDevice(), Mode);
+    break;
+  }
+  case Command::MapImage: {
+    auto &TheCmd = *llvm::cast<EnqueueMapImage>(&Cmd);
+    unsigned Mode = SM::SyncMap;
+    if (TheCmd.GetMapFlags() & CL_MAP_READ)
+      Mode |= SM::SyncRead;
+    if (TheCmd.GetMapFlags() & CL_MAP_WRITE)
+      Mode |= SM::SyncWrite;
+    TheCmd.GetSource().synchronizeFor(GetDevice(), Mode);
+    break;
+  }
+  case Command::UnmapMemObject: {
+    auto &TheCmd = *llvm::cast<EnqueueUnmapMemObject>(&Cmd);
+    TheCmd.GetMemObj().synchronizeFor(GetDevice(), SM::SyncRead);
+    break;
+  }
+  case Command::ReadBufferRect: {
+    auto &TheCmd = *llvm::cast<EnqueueReadBufferRect>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    break;
+  }
+  case Command::WriteBufferRect: {
+    auto &TheCmd = *llvm::cast<EnqueueWriteBufferRect>(&Cmd);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::CopyBufferRect: {
+    auto &TheCmd = *llvm::cast<EnqueueCopyBufferRect>(&Cmd);
+    TheCmd.GetSource().synchronizeFor(GetDevice(), SM::SyncRead);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::FillBuffer: {
+    auto &TheCmd = *llvm::cast<EnqueueFillBuffer>(&Cmd);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::FillImage: {
+    auto &TheCmd = *llvm::cast<EnqueueFillImage>(&Cmd);
+    TheCmd.GetTarget().synchronizeFor(GetDevice(), SM::SyncReadWrite);
+    break;
+  }
+  case Command::NDRangeKernel: {
+    auto &TheCmd = *llvm::cast<EnqueueNDRangeKernel>(&Cmd);
+    auto &Kern = TheCmd.GetKernel();
+    for (auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I) {
+      MemoryObject *Obj = nullptr;
+      if (I->getKind() == KernelArg::BufferArg)
+        Obj = I->getBuffer();
+      else if (I->getKind() == KernelArg::ImageArg)
+        Obj = I->getImage();
+
+      if (Obj) {
+        unsigned Mode = 0;
+        if (Obj->getFlags() & MemoryObject::ReadWrite)
+          Mode = SM::SyncReadWrite;
+        else if (Obj->getFlags() & MemoryObject::ReadOnly)
+          Mode = SM::SyncRead;
+        else if (Obj->getFlags() & MemoryObject::WriteOnly)
+          Mode = SM::SyncWrite;
+
+        Obj->synchronizeFor(GetDevice(), Mode);
+      }
+    }
+    break;
+  }
+  case Command::NativeKernel: {
+    auto &TheCmd = *llvm::cast<EnqueueNativeKernel>(&Cmd);
+    for (const auto &Loc : TheCmd.GetMemoryLocations()) {
+      unsigned Mode = 0;
+      if (Loc.second->getFlags() & MemoryObject::ReadWrite)
+        Mode = SM::SyncReadWrite;
+      else if (Loc.second->getFlags() & MemoryObject::ReadOnly)
+        Mode = SM::SyncRead;
+      else if (Loc.second->getFlags() & MemoryObject::WriteOnly)
+        Mode = SM::SyncWrite;
+
+      Loc.second->synchronizeFor(GetDevice(), Mode);
+    }
+    break;
+  }
+  }
+  return true;
+}
+
+
+bool CommandQueue::submit(Command &Cmd) {
+  if (!ensureMemoryCoherency(Cmd))
+    return false;
+
+  return Dev.Submit(Cmd);
+}
+
 //
 // OutOfOrderQueue implementation.
 //
@@ -147,7 +300,7 @@ bool InOrderQueue::RunScheduler() {
 
   std::unique_ptr<Command> Cmd = std::move(Commands.front());
 
-  if (!Dev.Submit(*Cmd)) {
+  if (!submit(*Cmd)) {
     Commands.front() = std::move(Cmd);
     return true;
   }
