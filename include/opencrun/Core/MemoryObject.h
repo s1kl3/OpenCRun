@@ -5,6 +5,7 @@
 
 #include "opencrun/Util/MTRefCounted.h"
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -19,6 +20,7 @@ class Context;
 class Device;
 class Image;
 class MemoryDescriptor;
+class MemoryCoherencyTracker;
 
 class MemoryObject : public _cl_mem, public MTRefCountedBaseVPTR<MemoryObject> {
 public:
@@ -62,6 +64,16 @@ public:
     bool isOverlappedWith(const MemMappingInfo &Info) const;
   };
 
+  enum SynchronizeMode {
+    SyncMap = 1 << 0,
+    SyncRead = 1 << 1,
+    SyncWrite = 1 << 2,
+
+    SyncReadWrite = SyncRead | SyncWrite,
+
+    SyncMaskAll = SyncMap | SyncRead | SyncWrite
+  };
+
 public:
   static bool classof(const _cl_mem *Obj) { return true; }
 
@@ -91,11 +103,18 @@ public:
   bool initForDevices();
   MemoryDescriptor &getDescriptorFor(const Device &Dev) const;
 
+  void openRegion(size_t Offset, size_t Size) const;
+  void closeRegion(size_t Offset, size_t Size) const;
+  void synchronizeFor(const Device &D, unsigned SM) const;
+  void synchronizeRegionFor(const Device &D, unsigned SM,
+                            size_t Offset, size_t Size) const;
+
 protected:
   MemoryObject(Context &Ctx, Kind K, size_t Size, void *HostPtr, unsigned Flags,
                MemoryObject *ParentObj, size_t ParentOffset)
    : MemObjKind(K), Size(Size), Ctx(&Ctx), HostPtr(HostPtr), Flags(Flags),
      Parent(ParentObj), ParentOffset(ParentOffset) {
+    initializeMCT();
   }
 
   size_t getParentOffset() const { return ParentOffset; }
@@ -106,9 +125,14 @@ protected:
   }
 
 private:
+  void initializeMCT();
+  MemoryCoherencyTracker &getMCT() const;
+
+private:
   mutable llvm::sys::Mutex ThisLock;
 
   std::vector<std::unique_ptr<MemoryDescriptor>> Descriptors;
+  std::unique_ptr<MemoryCoherencyTracker> MCT;
 
   Kind MemObjKind;
   size_t Size;
@@ -321,6 +345,58 @@ public:
 
 private:
   MemoryDescriptor &Parent;
+};
+
+class MemoryCoherencyTracker {
+public:
+  explicit MemoryCoherencyTracker(const MemoryObject &Obj);
+
+  void initialize();
+  void addRegion(size_t Offset, size_t Size);
+  void updateRegion(size_t Offset, size_t Size, unsigned Mode, const Device &D);
+
+private:
+  static const unsigned MinSlots = 4;
+
+  struct MemoryChunk {
+    size_t Offset;
+    size_t Size;
+    llvm::BitVector Validity;
+
+    MemoryChunk(size_t Offset, size_t Size, unsigned NumDev = 0)
+     : Offset(Offset), Size(Size), Validity(NumDev) {}
+
+    bool operator<(size_t Offset) const {
+      return this->Offset < Offset;
+    }
+  };
+
+  using MemoryChunkVector = llvm::SmallVector<MemoryChunk, 4>;
+  using iterator = MemoryChunkVector::iterator;
+  using iterator_range = llvm::iterator_range<iterator>;
+
+  unsigned getNumDevices() const;
+  unsigned getDeviceIndex(const Device &D) const;
+  unsigned getHostIndex() const;
+  const Device &getDeviceFromIndex(unsigned Idx) const;
+
+  iterator_range findRangeFor(size_t Offset, size_t Size);
+
+  iterator findChunk(iterator I, iterator E, size_t Offset);
+  iterator splitChunk(iterator I, size_t Offset);
+
+  std::vector<MemoryChunk> computeChunksToTransfer(size_t Offset, size_t Size,
+                                                   unsigned Mode);
+
+  void transferToDevice(const Device &D, const MemoryChunk &C);
+  void transferToHost(const Device &D, const MemoryChunk &C);
+
+  void updateHostValidity(MemoryChunk &C);
+
+private:
+  llvm::sys::Mutex ThisLock;
+  const MemoryObject &Obj;
+  MemoryChunkVector Partition;
 };
 
 class MemoryObjectBuilder {

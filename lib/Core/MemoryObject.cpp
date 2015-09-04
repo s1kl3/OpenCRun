@@ -6,6 +6,8 @@
 using namespace opencrun;
 
 MemoryObject::~MemoryObject() {
+  if (Parent)
+    closeRegion(0, getSize());
 }
 
 static inline
@@ -126,6 +128,9 @@ bool MemoryObject::initForDevices() {
       return false;
     }
 
+  if (MCT)
+    MCT->initialize();
+
   return true;
 }
 
@@ -137,6 +142,50 @@ MemoryDescriptor &MemoryObject::getDescriptorFor(const Device &Dev) const {
   llvm_unreachable("looking for a device not in the context");
 }
 
+void MemoryObject::initializeMCT() {
+  // Only a main memory-object has a region-coherency tracker.
+  if (!Parent)
+    MCT = llvm::make_unique<MemoryCoherencyTracker>(*this);
+  else
+    openRegion(0, getSize());
+}
+
+MemoryCoherencyTracker &MemoryObject::getMCT() const {
+  if (Parent)
+    return Parent->getMCT();
+
+  return *MCT.get();
+}
+
+void MemoryObject::openRegion(size_t RegionOffset, size_t RegionSize) const {
+  if (auto *Buf = llvm::dyn_cast<Buffer>(this))
+    if (Buf->isSubBuffer())
+      RegionOffset += Buf->getOrigin();
+
+  getMCT().addRegion(RegionOffset, RegionSize);
+}
+
+void MemoryObject::closeRegion(size_t RegionOffset, size_t RegionSize) const {
+  // FIXME: regions elimination not supported yet.
+}
+
+void MemoryObject::synchronizeFor(const Device &D, unsigned SM) const {
+  size_t Offset = 0;
+  if (auto *Buf = llvm::dyn_cast<Buffer>(this))
+    if (Buf->isSubBuffer())
+      Offset = Buf->getOrigin();
+
+  getMCT().updateRegion(Offset, getSize(), SM, D);
+}
+
+void MemoryObject::synchronizeRegionFor(const Device &D, unsigned SM,
+                                        size_t Offset, size_t Size) const {
+  if (auto *Buf = llvm::dyn_cast<Buffer>(this))
+    if (Buf->isSubBuffer())
+      Offset += Buf->getOrigin();
+
+  getMCT().updateRegion(Offset, Size, SM, D);
+}
 
 void *Buffer::computeHostPtr(Buffer &P, size_t O) {
   if (P.getFlags() & UseHostPtr)
@@ -258,6 +307,266 @@ void *SubObjectDescriptor::ptr() {
     Offset = Buf->getOrigin();
 
   return reinterpret_cast<uint8_t*>(Base) + Offset;
+}
+
+MemoryCoherencyTracker::MemoryCoherencyTracker(const MemoryObject &Obj)
+ : Obj(Obj) {}
+
+void MemoryCoherencyTracker::initialize() {
+  auto C = MemoryChunk {0, Obj.getSize(), getNumDevices()};
+
+  if (Obj.getFlags() & MemoryObject::UseHostPtr)
+    updateHostValidity(C);
+
+  if (Obj.getFlags() & MemoryObject::CopyHostPtr) {
+    auto &Dev = getDeviceFromIndex(0);
+    auto &DevDesc = Obj.getDescriptorFor(Dev);
+
+    void *DstPtr = DevDesc.map();
+    memcpy(DstPtr, Obj.getHostPtr(), C.Size);
+    DevDesc.unmap();
+
+    C.Validity.set(0);
+  }
+
+  llvm::sys::ScopedLock Lock(ThisLock);
+  Partition.push_back(C);
+}
+
+unsigned MemoryCoherencyTracker::getNumDevices() const {
+  // We have one extra slot to track the coherency for the host.
+  return Obj.getContext().device_size() + 1;
+}
+
+unsigned MemoryCoherencyTracker::getDeviceIndex(const Device &D) const {
+  Context &Ctx = Obj.getContext();
+  auto I = std::find(Ctx.device_begin(), Ctx.device_end(), &D);
+  assert(I != Ctx.device_end() && "Device not in context");
+  return std::distance(Ctx.device_begin(), I);
+}
+
+unsigned MemoryCoherencyTracker::getHostIndex() const {
+  return getNumDevices() - 1;
+}
+
+const Device &MemoryCoherencyTracker::getDeviceFromIndex(unsigned Idx) const {
+  assert(Idx < Obj.getContext().device_size());
+  return **(Obj.getContext().device_begin() + Idx);
+}
+
+MemoryCoherencyTracker::iterator
+MemoryCoherencyTracker::findChunk(iterator I, iterator E, size_t Offset) {
+  I = std::lower_bound(I, E, Offset);
+  if (I != E && I->Offset == Offset)
+    return I;
+  return std::prev(I);
+}
+
+MemoryCoherencyTracker::iterator_range
+MemoryCoherencyTracker::findRangeFor(size_t Offset, size_t Size) {
+  auto I = findChunk(Partition.begin(), Partition.end(), Offset);
+  auto E = findChunk(I, Partition.end(), Offset + Size);
+  return { I, std::next(E) };
+}
+
+MemoryCoherencyTracker::iterator
+MemoryCoherencyTracker::splitChunk(iterator I, size_t Offset) {
+  if (I->Offset == Offset)
+    return I;
+
+  assert(I->Offset < Offset && I->Offset + I->Size > Offset);
+
+  size_t NewSize = I->Offset + I->Size - Offset;
+  I->Size -= NewSize;
+  I = Partition.insert(std::next(I), *I);
+  I->Offset = Offset;
+  I->Size = NewSize;
+
+  return I;
+}
+
+void MemoryCoherencyTracker::addRegion(size_t Offset, size_t Size) {
+  llvm::sys::ScopedLock Lock(ThisLock);
+
+  auto C = findChunk(Partition.begin(), Partition.end(), Offset);
+  C = splitChunk(C, Offset);
+  C = findChunk(C, Partition.end(), Offset + Size);
+  C = splitChunk(C, Offset + Size);
+}
+
+void MemoryCoherencyTracker::transferToDevice(const Device &D,
+                                              const MemoryChunk &C) {
+  if (C.Validity.none())
+    return;
+
+  // Check whether the region is already valid for this device.
+  if (C.Validity.test(getDeviceIndex(D)))
+    return;
+
+  auto &DevDesc = Obj.getDescriptorFor(D);
+  void *DstPtr = DevDesc.map();
+  if (C.Validity.test(getHostIndex())) {
+    // Prefer sync from host.
+    assert(Obj.getFlags() & MemoryObject::UseHostPtr);
+    void *SrcPtr = Obj.getHostPtr();
+
+    if (!DevDesc.aliasWithHostPtr())
+      memcpy(reinterpret_cast<uint8_t*>(DstPtr) + C.Offset,
+             reinterpret_cast<uint8_t*>(SrcPtr) + C.Offset,
+             C.Size);
+  } else {
+    // Use first device with a valid state.
+    const Device &SrcDev = getDeviceFromIndex(C.Validity.find_first());
+    auto &SrcDesc = Obj.getDescriptorFor(SrcDev);
+
+    void *SrcPtr = SrcDesc.map();
+    memcpy(reinterpret_cast<uint8_t*>(DstPtr) + C.Offset,
+           reinterpret_cast<uint8_t*>(SrcPtr) + C.Offset,
+           C.Size);
+    SrcDesc.unmap();
+  }
+  DevDesc.unmap();
+}
+
+void MemoryCoherencyTracker::transferToHost(const Device &D,
+                                            const MemoryChunk &C) {
+  if (C.Validity.none())
+    return;
+
+  // Check whether the region is already valid for the host.
+  if (C.Validity.test(getHostIndex()))
+    return;
+
+  // Use first device with a valid state.
+  const Device &SrcDev = getDeviceFromIndex(C.Validity.find_first());
+  auto &SrcDesc = Obj.getDescriptorFor(SrcDev);
+
+  void *DstPtr = Obj.getHostPtr();
+  void *SrcPtr = SrcDesc.map();
+  assert(DstPtr != SrcPtr);
+  memcpy(reinterpret_cast<uint8_t*>(DstPtr) + C.Offset,
+         reinterpret_cast<uint8_t*>(SrcPtr) + C.Offset,
+         C.Size);
+  SrcDesc.unmap();
+}
+
+void MemoryCoherencyTracker::updateHostValidity(MemoryChunk &C) {
+  C.Validity.set(getHostIndex());
+
+  // If we set the host to valide we need to update the validity for all
+  // the devices aliasing with the host.
+  for (unsigned Idx = 0; Idx != getHostIndex(); ++Idx) {
+    auto &Desc = Obj.getDescriptorFor(getDeviceFromIndex(Idx));
+    if (Desc.aliasWithHostPtr())
+      C.Validity.set(Idx);
+  }
+}
+
+
+std::vector<MemoryCoherencyTracker::MemoryChunk>
+MemoryCoherencyTracker::computeChunksToTransfer(size_t Offset, size_t Size,
+                                                unsigned Mode) {
+  using SM = MemoryObject::SynchronizeMode;
+
+  std::vector<MemoryChunk> Chunks;
+
+  auto Range = findRangeFor(Offset, Size);
+
+  if (Mode & SM::SyncRead) {
+    // Read access implies to transfer all the chunks in the range.
+    Chunks.assign(Range.begin(), Range.end());
+    return Chunks;
+  }
+
+  assert(Mode & SM::SyncWrite);
+
+  // Write-only access to a given region still requires to transfer data
+  // outside the queried region but still in the range of chunks we have.
+  // This is mandatory for correctness as we keep the partition generated by
+  // sub-objects only.
+
+  const auto &FirstChunk = *Range.begin();
+  if (FirstChunk.Offset < Offset) {
+    Chunks.push_back(FirstChunk);
+    Chunks.back().Size = Offset - FirstChunk.Offset;
+  }
+
+  const auto &LastChunk = *std::prev(Range.end());
+  if (LastChunk.Offset + LastChunk.Size > Offset + Size) {
+    Chunks.push_back(LastChunk);
+    Chunks.back().Offset = Offset + Size;
+    Chunks.back().Size = (LastChunk.Offset + LastChunk.Size) - (Offset + Size);
+  }
+
+  return Chunks;
+}
+
+void MemoryCoherencyTracker::updateRegion(size_t Offset, size_t Size,
+                                          unsigned Mode, const Device &D) {
+  // The update of a memory object region is split in three steps:
+  // 1. compute the chunks of memory we need to transfer.
+  // 2. for each chunk copy the content from a valid device/host memory.
+  // 3. update the validity bits for all the memory chunks in the partition
+  // that contain the queried region.
+  //
+  // It is correct and safe to perform step 1 and 3 in two different atomic
+  // transactions since a reader-writer or writer-writer on the same region may
+  // leads to undefined behavior by standard. Thus, a writer that invalidates
+  // all the caches is assumed to be exclusive.
+  // This allow to perform the actual memory transfer *outside* the critical
+  // section.
+  //
+  // NOTE: the initial implementation uses standard locks. We need to check if
+  // we can improve the scalability employing a reader-writer lock instead.
+
+  using SM = MemoryObject::SynchronizeMode;
+
+  assert(Mode && (Mode & ~(SM::SyncMaskAll)) == 0);
+
+  bool DeviceUpdate = !((Mode & SM::SyncMap) &&
+                        (Obj.getFlags() & MemoryObject::UseHostPtr));
+
+  std::vector<MemoryChunk> Chunks;
+
+  // Step 1: compute the chunks of memory we need to transfer.
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+
+    Chunks = computeChunksToTransfer(Offset, Size, Mode);
+  }
+
+  // Step 2: do actual memory transfers considering the validity bits inherited
+  // by the partition.
+  for (const auto &C : Chunks)
+    if (DeviceUpdate)
+      transferToDevice(D, C);
+    else
+      transferToHost(D, C);
+
+  // Step 3: update validity bits for the memory chunks in the partition that
+  // contain the queried region.
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+
+    auto Range = findRangeFor(Offset, Size);
+    assert(Range.begin() != Range.end());
+
+    auto &DevDesc = Obj.getDescriptorFor(D);
+    unsigned DevIndex = getDeviceIndex(D);
+
+    for (auto &C : Range) {
+      if (Mode & SM::SyncWrite)
+        C.Validity.reset();
+
+      if (DeviceUpdate) {
+        C.Validity.set(DevIndex);
+        if (DevDesc.aliasWithHostPtr())
+          updateHostValidity(C);
+      } else {
+        updateHostValidity(C);
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
