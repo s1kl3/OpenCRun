@@ -5,7 +5,6 @@
 #include "opencrun/Passes/AllPasses.h"
 
 #include "llvm/IR/Constants.h"
-#include "llvm/PassManager.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace opencrun;
