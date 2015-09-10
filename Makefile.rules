@@ -267,11 +267,11 @@ endif
 ifdef DEBUG_RUNTIME
 $(ObjectsBC): $(ObjDir)/%.bc: $(ObjDir)/%.ll $(LOPT)
 	$(Echo) "Compiling $*.ll to $*.bc for $(BuildMode) build (bytecode)"
-	$(Verb) $(LOPT) $< -std-compile-opts -o $@
+	$(Verb) $(LOPT) $< -O2 -o $@
 else
 $(ObjectsBC): $(ObjDir)/%.bc: $(ObjDir)/%.ll $(LOPT)
 	$(Echo) "Compiling $*.ll to $*.bc for $(BuildMode) build (bytecode)"
-	$(Verb) $(LOPT) $< -std-compile-opts -strip-debug -o $@
+	$(Verb) $(LOPT) $< -O2 -strip-debug -o $@
 endif
 
 #---------------------------------------------------------
