@@ -9,6 +9,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Mutex.h"
 
 #include <unordered_map>
@@ -118,10 +119,10 @@ protected:
   }
 
   size_t getParentOffset() const { return ParentOffset; }
-  MemoryObject *getParentObject() const { return Parent.getPtr(); }
+  MemoryObject *getParentObject() const { return Parent.get(); }
 
   template<typename Ty> Ty *getParentObject() const {
-    return llvm::cast_or_null<Ty>(Parent.getPtr());
+    return llvm::cast_or_null<Ty>(Parent.get());
   }
 
 private:

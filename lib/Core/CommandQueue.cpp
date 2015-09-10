@@ -58,7 +58,7 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   llvm::IntrusiveRefCntPtr<InternalEvent> Ev;
   Ev = new InternalEvent(*this, Cmd.GetType(), Sample);
 
-  Cmd.SetNotifyEvent(Ev.getPtr());
+  Cmd.SetNotifyEvent(Ev.get());
   Commands.push_back(std::unique_ptr<Command>(&Cmd));
 
   ThisLock.release();

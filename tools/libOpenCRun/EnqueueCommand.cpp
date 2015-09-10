@@ -595,7 +595,7 @@ clEnqueueMapBuffer(cl_command_queue command_queue,
   }
   
   if(event) {
-    *event = Ev.getPtr();
+    *event = Ev.get();
     Ev.resetWithoutRelease();
   }
   
@@ -652,7 +652,7 @@ clEnqueueMapImage(cl_command_queue command_queue,
   }
   
   if(event) {
-    *event = Ev.getPtr();
+    *event = Ev.get();
     Ev.resetWithoutRelease();
   }
   

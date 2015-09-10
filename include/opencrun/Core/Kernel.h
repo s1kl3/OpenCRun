@@ -55,15 +55,15 @@ public:
 
   Buffer *getBuffer() const {
     assert(Kind == BufferArg);
-    return Buf.getPtr();
+    return Buf.get();
   }
   Image *getImage() const {
     assert(Kind == ImageArg);
-    return Img.getPtr();
+    return Img.get();
   }
   Sampler *getSampler() const {
     assert(Kind == SamplerArg);
-    return Smplr.getPtr();
+    return Smplr.get();
   }
   void *getByValPtr() const {
     assert(Kind == ByValueArg);

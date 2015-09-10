@@ -28,7 +28,7 @@
 #define RETURN_WITH_EVENT(VAR, EV) \
   {                                \
   if(VAR) {                        \
-    *VAR = EV.getPtr();            \
+    *VAR = EV.get();            \
     EV.resetWithoutRelease();      \
   }                                \
   return CL_SUCCESS;               \
