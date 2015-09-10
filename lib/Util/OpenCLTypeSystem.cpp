@@ -53,10 +53,10 @@ Type::PrimitiveClass Type::getPrimitiveClass() const {
 
   assert(isPrimitive());
 
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(2))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(2));
 
-  assert(V < PrimitiveEnd);
-  return PrimitiveClass(V);
+  assert(Cst->getZExtValue() < PrimitiveEnd);
+  return PrimitiveClass(Cst->getZExtValue());
 }
 
 Type::ImageClass Type::getImageClass() const {
@@ -64,10 +64,10 @@ Type::ImageClass Type::getImageClass() const {
     return getUnqualifiedType().getImageClass();
 
   assert(isImage());
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(2))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(2));
 
-  assert(V < ImageEnd);
-  return ImageClass(V);
+  assert(Cst->getZExtValue() < ImageEnd);
+  return ImageClass(Cst->getZExtValue());
 }
 
 Type Type::getElementType() const {
@@ -85,11 +85,13 @@ unsigned Type::getNumElements() const {
 
   assert(isArray() || isVector());
 
-  return llvm::cast<llvm::ConstantInt>(MD->getOperand(3))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(3));
+  return Cst->getZExtValue();
 }
 
 bool Type::isRecordTypeAnonymous() const {
-  return llvm::cast<llvm::ConstantInt>(MD->getOperand(3))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(3));
+  return Cst->getZExtValue();
 }
 
 llvm::StringRef Type::getRecordTypeName() const {
@@ -114,31 +116,30 @@ RecordTypeBody Type::getRecordTypeBody() const {
 Qualifiers Type::getQualifiers() const {
   if (!isQualType()) return Qualifiers(0);
 
-  uint32_t Mask = llvm::cast<llvm::ConstantInt>(MD->getOperand(1))
-                    ->getZExtValue();
-  return Qualifiers(Mask);
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(1));
+  return Qualifiers(Cst->getZExtValue());
 }
 
 Type::Kind Type::getKind() const {
   if (isQualType())
     return getUnqualifiedType().getKind();
 
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(1))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(1));
 
-  assert(V <= TK_Union);
-  return Kind(V);
+  assert(Cst->getZExtValue() <= TK_Union);
+  return Kind(Cst->getZExtValue());
 }
 
 bool Type::isQualType() const {
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(0))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(0));
 
-  return V == ID_QualType;
+  return Cst->getZExtValue() == ID_QualType;
 }
 
 bool Type::isRawType() const {
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(0))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(0));
 
-  return V == ID_Type;
+  return Cst->getZExtValue() == ID_Type;
 }
 
 Type Type::getUnqualifiedType() const {
@@ -152,15 +153,18 @@ RecordTypeBody::RecordTypeBody(llvm::MDNode *MD) : MD(MD) {
 }
 
 uint64_t RecordTypeBody::getSizeInBits() const {
-  return llvm::cast<llvm::ConstantInt>(MD->getOperand(1))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(1));
+  return Cst->getZExtValue();
 }
 
 uint64_t RecordTypeBody::getAlignment() const {
-  return llvm::cast<llvm::ConstantInt>(MD->getOperand(2))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(2));
+  return Cst->getZExtValue();
 }
 
 bool RecordTypeBody::isPacked() const {
-  return llvm::cast<llvm::ConstantInt>(MD->getOperand(3))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(3));
+  return Cst->getZExtValue();
 }
 
 unsigned RecordTypeBody::getNumFields() const {
@@ -174,14 +178,18 @@ Type RecordTypeBody::getField(unsigned I) const {
 
 uint64_t RecordTypeBody::getFieldOffset(unsigned I) const {
   assert(I < getNumFields());
-  llvm::Value *V = MD->getOperand(I * 2 + 5);
-  return llvm::cast<llvm::ConstantInt>(V)->getZExtValue();
+  auto *Cst =
+    llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(I * 2 + 5));
+  return Cst->getZExtValue();
 }
 
 bool RecordTypeBody::isRecordBody() const {
-  uint64_t V = llvm::cast<llvm::ConstantInt>(MD->getOperand(0))->getZExtValue();
+  auto *Cst = llvm::mdconst::extract<llvm::ConstantInt>(MD->getOperand(0));
+  return Cst->getZExtValue() == ID_RecordTypeBody;
+}
 
-  return V == ID_RecordTypeBody;
+static llvm::Metadata *getIntegerMD(llvm::Type *Ty, uint64_t Value) {
+  return llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(Ty, Value));
 }
 
 Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
@@ -264,7 +272,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
   }
 
   if (Ty->isConstantArrayType()) {
-    const clang::ConstantArrayType *CATy = llvm::cast<clang::ConstantArrayType>(Ty->getAsArrayTypeUnsafe());
+    auto *CATy = llvm::cast<clang::ConstantArrayType>(Ty->getAsArrayTypeUnsafe());
     clang::QualType Elem = CATy->getElementType();
     unsigned NumElems = CATy->getSize().getZExtValue();
     return addQualifiers(Ty.getQualifiers(), 0,
@@ -317,18 +325,18 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
     llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
     llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
 
-    llvm::SmallVector<llvm::Value *, 32> BodyVals;
-    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, ID_RecordTypeBody));
-    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Size));
-    BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Alignment));
-    BodyVals.push_back(llvm::ConstantInt::get(I1Ty, Packed));
+    llvm::SmallVector<llvm::Metadata *, 32> BodyVals;
+    BodyVals.push_back(getIntegerMD(I64Ty, ID_RecordTypeBody));
+    BodyVals.push_back(getIntegerMD(I64Ty, Size));
+    BodyVals.push_back(getIntegerMD(I64Ty, Alignment));
+    BodyVals.push_back(getIntegerMD(I1Ty, Packed));
 
     uint64_t FieldIdx = 0;
     for (clang::RecordDecl::field_iterator I = RD->field_begin(),
          E = RD->field_end(); I != E; ++I, ++FieldIdx) {
       BodyVals.push_back(get(ASTCtx, I->getType()).getMDNode());
       uint64_t Offset = Layout.getFieldOffset(FieldIdx);
-      BodyVals.push_back(llvm::ConstantInt::get(I64Ty, Offset));
+      BodyVals.push_back(getIntegerMD(I64Ty, Offset));
     }
 
     RecordTypeBody Body = llvm::MDNode::get(Ctx, BodyVals);
@@ -353,26 +361,26 @@ Type TypeGenerator::getPrimitiveType(Type::PrimitiveClass C) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  llvm::Value *Vals[3] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, Type::TK_Primitive),
-    llvm::ConstantInt::get(I64Ty, C)
+  llvm::Metadata *MDs[3] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, Type::TK_Primitive),
+    getIntegerMD(I64Ty, C)
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getImageType(Type::ImageClass C) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  llvm::Value *Vals[3] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, Type::TK_Image),
-    llvm::ConstantInt::get(I64Ty, C)
+  llvm::Metadata *MDs[3] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, Type::TK_Image),
+    getIntegerMD(I64Ty, C)
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getVectorType(Type Elem, unsigned NumElems) {
@@ -381,14 +389,14 @@ Type TypeGenerator::getVectorType(Type Elem, unsigned NumElems) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  llvm::Value *Vals[4] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, Type::TK_Vector),
+  llvm::Metadata *MDs[4] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, Type::TK_Vector),
     Elem.getMDNode(),
-    llvm::ConstantInt::get(I64Ty, NumElems)
+    getIntegerMD(I64Ty, NumElems)
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getRecordType(llvm::StringRef Name, bool IsUnion,
@@ -397,15 +405,15 @@ Type TypeGenerator::getRecordType(llvm::StringRef Name, bool IsUnion,
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
   llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
 
-  llvm::Value *Vals[5] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
+  llvm::Metadata *MDs[5] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
     llvm::MDString::get(Ctx, Name),
-    llvm::ConstantInt::get(I1Ty, IsAnonymous),
-    llvm::Constant::getNullValue(I64Ty) // Placeholder for body
+    getIntegerMD(I1Ty, IsAnonymous),
+    getIntegerMD(I64Ty, -1) // Placeholder for body
   };
 
-  Type Res = llvm::MDNode::get(Ctx, Vals);
+  Type Res = llvm::MDNode::get(Ctx, MDs);
   Res.getMDNode()->replaceOperandWith(4, Res.getMDNode());
   return Res;
 }
@@ -416,42 +424,42 @@ Type TypeGenerator::getRecordTypeWithBody(llvm::StringRef Name, bool IsUnion,
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
   llvm::Type *I1Ty = llvm::Type::getInt1Ty(Ctx);
 
-  llvm::Value *Vals[5] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
+  llvm::Metadata *MDs[5] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, IsUnion ? Type::TK_Union : Type::TK_Struct),
     llvm::MDString::get(Ctx, Name),
-    llvm::ConstantInt::get(I1Ty, IsAnonymous),
+    getIntegerMD(I1Ty, IsAnonymous),
     B.getMDNode()
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getPointerType(Type Pointee) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  llvm::Value *Vals[3] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, Type::TK_Pointer),
+  llvm::Metadata *MDs[3] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, Type::TK_Pointer),
     Pointee.getMDNode()
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getArrayType(Type Elem, unsigned NumElems) {
   llvm::LLVMContext &Ctx = Mod.getContext();
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  llvm::Value *Vals[4] = {
-    llvm::ConstantInt::get(I64Ty, ID_Type),
-    llvm::ConstantInt::get(I64Ty, Type::TK_Array),
+  llvm::Metadata *MDs[4] = {
+    getIntegerMD(I64Ty, ID_Type),
+    getIntegerMD(I64Ty, Type::TK_Array),
     Elem.getMDNode(),
-    llvm::ConstantInt::get(I64Ty, NumElems)
+    getIntegerMD(I64Ty, NumElems)
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
 
 Type TypeGenerator::getQualType(uint32_t Mask, Type T) {
@@ -461,13 +469,13 @@ Type TypeGenerator::getQualType(uint32_t Mask, Type T) {
   llvm::Type *I64Ty = llvm::Type::getInt64Ty(Ctx);
   llvm::Type *I32Ty = llvm::Type::getInt32Ty(Ctx);
 
-  llvm::Value *Vals[3] = {
-    llvm::ConstantInt::get(I64Ty, ID_QualType),
-    llvm::ConstantInt::get(I32Ty, Mask),
+  llvm::Metadata *MDs[3] = {
+    getIntegerMD(I64Ty, ID_QualType),
+    getIntegerMD(I32Ty, Mask),
     T.getMDNode()
   };
 
-  return llvm::MDNode::get(Ctx, Vals);
+  return llvm::MDNode::get(Ctx, MDs);
 }
  
 Type TypeGenerator::addQualifiers(clang::Qualifiers Q,

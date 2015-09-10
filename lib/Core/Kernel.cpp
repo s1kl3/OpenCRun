@@ -187,7 +187,7 @@ Kernel::~Kernel() {}
 
 llvm::StringRef Kernel::GetArgName(unsigned I) const {
   KernelArgInfo ArgsName = Desc->getKernelInfo().getArgsName();
-  return ArgsName.getArgumentAs<llvm::MDString>(I)->getString();
+  return ArgsName.getArgumentAsString(I);
 }
 
 unsigned Kernel::GetArgCount() const {
@@ -228,8 +228,7 @@ cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const
 cl_kernel_arg_access_qualifier Kernel::GetArgAccessQualifier(unsigned I) const {
   KernelArgInfo ArgsAccessQual = Desc->getKernelInfo().getArgsAccessQual();
 
-  llvm::StringRef ArgAccStr =
-    ArgsAccessQual.getArgumentAs<llvm::MDString>(I)->getString();
+  llvm::StringRef ArgAccStr = ArgsAccessQual.getArgumentAsString(I);
 
   return llvm::StringSwitch<cl_kernel_arg_access_qualifier>(ArgAccStr)
           .Case("read_only", CL_KERNEL_ARG_ACCESS_READ_ONLY)
@@ -240,14 +239,13 @@ cl_kernel_arg_access_qualifier Kernel::GetArgAccessQualifier(unsigned I) const {
 
 llvm::StringRef Kernel::GetArgTypeName(unsigned I) const {
   KernelArgInfo ArgsType = Desc->getKernelInfo().getArgsType();
-  return ArgsType.getArgumentAs<llvm::MDString>(I)->getString();
+  return ArgsType.getArgumentAsString(I);
 }
 
 cl_kernel_arg_type_qualifier Kernel::GetArgTypeQualifier(unsigned I) const {
   KernelArgInfo ArgsTypeQual = Desc->getKernelInfo().getArgsTypeQual();
 
-  llvm::StringRef TyQlsStr =
-    ArgsTypeQual.getArgumentAs<llvm::MDString>(I)->getString();
+  llvm::StringRef TyQlsStr = ArgsTypeQual.getArgumentAsString(I);
 
   cl_kernel_arg_type_qualifier TyQls = CL_KERNEL_ARG_TYPE_NONE;
 

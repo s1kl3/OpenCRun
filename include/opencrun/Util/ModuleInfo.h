@@ -19,14 +19,18 @@ public:
     return MD->getNumOperands() - 1;
   }
 
-  llvm::Value *getArgument(unsigned I) const {
+  llvm::Metadata *getArgument(unsigned I) const {
     assert(I < getNumArguments());
-    return MD->getOperand(I + 1);
+    return MD->getOperand(I + 1).get();
   }
 
   template<typename Ty>
   Ty *getArgumentAs(unsigned I) const {
-    return llvm::cast<Ty>(getArgument(I));
+    return llvm::mdconst::extract<Ty>(getArgument(I));
+  }
+
+  llvm::StringRef getArgumentAsString(unsigned I) const {
+    return llvm::cast<llvm::MDString>(getArgument(I))->getString();
   }
 
 private:
@@ -48,7 +52,7 @@ public:
 
   opencl::Type getArgument(unsigned I) const {
     assert(I < getNumArguments());
-    return llvm::cast<llvm::MDNode>(MD->getOperand(I + 1));
+    return llvm::cast<llvm::MDNode>(MD->getOperand(I + 1).get());
   }
 
   bool operator==(const KernelSignature &S) const;
@@ -82,7 +86,7 @@ public:
 
   llvm::Function *getFunction() const {
     assert(MD);
-    return llvm::cast<llvm::Function>(MD->getOperand(0));
+    return llvm::mdconst::extract<llvm::Function>(MD->getOperand(0));
   }
 
   llvm::StringRef getName() const {
@@ -187,7 +191,7 @@ public:
   private:
     void updateKernelInfo() {
       if (KernelsMD && CurIdx < KernelsMD->getNumOperands())
-        CurInfo = llvm::cast<llvm::MDNode>(KernelsMD->getOperand(CurIdx));
+        CurInfo = KernelsMD->getOperand(CurIdx);
     }
 
     void advance() {

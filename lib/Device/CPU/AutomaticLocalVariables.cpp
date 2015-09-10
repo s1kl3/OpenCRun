@@ -275,7 +275,7 @@ CallChainLocals::CallChainLocals(llvm::Function &F,
   using namespace llvm;
 
   Module &M = *F.getParent();
-  const DataLayout &DL = *M.getDataLayout();
+  const DataLayout &DL = M.getDataLayout();
 
   SmallVector<llvm::Type *, 8> Fields;
   unsigned long Offset = 0;
@@ -455,6 +455,10 @@ void AutomaticLocalVariables::updateCallInst(llvm::CallInst *CInst) {
                       CallInst::Create(NewCallee, Args));
 }
 
+static llvm::ConstantAsMetadata *getIntegerMD(llvm::Type *Ty, uint64_t V) {
+  return llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(Ty, V));
+}
+
 void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
   using namespace llvm;
 
@@ -495,37 +499,36 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
 
     // Meta-data decoration:
     //
-    // !<n> = metadata !{metadata !"static_local_infos", i32 <KLs_num>, i64 <sz>,
-    //          metadata !<n+1>, metadata !<n+2>, ...}
-    // !<n+1> = metadata !{i32 <array_idx_F>, i64 <offset_F>}
-    // !<n+2> = metadata !{i32 <array_idx_K_i>, i64 <offset_K_i>}
+    // !<n> = !{!"static_local_infos", i32 <KLs_num>, i64 <sz>,
+    //          !<n+1>, !<n+2>, ...}
+    // !<n+1> = !{i32 <array_idx_F>, i64 <offset_F>}
+    // !<n+2> = !{i32 <array_idx_K_i>, i64 <offset_K_i>}
     // ...
     //
     // where <KLs_num> is the number of kernel local structures (see KernelLocals)
     // within the LLVM module, while <sz> is the total size (in bytes) for the
     // structure belonging to the call-chain having F as its root.
-    const DataLayout &DL = *M.getDataLayout();
+    const DataLayout &DL = M.getDataLayout();
     KernelInfo KI = ModuleInfo(M).getKernelInfo(F.getName());
     llvm::MDNode *InfoMD = KI.getCustomInfo();
 
-    SmallVector<Value *, 8> Info;
+    SmallVector<Metadata *, 8> Info;
     for (unsigned I = 0, E = InfoMD->getNumOperands(); I != E; ++I)
       Info.push_back(InfoMD->getOperand(I));
 
     Type *I32Ty = Type::getInt32Ty(Ctx);
     Type *I64Ty = Type::getInt64Ty(Ctx);
 
-    SmallVector<Value *, 8> Args;
+    SmallVector<Metadata *, 8> Args;
     Args.push_back(MDString::get(Ctx, "static_local_infos"));
-    Args.push_back(ConstantInt::get(I32Ty, Locals.size()));
-    Args.push_back(ConstantInt::get(I64Ty, DL.getTypeStoreSize(CCL.getStructType())));
+    Args.push_back(getIntegerMD(I32Ty, Locals.size()));
+    Args.push_back(getIntegerMD(I64Ty, DL.getTypeStoreSize(CCL.getStructType())));
    
-    // Add a meta-data for the current kernel if it declares automatic
-    // locals.
+    // Add a meta-data for the current kernel if it declares automatic locals.
     if (K2IdxMap.count(&F)) {
-      Value *Args_F[2] = {
-        ConstantInt::get(I32Ty, K2IdxMap[&F]),
-        ConstantInt::get(I64Ty, CCL.getOffset(K2LocalsMap[&F]))
+      Metadata *Args_F[2] = {
+        getIntegerMD(I32Ty, K2IdxMap[&F]),
+        getIntegerMD(I64Ty, CCL.getOffset(K2LocalsMap[&F]))
       };
       Args.push_back(MDNode::get(Ctx, Args_F));
     }
@@ -534,9 +537,9 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
     // automatic locals.
     for (FunctionSet::const_iterator I = RKSet.begin(), E = RKSet.end(); I != E; ++I)
       if (K2IdxMap.find(*I) != K2IdxMap.end()) {
-        Value *Args_RK_I[2] = {
-          ConstantInt::get(I32Ty, K2IdxMap[*I]),
-          ConstantInt::get(I64Ty, CCL.getOffset(K2LocalsMap[*I]))
+        Metadata *Args_RK_I[2] = {
+          getIntegerMD(I32Ty, K2IdxMap[*I]),
+          getIntegerMD(I64Ty, CCL.getOffset(K2LocalsMap[*I]))
         };
         Args.push_back(MDNode::get(Ctx, Args_RK_I));
       }
@@ -560,8 +563,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
     // automatic variables and their signature needs updated.
     prepareFunctionSignature(F, true);
   } else {
-    // The current function F is not a kernel and it doesn't reach any
-    // kernel.
+    // The current function F is not a kernel and it doesn't reach any kernel.
     if(RKSet.empty())
       return;
  

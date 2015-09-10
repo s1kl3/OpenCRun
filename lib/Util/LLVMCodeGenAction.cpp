@@ -102,9 +102,9 @@ private:
 
 }
 
-static bool isKernelMetadata(llvm::Value *V, llvm::StringRef Name) {
-  if (llvm::MDNode *MD = llvm::dyn_cast<llvm::MDNode>(V))
-    if (llvm::MDString *S = llvm::dyn_cast<llvm::MDString>(MD->getOperand(0)))
+static bool isKernelMetadata(llvm::Metadata *MD, llvm::StringRef Name) {
+  if (llvm::MDNode *MDN = llvm::dyn_cast<llvm::MDNode>(MD))
+    if (auto *S = llvm::dyn_cast<llvm::MDString>(MDN->getOperand(0).get()))
       return S->getString() == Name;
 
   return false;
@@ -113,11 +113,22 @@ static bool isKernelMetadata(llvm::Value *V, llvm::StringRef Name) {
 static llvm::MDNode *getKernelMD(llvm::NamedMDNode *Kernels,
                                   llvm::Function *F) {
   for (unsigned i = 0, e = Kernels->getNumOperands(); i != e; ++i) {
-    llvm::MDNode *CurMD = Kernels->getOperand(i);
-    if (CurMD->getOperand(0) == F)
+    auto *CurMD = Kernels->getOperand(i);
+    if (llvm::mdconst::extract<llvm::Constant>(CurMD->getOperand(0)) == F)
       return CurMD;
   }
   return 0;
+}
+
+static void replaceKernelMD(llvm::NamedMDNode *Kernels, llvm::Function *F,
+                            llvm::MDNode *KernMD) {
+  for (unsigned i = 0, e = Kernels->getNumOperands(); i != e; ++i) {
+    auto *CurMD = Kernels->getOperand(i);
+    if (llvm::mdconst::extract<llvm::Constant>(CurMD->getOperand(0)) == F) {
+      Kernels->setOperand(i, KernMD);
+      break;
+    }
+  }
 }
 
 void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
@@ -126,16 +137,17 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   // OpenCL kernel names are not mangled!
   llvm::Function *F = TheModule->getFunction(KernelName);
 
-  if (!F) return;
+  if (!F)
+    return;
 
   clang::ASTContext &ASTCtx = FD->getASTContext();
   llvm::LLVMContext &Ctx = F->getContext();
   llvm::Type *I32Ty = llvm::Type::getInt32Ty(Ctx);
 
-  llvm::SmallVector<llvm::Value*, 8> ArgAddrSpace;
+  llvm::SmallVector<llvm::Metadata*, 8> ArgAddrSpace;
   ArgAddrSpace.push_back(llvm::MDString::get(Ctx, "kernel_arg_addr_space"));
 
-  llvm::SmallVector<llvm::Value*, 8> Sign;
+  llvm::SmallVector<llvm::Metadata*, 8> Sign;
   Sign.push_back(llvm::MDString::get(Ctx, "signature"));
 
   for (unsigned I = 0, E = FD->getNumParams(); I != E; ++I) {
@@ -146,7 +158,8 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
     unsigned LangAS = ParamTy->isPointerType()
                        ? ParamTy->getPointeeType().getAddressSpace() : 0;
     unsigned AS = opencl::convertAddressSpace(LangAS);
-    ArgAddrSpace.push_back(llvm::ConstantInt::get(I32Ty, AS));
+    ArgAddrSpace.push_back(llvm::ConstantAsMetadata::get(
+                              llvm::ConstantInt::get(I32Ty, AS)));
 
     // Access qualifiers
     const clang::OpenCLImageAccessAttr *CLIA =
@@ -162,22 +175,23 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   llvm::MDNode *KernMD = getKernelMD(Kernels, F);
   assert(KernMD && "Missing kernel infos!");
 
-  llvm::SmallVector<llvm::Value *, 8> MDs;
+  llvm::SmallVector<llvm::Metadata *, 8> MDs;
   for (unsigned I = 0, E = KernMD->getNumOperands(); I != E; ++I) {
-    llvm::Value *Cur = KernMD->getOperand(I);
+    auto *Cur = KernMD->getOperand(I).get();
     if (isKernelMetadata(Cur, "kernel_arg_addr_space"))
       Cur = llvm::MDNode::get(Ctx, ArgAddrSpace);
 
     MDs.push_back(Cur);
   }
 
-  llvm::SmallVector<llvm::Value *, 8> CustomInfo;
+  llvm::SmallVector<llvm::Metadata *, 8> CustomInfo;
   CustomInfo.push_back(llvm::MDString::get(Ctx, "custom_info"));
   CustomInfo.push_back(llvm::MDNode::get(Ctx, Sign));
 
   MDs.push_back(llvm::MDNode::get(Ctx, CustomInfo));
 
-  KernMD->replaceAllUsesWith(llvm::MDNode::get(Ctx, MDs));
+  auto *NewKernMD = llvm::MDNode::get(Ctx, MDs);
+  replaceKernelMD(Kernels, F, NewKernMD);
 }
 
 LLVMCodeGenAction::LLVMCodeGenAction(llvm::LLVMContext *Ctx)

@@ -28,7 +28,7 @@ bool KernelSignature::operator==(const KernelSignature &S) const {
 }
 
 bool KernelInfo::checkValidity() const {
-  return !MD || llvm::isa<llvm::Function>(MD->getOperand(0));
+  return !MD || llvm::mdconst::hasa<llvm::Function>(MD->getOperand(0));
 }
 
 llvm::MDNode *KernelInfo::retrieveCustomInfo() const {
