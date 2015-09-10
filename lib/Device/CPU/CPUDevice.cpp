@@ -25,13 +25,6 @@
 using namespace opencrun;
 using namespace opencrun::cpu;
 
-namespace {
-
-void SignalJITCallStart(CPUDevice &Dev);
-void SignalJITCallEnd();
-
-} // End anonymous namespace.
-
 //
 // CPUMemoryDescriptor implementation.
 //
@@ -76,8 +69,8 @@ void CPUMemoryDescriptor::unmap() {
 //
 
 CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
-  Device(CPUType, "CPU", llvm::sys::getDefaultTargetTriple()),
-  Machine(Machine) {
+  Device(CPUType, "CPU", llvm::sys::getProcessTriple()),
+  Machine(Machine), JIT(GetTriple()) {
   HardwareCPUsContainer CPUs;
   for(auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
     CPUs.insert(&*I);
@@ -92,7 +85,7 @@ CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
 CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
                      const HardwareCPUsContainer &CPUs) :
   Device(Parent, Part),
-  Machine(Parent.GetHardwareMachine()) {
+  Machine(Parent.GetHardwareMachine()), JIT(GetTriple()) {
   InitSubDeviceInfo(CPUs);
   InitMultiprocessors(CPUs);
   InitJIT();
@@ -181,16 +174,12 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
 
   // Remove module from the JIT.
   llvm::Module &Mod = *Kern.getFunction(this)->getParent();
-  JIT->removeModule(&Mod);
 
   // Erase kernel from the cache.
   BlockParallelEntriesCache.erase(&Kern);
   BlockParallelStaticLocalsCache.erase(&Kern);
   BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
-
-  // Invoke static destructors.
-  JIT->runStaticConstructorsDestructors(&Mod, true);
 }
 
 void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
@@ -480,33 +469,14 @@ void CPUDevice::computeSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
 }
 
 void CPUDevice::InitJIT() {
-  // Init the native target.
-  llvm::InitializeNativeTarget();
-
-  // Create the JIT.
-  llvm::EngineBuilder Bld(&*BitCodeLibrary);
-  llvm::ExecutionEngine *Engine = Bld.setEngineKind(llvm::EngineKind::JIT)
-                                     .setOptLevel(llvm::CodeGenOpt::Default)
-                                     .create();
-
-  // Configure the JIT.
-  Engine->InstallLazyFunctionCreator(LibLinker);
-
-  intptr_t AddrInt;
   void *Addr;
-
-  llvm::Function *Func;
-
-  #define INTERNAL_CALL(N, Fmt, F)                                    \
-    AddrInt = reinterpret_cast<intptr_t>(F);                          \
-    Addr = reinterpret_cast<void *>(AddrInt);                         \
-    Func = DeviceBuiltinInfo::getPrototype(*BitCodeLibrary, "__internal_" #N, Fmt); \
-    Engine->addGlobalMapping(Func, Addr);
+  #define INTERNAL_CALL(N, Fmt, F)               \
+    Addr = reinterpret_cast<void *>(F);          \
+    JIT.addSymbolMapping("__internal_" #N, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
 
-  // Save pointer.
-  JIT.reset(Engine);
+  JIT.addModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::InitMultiprocessors() {
@@ -519,7 +489,7 @@ void CPUDevice::InitMultiprocessors(const HardwareCPUsContainer &CPUs) {
 }
 
 void CPUDevice::DestroyJIT() {
-  JIT->removeModule(&*BitCodeLibrary);
+  JIT.removeModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::DestroyMultiprocessors() {
@@ -808,18 +778,9 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
 
   // Retrieve it.
   std::string EntryName = MangleBlockParallelKernelName(KernName);
-  llvm::Function *EntryFn = Mod.getFunction(EntryName);
 
-
-  // Force translation to native code.
-  SignalJITCallStart(*this);
-  JIT->addModule(&Mod);
-  void *EntryPtr = JIT->getPointerToFunction(EntryFn);
-  SignalJITCallEnd();
-
-  // Invoke static constructors -- we do not expect static constructors in
-  // OpenCL code, run only for safety.
-  JIT->runStaticConstructorsDestructors(&Mod, false);
+  JIT.addModule(&Mod);
+  void *EntryPtr = (void*)JIT.findSymbol(EntryName).getAddress();
 
   // Cache it. In order to correctly cast the EntryPtr to a function pointer we
   // must pass through a uintptr_t. Otherwise, a warning is issued by the
@@ -907,14 +868,6 @@ CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   KernelFootprints[&Kern] = *Pass;
 
   return KernelFootprints[&Kern];
-}
-
-void *CPUDevice::LinkLibFunction(const std::string &Name) {
-  // Bit-code function.
-  if(llvm::Function *Func = JIT->FindFunctionNamed(Name.c_str()))
-    return JIT->getPointerToFunction(Func);
-
-  return NULL;
 }
 
 void CPUDevice::LocateMemoryObjArgAddresses(
@@ -1071,39 +1024,6 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
   default: llvm_unreachable(0);
   }
 }
-
-//
-// LibLinker implementation.
-//
-
-namespace {
-
-llvm::sys::ThreadLocal<const CPUDevice> CurDevice;
-
-} // End anonymous namespace.
-
-void *opencrun::LibLinker(const std::string &Name) {
-  void *Func = NULL;
-
-  if(CPUDevice *Dev = const_cast<CPUDevice *>(CurDevice.get()))
-    Func = Dev->LinkLibFunction(Name);
-
-  return Func;
-}
-
-namespace {
-
-void SignalJITCallStart(CPUDevice &Dev) {
-  // Save current device, it can be used by the JIT trampoline later.
-  CurDevice.set(&Dev);
-}
-
-void SignalJITCallEnd() {
-  // JIT is done, remove current device.
-  CurDevice.erase();
-}
-
-} // End anonymous namespace.
 
 void opencrun::initializeCPUDevice(Platform &P) {
   sys::Hardware &HW = sys::GetHardware();

@@ -2,11 +2,10 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
+#include "JITCompiler.h"
 #include "Multiprocessor.h"
 
 #include "opencrun/Core/Device.h"
-
-#include "llvm/ExecutionEngine/JIT.h"
 
 namespace opencrun {
 namespace cpu {
@@ -106,8 +105,6 @@ private:
   void GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
                                          BlockParallelStaticLocalVector &SLVec);
 
-  void *LinkLibFunction(const std::string &Name);
-
   void LocateMemoryObjArgAddresses(Kernel &Kern,
                                    GlobalArgMappingsContainer &GlobalArgs);
 
@@ -127,14 +124,12 @@ private:
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
 
-  std::unique_ptr<llvm::ExecutionEngine> JIT;
+  JITCompiler JIT;
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
   BlockParallelStaticLocalVectors BlockParallelStaticLocalVectorsCache;
   mutable FootprintsContainer KernelFootprints;
-
-  friend void *LibLinker(const std::string &);
 };
 
 class CPUMemoryDescriptor : public MemoryDescriptor {
@@ -155,8 +150,6 @@ public:
 private:
   void *Ptr;
 };
-
-void *LibLinker(const std::string &Name);
 
 } // End namespace cpu.
 } // End namespace opencrun.
