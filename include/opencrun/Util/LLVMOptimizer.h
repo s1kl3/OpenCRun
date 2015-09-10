@@ -1,7 +1,7 @@
 #ifndef OPENCRUN_UTIL_LLVMOPTIMIZERACTION_H
 #define OPENCRUN_UTIL_LLVMOPTIMIZERACTION_H
 
-#include "llvm/PassManager.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 namespace clang {
@@ -41,8 +41,6 @@ public:
 private:
   LLVMOptimizerParams Params;
   llvm::PassManagerBuilder PMBuilder;
-  std::unique_ptr<llvm::PassManager> MPM;
-  std::unique_ptr<llvm::FunctionPassManager> FPM;
 
   template<class InterfaceTy> friend class LLVMOptimizer;
 };

@@ -4,17 +4,21 @@
 #include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetRegistry.h"
-#include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/IPO.h"
 
 using namespace opencrun;
+
+using namespace clang;
+using namespace llvm;
 
 LLVMOptimizerBase::LLVMOptimizerBase(const clang::LangOptions &langopts,
                                      const clang::CodeGenOptions &cgopts,
@@ -22,185 +26,216 @@ LLVMOptimizerBase::LLVMOptimizerBase(const clang::LangOptions &langopts,
  : Params(langopts, cgopts, targetopts) {
 }
 
+static TargetLibraryInfoImpl *createTLII(Triple &TargetTriple,
+                                         const CodeGenOptions &CGOpts) {
+  auto *TLII = new TargetLibraryInfoImpl(TargetTriple);
+  if (!CGOpts.SimplifyLibCalls)
+    TLII->disableAllFunctions();
+
+  switch (CGOpts.getVecLib()) {
+  case clang::CodeGenOptions::Accelerate:
+    TLII->addVectorizableFunctionsFromVecLib(TargetLibraryInfoImpl::Accelerate);
+    break;
+  default:
+    break;
+  }
+  return TLII;
+}
+
 void LLVMOptimizerBase::init() {
   // Setup code copied from clang/lib/CodeGen/BackendUtil.cpp
-  const clang::CodeGenOptions &CGOpts = Params.CodeGenOpts;
-  unsigned OptLevel = CGOpts.OptimizationLevel;
-  clang::CodeGenOptions::InliningMethod Inlining = CGOpts.getInlining();
+  const clang::CodeGenOptions &CodeGenOpts = Params.CodeGenOpts;
 
-  if (CGOpts.DisableLLVMOpts) {
+  if (CodeGenOpts.DisableLLVMPasses)
+    return;
+
+  unsigned OptLevel = CodeGenOpts.OptimizationLevel;
+  clang::CodeGenOptions::InliningMethod Inlining = CodeGenOpts.getInlining();
+
+  // Handle disabling of LLVM optimization, where we want to preserve the
+  // internal module before any optimization.
+  if (CodeGenOpts.DisableLLVMOpts) {
     OptLevel = 0;
-    Inlining = CGOpts.NoInlining;
+    Inlining = CodeGenOpts.NoInlining;
   }
 
   PMBuilder.OptLevel = OptLevel;
-  PMBuilder.SizeLevel = CGOpts.OptimizeSize;
-  PMBuilder.BBVectorize = CGOpts.VectorizeBB;
-  PMBuilder.SLPVectorize = CGOpts.VectorizeSLP;
-  PMBuilder.LoopVectorize = CGOpts.VectorizeLoop;
+  PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
+  PMBuilder.BBVectorize = CodeGenOpts.VectorizeBB;
+  PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
+  PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
 
-  PMBuilder.DisableUnitAtATime = !CGOpts.UnitAtATime;
-  PMBuilder.DisableUnrollLoops = !CGOpts.UnrollLoops;
-  PMBuilder.RerollLoops = CGOpts.RerollLoops;
+  PMBuilder.DisableUnitAtATime = !CodeGenOpts.UnitAtATime;
+  PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
+  PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
+  PMBuilder.PrepareForLTO = CodeGenOpts.PrepareForLTO;
+  PMBuilder.RerollLoops = CodeGenOpts.RerollLoops;
 
-  llvm::Triple Triple(Params.TargetOpts.Triple);
-
-  PMBuilder.LibraryInfo = new llvm::TargetLibraryInfo(Triple);
-  if (!CGOpts.SimplifyLibCalls)
-    PMBuilder.LibraryInfo->disableAllFunctions();
+  // Figure out TargetLibraryInfo.
+  Triple TargetTriple(Params.TargetOpts.Triple);
+  PMBuilder.LibraryInfo = createTLII(TargetTriple, CodeGenOpts);
 
   switch (Inlining) {
   case clang::CodeGenOptions::NoInlining: break;
   case clang::CodeGenOptions::NormalInlining: {
-    unsigned Threshold = 225;
-    if (CGOpts.OptimizeSize == 1) Threshold = 75;
-    else if (CGOpts.OptimizeSize == 2) Threshold = 25;
-    else if (OptLevel > 2) Threshold = 275;
-    PMBuilder.Inliner = llvm::createFunctionInliningPass(Threshold);
+    PMBuilder.Inliner =
+        createFunctionInliningPass(OptLevel, CodeGenOpts.OptimizeSize);
     break;
   }
   case clang::CodeGenOptions::OnlyAlwaysInlining:
+    // Respect always_inline.
     if (OptLevel == 0)
-      PMBuilder.Inliner = llvm::createAlwaysInlinerPass(false);
+      // Do not insert lifetime intrinsics at -O0.
+      PMBuilder.Inliner = createAlwaysInlinerPass(false);
     else
-      PMBuilder.Inliner = llvm::createAlwaysInlinerPass();
+      PMBuilder.Inliner = createAlwaysInlinerPass();
     break;
   }
 }
 
-static llvm::TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
-  std::string Error;
-  std::string Triple(P.TargetOpts.Triple);
-  const llvm::Target *TheTarget =
-    llvm::TargetRegistry::lookupTarget(Triple, Error);
+static TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
+  const clang::LangOptions &LangOpts = P.LangOpts;
+  const clang::CodeGenOptions &CodeGenOpts = P.CodeGenOpts;
+  const clang::TargetOptions &TargetOpts = P.TargetOpts;
 
-  if (!TheTarget) return 0;
+  // Create the TargetMachine for generating code.
+  std::string Error;
+  auto *TheTarget = TargetRegistry::lookupTarget(P.TargetOpts.Triple, Error);
+  if (!TheTarget)
+    return nullptr;
 
   unsigned CodeModel =
-    llvm::StringSwitch<unsigned>(P.CodeGenOpts.CodeModel)
-      .Case("small", llvm::CodeModel::Small)
-      .Case("kernel", llvm::CodeModel::Kernel)
-      .Case("medium", llvm::CodeModel::Medium)
-      .Case("large", llvm::CodeModel::Large)
-      .Case("default", llvm::CodeModel::Default)
+    StringSwitch<unsigned>(CodeGenOpts.CodeModel)
+      .Case("small", CodeModel::Small)
+      .Case("kernel", CodeModel::Kernel)
+      .Case("medium", CodeModel::Medium)
+      .Case("large", CodeModel::Large)
+      .Case("default", CodeModel::Default)
       .Default(~0u);
   assert(CodeModel != ~0u && "invalid code model!");
-  llvm::CodeModel::Model CM = static_cast<llvm::CodeModel::Model>(CodeModel);
+  CodeModel::Model CM = static_cast<CodeModel::Model>(CodeModel);
 
   std::string FeaturesStr;
-  if (P.TargetOpts.Features.size()) {
-    llvm::SubtargetFeatures Features;
-    for (std::vector<std::string>::const_iterator
-           it = P.TargetOpts.Features.begin(),
-           ie = P.TargetOpts.Features.end(); it != ie; ++it)
-      Features.AddFeature(*it);
+  if (!TargetOpts.Features.empty()) {
+    SubtargetFeatures Features;
+    for (const std::string &Feature : TargetOpts.Features)
+      Features.AddFeature(Feature);
     FeaturesStr = Features.getString();
   }
 
-  llvm::Reloc::Model RM = llvm::Reloc::Default;
-  if (P.CodeGenOpts.RelocationModel == "static") {
-    RM = llvm::Reloc::Static;
-  } else if (P.CodeGenOpts.RelocationModel == "pic") {
-    RM = llvm::Reloc::PIC_;
+  Reloc::Model RM = Reloc::Default;
+  if (CodeGenOpts.RelocationModel == "static") {
+    RM = Reloc::Static;
+  } else if (CodeGenOpts.RelocationModel == "pic") {
+    RM = Reloc::PIC_;
   } else {
-    assert(P.CodeGenOpts.RelocationModel == "dynamic-no-pic" &&
+    assert(CodeGenOpts.RelocationModel == "dynamic-no-pic" &&
            "Invalid PIC model!");
-    RM = llvm::Reloc::DynamicNoPIC;
+    RM = Reloc::DynamicNoPIC;
   }
 
-  llvm::CodeGenOpt::Level OptLevel = llvm::CodeGenOpt::Default;
-  switch (P.CodeGenOpts.OptimizationLevel) {
+  CodeGenOpt::Level OptLevel = CodeGenOpt::Default;
+  switch (CodeGenOpts.OptimizationLevel) {
   default: break;
-  case 0: OptLevel = llvm::CodeGenOpt::None; break;
-  case 1: OptLevel = llvm::CodeGenOpt::Less; break;
-  case 3: OptLevel = llvm::CodeGenOpt::Aggressive; break;
+  case 0: OptLevel = CodeGenOpt::None; break;
+  case 1: OptLevel = CodeGenOpt::Less; break;
+  case 3: OptLevel = CodeGenOpt::Aggressive; break;
   }
 
   llvm::TargetOptions Options;
 
-  // Set frame pointer elimination mode.
-  if (!P.CodeGenOpts.DisableFPElim) {
-    Options.NoFramePointerElim = false;
-  } else if (P.CodeGenOpts.OmitLeafFramePointer) {
-    Options.NoFramePointerElim = false;
-  } else {
-    Options.NoFramePointerElim = true;
-  }
+  if (!TargetOpts.Reciprocals.empty())
+    Options.Reciprocals = TargetRecip(TargetOpts.Reciprocals);
 
-  if (P.CodeGenOpts.UseInitArray)
+  Options.ThreadModel =
+    StringSwitch<ThreadModel::Model>(CodeGenOpts.ThreadModel)
+      .Case("posix", ThreadModel::POSIX)
+      .Case("single", ThreadModel::Single);
+
+  if (CodeGenOpts.DisableIntegratedAS)
+    Options.DisableIntegratedAS = true;
+
+  if (CodeGenOpts.CompressDebugSections)
+    Options.CompressDebugSections = true;
+
+  if (CodeGenOpts.UseInitArray)
     Options.UseInitArray = true;
 
   // Set float ABI type.
-  if (P.CodeGenOpts.FloatABI == "soft" || P.CodeGenOpts.FloatABI == "softfp")
-    Options.FloatABIType = llvm::FloatABI::Soft;
-  else if (P.CodeGenOpts.FloatABI == "hard")
-    Options.FloatABIType = llvm::FloatABI::Hard;
+  if (CodeGenOpts.FloatABI == "soft" || CodeGenOpts.FloatABI == "softfp")
+    Options.FloatABIType = FloatABI::Soft;
+  else if (CodeGenOpts.FloatABI == "hard")
+    Options.FloatABIType = FloatABI::Hard;
   else {
-    assert(P.CodeGenOpts.FloatABI.empty() && "Invalid float abi!");
-    Options.FloatABIType = llvm::FloatABI::Default;
+    assert(CodeGenOpts.FloatABI.empty() && "Invalid float abi!");
+    Options.FloatABIType = FloatABI::Default;
   }
 
   // Set FP fusion mode.
-  switch (P.CodeGenOpts.getFPContractMode()) {
-  case clang::CodeGenOptions::FPC_Off:
-    Options.AllowFPOpFusion = llvm::FPOpFusion::Strict;
+  switch (CodeGenOpts.getFPContractMode()) {
+  case CodeGenOptions::FPC_Off:
+    Options.AllowFPOpFusion = FPOpFusion::Strict;
     break;
-  case clang::CodeGenOptions::FPC_On:
-    Options.AllowFPOpFusion = llvm::FPOpFusion::Standard;
+  case CodeGenOptions::FPC_On:
+    Options.AllowFPOpFusion = FPOpFusion::Standard;
     break;
-  case clang::CodeGenOptions::FPC_Fast:
-    Options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+  case CodeGenOptions::FPC_Fast:
+    Options.AllowFPOpFusion = FPOpFusion::Fast;
     break;
   }
 
-  Options.LessPreciseFPMADOption = P.CodeGenOpts.LessPreciseFPMAD;
-  Options.NoInfsFPMath = P.CodeGenOpts.NoInfsFPMath;
-  Options.NoNaNsFPMath = P.CodeGenOpts.NoNaNsFPMath;
-  Options.NoZerosInBSS = P.CodeGenOpts.NoZeroInitializedInBSS;
-  Options.UnsafeFPMath = P.CodeGenOpts.UnsafeFPMath;
-  Options.UseSoftFloat = P.CodeGenOpts.SoftFloat;
-  Options.StackAlignmentOverride = P.CodeGenOpts.StackAlignment;
-  Options.DisableTailCalls = P.CodeGenOpts.DisableTailCalls;
-  Options.TrapFuncName = P.CodeGenOpts.TrapFuncName;
-  Options.PositionIndependentExecutable = P.LangOpts.PIELevel != 0;
-  Options.FunctionSections = P.CodeGenOpts.FunctionSections;
-  Options.DataSections = P.CodeGenOpts.DataSections;
+  Options.LessPreciseFPMADOption = CodeGenOpts.LessPreciseFPMAD;
+  Options.NoInfsFPMath = CodeGenOpts.NoInfsFPMath;
+  Options.NoNaNsFPMath = CodeGenOpts.NoNaNsFPMath;
+  Options.NoZerosInBSS = CodeGenOpts.NoZeroInitializedInBSS;
+  Options.UnsafeFPMath = CodeGenOpts.UnsafeFPMath;
+  Options.StackAlignmentOverride = CodeGenOpts.StackAlignment;
+  Options.PositionIndependentExecutable = LangOpts.PIELevel != 0;
+  Options.FunctionSections = CodeGenOpts.FunctionSections;
+  Options.DataSections = CodeGenOpts.DataSections;
+  Options.UniqueSectionNames = CodeGenOpts.UniqueSectionNames;
+  Options.EmulatedTLS = CodeGenOpts.EmulatedTLS;
 
-  Options.MCOptions.MCRelaxAll = P.CodeGenOpts.RelaxAll;
-  Options.MCOptions.MCSaveTempLabels = P.CodeGenOpts.SaveTempLabels;
-  Options.MCOptions.MCUseDwarfDirectory = !P.CodeGenOpts.NoDwarfDirectoryAsm;
-  Options.MCOptions.MCNoExecStack = P.CodeGenOpts.NoExecStack;
-  Options.MCOptions.AsmVerbose = P.CodeGenOpts.AsmVerbose;
+  Options.MCOptions.MCRelaxAll = CodeGenOpts.RelaxAll;
+  Options.MCOptions.MCSaveTempLabels = CodeGenOpts.SaveTempLabels;
+  Options.MCOptions.MCUseDwarfDirectory = !CodeGenOpts.NoDwarfDirectoryAsm;
+  Options.MCOptions.MCNoExecStack = CodeGenOpts.NoExecStack;
+  Options.MCOptions.MCFatalWarnings = CodeGenOpts.FatalWarnings;
+  Options.MCOptions.AsmVerbose = CodeGenOpts.AsmVerbose;
+  Options.MCOptions.ABIName = TargetOpts.ABI;
 
-  llvm::TargetMachine *TM =
-    TheTarget->createTargetMachine(Triple, P.TargetOpts.CPU, FeaturesStr,
-                                   Options, RM, CM, OptLevel);
-
-  return TM;
+  return TheTarget->createTargetMachine(TargetOpts.Triple, TargetOpts.CPU,
+                                        FeaturesStr, Options, RM, CM, OptLevel);
 }
 
-void LLVMOptimizerBase::run(llvm::Module *M) {
-  if (!M) return;
+static Pass *createTTI(TargetMachine *TM) {
+  assert(TM);
+  return createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis());
+}
 
-  llvm::TargetMachine *TM = createTargetMachine(Params);
+void LLVMOptimizerBase::run(Module *M) {
+  if (!M)
+    return;
 
-  FPM.reset(new llvm::FunctionPassManager(M));
-  FPM->add(new llvm::DataLayoutPass(M));
-  if (TM) TM->addAnalysisPasses(*FPM);
+  TargetMachine *TM = createTargetMachine(Params);
+
+  // Set up the per-function pass manager.
+  legacy::FunctionPassManager *FPM = new legacy::FunctionPassManager(M);
+  FPM->add(createTTI(TM));
   PMBuilder.populateFunctionPassManager(*FPM);
 
-  MPM.reset(new llvm::PassManager());
-  MPM->add(new llvm::DataLayoutPass(M));
-  if (TM) TM->addAnalysisPasses(*MPM);
+  // Set up the per-module pass manager.
+  legacy::PassManager *MPM = new legacy::PassManager();
+  MPM->add(createTTI(TM));
   PMBuilder.populateModulePassManager(*MPM);
 
-  if (FPM) {
-    FPM->doInitialization();
-    for (llvm::Module::iterator I = M->begin(), E = M->end(); I != E; ++I)
-      if (!I->isDeclaration())
-        FPM->run(*I);
-    FPM->doFinalization();
-  }
-  if (MPM)
-    MPM->run(*M);
+  // Run per-function passes.
+  FPM->doInitialization();
+  for (Function &F : *M)
+    if (!F.isDeclaration())
+      FPM->run(F);
+  FPM->doFinalization();
+
+  // Run per-module passes.
+  MPM->run(*M);
 }
