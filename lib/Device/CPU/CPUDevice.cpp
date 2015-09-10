@@ -15,7 +15,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/PassManager.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
@@ -797,7 +797,7 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   AggressiveInliner *Inliner = CreateAggressiveInlinerPass(KernName);
 
   // Build the entry point and optimize.
-  llvm::PassManager PM;
+  llvm::legacy::PassManager PM;
   PM.add(Inliner);
   PM.add(CreateGroupParallelStubPass(KernName));
   PM.run(Mod);
@@ -885,7 +885,7 @@ CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
   llvm::Function *Fun = Kern.getFunction(this);
 
-  llvm::PassManager PM;
+  llvm::legacy::PassManager PM;
   PM.add(Pass);
   PM.run(*Fun->getParent());
 
