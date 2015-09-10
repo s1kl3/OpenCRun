@@ -120,7 +120,8 @@ bool GroupParallelStub::BuildStub(llvm::Function &Kern) {
     // Get J-th element address.
     llvm::Value *J = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx),
                                             I->getArgNo());
-    llvm::Value *Addr = llvm::GetElementPtrInst::Create(Arg, J, "", Entry);
+    llvm::Value *Addr =
+      llvm::GetElementPtrInst::Create(nullptr, Arg, J, "", Entry);
 
     // Get its type.
     llvm::Type *ArgTy = I->getType();
