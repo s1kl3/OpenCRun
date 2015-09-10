@@ -398,9 +398,11 @@ void Device::InitLibrary() {
     llvm::sys::path::append(Path, LLVM_PREFIX);
   llvm::sys::path::append(Path, "lib", LibName.str());
 
-  std::unique_ptr<llvm::MemoryBuffer> File;
-  if (!llvm::MemoryBuffer::getFile(Path.str(), File))
-    BitCodeLibrary.reset(llvm::parseBitcodeFile(File.get(), LLVMCtx).get());
+  if (auto MBOrErr = llvm::MemoryBuffer::getFile(Path.str())) {
+    auto MB = std::move(MBOrErr.get());
+    if (auto BCOrErr = llvm::parseBitcodeFile(MB->getMemBufferRef(), LLVMCtx))
+      BitCodeLibrary = std::move(BCOrErr.get());
+  }
 
   if (!BitCodeLibrary)
     llvm::report_fatal_error("Unable to find class library " + LibName +

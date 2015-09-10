@@ -52,16 +52,10 @@ Program::Program(Context &Ctx, BinariesContainer &Binaries) : Ctx(&Ctx) {
 
     llvm::LLVMContext &LLVMCtx = Dev.GetContext();
 
-    if (llvm::isBitcode((const unsigned char *)Binary->getBufferStart(),
-                        (const unsigned char *)Binary->getBufferEnd())) {
-
-      // Parse the LLVM bitcode image and return an llvm::Module for it.
-      auto BitCode = llvm::parseBitcodeFile(Binary, LLVMCtx);
-
-      if (BitCode) {
-        Info.SetBitCode(BitCode.get());
-        Info.RegisterBuildDone(true);
-      }
+    auto MBR = Binary->getMemBufferRef();
+    if (auto BCOrErr = llvm::parseBitcodeFile(MBR, LLVMCtx)) {
+      Info.SetBitCode(BCOrErr.get().release());
+      Info.RegisterBuildDone(true);
     }
   }
 }
@@ -291,10 +285,10 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
     llvm::WriteBitcodeToFile(BitCode, BitCodeOS);
     BitCodeOS.flush();
 
-    llvm::MemoryBuffer *Binary = llvm::MemoryBuffer::getMemBufferCopy(BitCodeDump);
+    auto Binary = llvm::MemoryBuffer::getMemBufferCopy(BitCodeDump);
 
     Info.SetBitCode(BitCode);
-    Info.SetBinary(Binary);
+    Info.SetBinary(Binary.release());
   } else if(BitCode)
     delete BitCode;
 
@@ -350,7 +344,7 @@ ProgramBuilder &ProgramBuilder::SetSources(unsigned Count,
     Buf += Src;
   }
 
-  this->Srcs = llvm::MemoryBuffer::getMemBufferCopy(Buf);
+  this->Srcs = llvm::MemoryBuffer::getMemBufferCopy(Buf).release();
 
   return *this;
 }
@@ -381,9 +375,10 @@ ProgramBuilder &ProgramBuilder::SetBinaries(const cl_device_id *DevList,
     // TODO: Check if the program binary is valid for the device,
     // otherwise return CL_INVALID_BINARY.
 
-    this->Binaries[Dev] =
-      llvm::MemoryBuffer::getMemBufferCopy(
-          llvm::StringRef(reinterpret_cast<const char *>(Binaries[I]), Lengths[I]));
+    auto Ref = llvm::StringRef{reinterpret_cast<const char*>(Binaries[I]),
+                               Lengths[I]};
+
+    this->Binaries[Dev] = llvm::MemoryBuffer::getMemBufferCopy(Ref).release();
 
     BinStatus[I] = CL_SUCCESS;
   }

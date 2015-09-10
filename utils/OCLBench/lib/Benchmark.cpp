@@ -200,11 +200,12 @@ cl::Program Benchmark::LoadProgramFromFile(llvm::StringRef File) {
       llvm::SmallString<32> Path = *I;
       llvm::sys::path::append(Path, File);
 
-      llvm::MemoryBuffer::getFile(Path.str(), BufPtr);
+      if (auto MBOrErr = llvm::MemoryBuffer::getFile(Path.str()))
+        BufPtr = std::move(MBOrErr.get());
     }
 
     // File not found.
-    if(!BufPtr)
+    if (!BufPtr)
       throw Error("Cannot open " + File.str());
 
     Sources[File] = BufPtr.release();
