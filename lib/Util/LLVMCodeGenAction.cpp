@@ -21,12 +21,13 @@ namespace opencrun {
 class LLVMCodeGenConsumer : public clang::ASTConsumer {
 public:
   LLVMCodeGenConsumer(clang::DiagnosticsEngine &Diags,
-                      const clang::CodeGenOptions &CGOpts,
-                      const clang::TargetOptions &TargetOpts,
-                      const clang::LangOptions &LangOpts,
+                      const clang::HeaderSearchOptions &HeaderSearchOpts,
+                      const clang::PreprocessorOptions &PPOpts,
+                      const clang::CodeGenOptions &CodeGenOpts,
                       const std::string &InFile,
                       llvm::LLVMContext &C)
-   : Gen(clang::CreateLLVMCodeGen(Diags, InFile, CGOpts, TargetOpts, C)),
+   : Gen(clang::CreateLLVMCodeGen(Diags, InFile, HeaderSearchOpts, PPOpts,
+                                  CodeGenOpts, C)),
      TheModule(Gen->GetModule()), TyGen(*TheModule) {}
 
   llvm::Module *takeModule() { return TheModule.release(); }
@@ -73,9 +74,8 @@ public:
     Gen->CompleteTentativeDefinition(D);
   }
 
-  void HandleVTable(clang::CXXRecordDecl *RD,
-                    bool DefinitionRequired) override {
-    Gen->HandleVTable(RD, DefinitionRequired);
+  void HandleVTable(clang::CXXRecordDecl *RD) override {
+    Gen->HandleVTable(RD);
   }
 
   void HandleLinkerOptionPragma(llvm::StringRef Opts) override {
@@ -189,12 +189,14 @@ LLVMCodeGenAction::~LLVMCodeGenAction() {
     delete Context;
 }
 
-clang::ASTConsumer *LLVMCodeGenAction::
+std::unique_ptr<clang::ASTConsumer> LLVMCodeGenAction::
 CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef InFile) {
-  Consumer = new LLVMCodeGenConsumer(CI.getDiagnostics(), CI.getCodeGenOpts(),
-                                     CI.getTargetOpts(), CI.getLangOpts(),
-                                     InFile, *Context);
-  return Consumer;
+  std::unique_ptr<LLVMCodeGenConsumer> Result(
+    new LLVMCodeGenConsumer(CI.getDiagnostics(), CI.getHeaderSearchOpts(),
+                            CI.getPreprocessorOpts(), CI.getCodeGenOpts(),
+                            InFile, *Context));
+  Consumer = Result.get();
+  return std::move(Result);
 }
 
 void LLVMCodeGenAction::EndSourceFileAction() {

@@ -20,8 +20,9 @@ public:
   llvm::Module *takeModule() { return TheModule.release(); }
 
 protected:
-  clang::ASTConsumer *CreateASTConsumer(clang::CompilerInstance &CI,
-                                        llvm::StringRef InFile) override;
+  std::unique_ptr<clang::ASTConsumer>
+      CreateASTConsumer(clang::CompilerInstance &CI,
+                        llvm::StringRef InFile) override;
 
   void EndSourceFileAction() override;
 
