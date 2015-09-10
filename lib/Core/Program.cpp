@@ -260,15 +260,16 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
 
   // Needed to log compilation results into the program structure.
   llvm::raw_string_ostream Log(Info.GetBuildLog());
-  clang::TextDiagnosticPrinter *ToLog;
-  ToLog = new clang::TextDiagnosticPrinter(Log, &DiagOptions);
+  auto ToLog =
+    llvm::make_unique<clang::TextDiagnosticPrinter>(Log, &DiagOptions);
 
   // Needed to log compilation results for internal diagnostic.
-  clang::TextDiagnosticBuffer *ToCtx = new clang::TextDiagnosticBuffer();
+  auto ToCtx = llvm::make_unique<clang::TextDiagnosticBuffer>();
 
   // Chain diagnostics.
   clang::ChainedDiagnosticConsumer *Diag;
-  Diag = new clang::ChainedDiagnosticConsumer(ToLog, ToCtx);
+  Diag = new clang::ChainedDiagnosticConsumer(std::move(ToLog),
+                                              std::move(ToCtx));
 
   // Build in progress.
   Info.RegisterBuildInProgress();
