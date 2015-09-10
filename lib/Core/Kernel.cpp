@@ -326,9 +326,10 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
                       "buffer and kernel contexts do not match");
 
-  ThisLock.acquire();
-  Arguments[I] = KernelArg(I, Buf);
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    Arguments[I] = KernelArg(I, Buf);
+  }
 
   return CL_SUCCESS;
 }
@@ -340,9 +341,10 @@ cl_int Kernel::SetLocalBufferArg(unsigned I, size_t Size, const void *Arg) {
   if (!Size)
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE, "local buffer size unspecified");
 
-  ThisLock.acquire();
-  Arguments[I] = KernelArg(I, Size);
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    Arguments[I] = KernelArg(I, Size);
+  }
 
   return CL_SUCCESS;
 }
@@ -358,9 +360,10 @@ cl_int Kernel::SetImageArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
                       "image and kernel contexts do not match");
 
-  ThisLock.acquire();
-  Arguments[I] = KernelArg(I, Img);
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    Arguments[I] = KernelArg(I, Img);
+  }
 
   return CL_SUCCESS;
 }
@@ -376,9 +379,10 @@ cl_int Kernel::SetSamplerArg(unsigned I, size_t Size, const void *Arg) {
     RETURN_WITH_ERROR(CL_INVALID_MEM_OBJECT,
                       "sampler and kernel contexts do not match");
 
-  ThisLock.acquire();
-  Arguments[I] = KernelArg(I, Smplr);
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    Arguments[I] = KernelArg(I, Smplr);
+  }
 
   return CL_SUCCESS;
 }
@@ -389,7 +393,7 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   // has been already performed by the SetArg function.
   llvm::Function *Kern = Desc->getKernelInfo().getFunction();
   llvm::FunctionType *FTy = Kern->getFunctionType();
-  const llvm::DataLayout *DL = Kern->getParent()->getDataLayout();
+  const llvm::DataLayout &DL = Kern->getParent()->getDataLayout();
   
   uint64_t ArgSz;
   llvm::Type *ParamTy = FTy->getParamType(I);
@@ -397,17 +401,19 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   // 4 * sizeof(component). This means that a 3-component vector data
   // type will be aligned to a 4 * sizeof(component) boundary.
   if (ParamTy->isVectorTy() && (ParamTy->getVectorNumElements() == 3))
-    ArgSz = DL->getTypeStoreSize(ParamTy->getVectorElementType()) * 4;
+    ArgSz = DL.getTypeStoreSize(ParamTy->getVectorElementType()) * 4;
   else
-    ArgSz = DL->getTypeStoreSize(FTy->getParamType(I));
+    ArgSz = DL.getTypeStoreSize(FTy->getParamType(I));
 
   if (Size != ArgSz)
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
                       "kernel argument size does not match");
 
-  ThisLock.acquire();
-  Arguments[I] = KernelArg(I, Arg, Size);
-  ThisLock.release();
+  // TODO: compute argument type size in order to match the parameter.
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    Arguments[I] = KernelArg(I, Arg, Size);
+  }
 
   return CL_SUCCESS;
 }

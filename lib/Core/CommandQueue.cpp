@@ -50,18 +50,18 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
                       CL_INVALID_OPERATION,
                       "device does not support native kernels");
 
-  ThisLock.acquire();
-
-  unsigned Cnts = EnableProfile ? Profiler::Time : Profiler::None;
-  ProfileSample *Sample = GetProfilerSample(Cnts,
-                                            ProfileSample::CommandEnqueued);
   llvm::IntrusiveRefCntPtr<InternalEvent> Ev;
-  Ev = new InternalEvent(*this, Cmd.GetType(), Sample);
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
 
-  Cmd.SetNotifyEvent(Ev.get());
-  Commands.push_back(std::unique_ptr<Command>(&Cmd));
+    unsigned Cnts = EnableProfile ? Profiler::Time : Profiler::None;
+    ProfileSample *Sample = GetProfilerSample(Cnts,
+                                              ProfileSample::CommandEnqueued);
+    Ev = new InternalEvent(*this, Cmd.GetType(), Sample);
 
-  ThisLock.release();
+    Cmd.SetNotifyEvent(Ev.get());
+    Commands.push_back(std::unique_ptr<Command>(&Cmd));
+  }
 
   // TODO: This should be avoided, the queue should notify the device that at
   // least one command is available so that it can start the processing.
@@ -79,9 +79,10 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
 void CommandQueue::CommandDone(Command &Cmd) {
   RunScheduler();
 
-  ThisLock.acquire();
-  PendingCommands.erase(&Cmd);
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    PendingCommands.erase(&Cmd);
+  }
 
   delete &Cmd;
 }
@@ -101,19 +102,20 @@ void CommandQueue::Finish() {
   // Safely copy events to wait in a new container. Reference counting is
   // incremented, because current thread can not be the same who has enqueued
   // the commands.
-  ThisLock.acquire();
-  for (auto I = PendingCommands.begin(), E = PendingCommands.end(); I != E; ++I)
-    WaitList.push_back(&(*I)->GetNotifyEvent());
-  for (auto I = Commands.begin(), E = Commands.end(); I != E; ++I)
-    WaitList.push_back(&(*I)->GetNotifyEvent());
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    for (auto Cmd : PendingCommands)
+      WaitList.push_back(&Cmd->GetNotifyEvent());
+    for (const auto &Cmd : Commands)
+      WaitList.push_back(&Cmd->GetNotifyEvent());
+  }
 
   // Wait for all events. If an event was linked to a command that is terminated
   // after leaving the critical section, the reference counting mechanism had
   // prevented the runtime to delete the memory associated with the event: we
   // can safely use the event to wait for a already terminated command.
-  for (auto I = WaitList.begin(), E = WaitList.end(); I != E; ++I)
-    (*I)->Wait();
+  for (const auto &Ev : WaitList)
+    Ev->Wait();
 }
 
 bool CommandQueue::ensureMemoryCoherency(Command &Cmd) {
@@ -313,9 +315,10 @@ bool InOrderQueue::RunScheduler() {
 }
 
 void InOrderQueue::CommandDone(Command &Cmd) {
-  ThisLock.acquire();
-  CommandOnFly = false;
-  ThisLock.release();
+  {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    CommandOnFly = false;
+  }
 
   CommandQueue::CommandDone(Cmd);
 }
