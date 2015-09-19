@@ -386,7 +386,7 @@ public:
   static bool classof(const _cl_device_id *Dev) { return true; }
 
 protected:
-  Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple);
+  Device(DeviceType Ty, llvm::StringRef Name);
   Device(Device &Parent, const DevicePartition &Part); 
 
 public:
@@ -441,19 +441,24 @@ public:
   llvm::LLVMContext &GetContext() { return LLVMCtx; }
   llvm::StringRef GetTriple() const { return Triple; }
   llvm::Module *GetBitCodeLibrary() const { return BitCodeLibrary.get(); }
+  llvm::StringRef getTargetCPU() const { return TargetCPU; }
+  llvm::ArrayRef<std::string> getTargetFeatures() const {return TargetFeatures;}
+  llvm::TargetMachine *getTargetMachine() const { return TM.get(); }
 
 protected:
   mutable llvm::sys::Mutex ThisLock;
 
-  llvm::LLVMContext LLVMCtx;
-  std::unique_ptr<llvm::Module> BitCodeLibrary;
-
   Device *Parent;
   DevicePartition Partition;
 
-private:
+  llvm::LLVMContext LLVMCtx;
+  std::unique_ptr<llvm::TargetMachine> TM;
+  std::unique_ptr<llvm::Module> BitCodeLibrary;
   std::string Triple;
+  std::string TargetCPU;
+  std::vector<std::string> TargetFeatures;
 
+private:
   friend class DeviceBuiltinInfo;
 };
 

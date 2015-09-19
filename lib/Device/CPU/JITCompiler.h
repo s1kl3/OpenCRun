@@ -22,9 +22,8 @@ public:
   using ModuleHandleT = IRCompileLayerT::ModuleSetHandleT;
 
 public:
-  JITCompiler(llvm::StringRef Triple)
-   : TM(initTargetMachine(Triple)),
-     CompileLayer(ObjLayer, llvm::orc::SimpleCompiler(*TM)) {}
+  JITCompiler(llvm::TargetMachine &TM)
+   : TM(TM), CompileLayer(ObjLayer, llvm::orc::SimpleCompiler(TM)) {}
 
   void addModule(llvm::Module *M);
   void removeModule(llvm::Module *M);
@@ -40,10 +39,7 @@ public:
   }
 
 private:
-  static llvm::TargetMachine *initTargetMachine(llvm::StringRef Triple);
-
-private:
-  llvm::TargetMachine *TM;
+  llvm::TargetMachine &TM;
   ObjectLayerT ObjLayer;
   IRCompileLayerT CompileLayer;
 

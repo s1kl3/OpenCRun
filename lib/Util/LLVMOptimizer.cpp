@@ -91,46 +91,10 @@ LLVMOptimizer::LLVMOptimizer(const clang::LangOptions &LangOpts,
   }
 }
 
-static TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
-  const clang::LangOptions &LangOpts = P.LangOpts;
+static void setupTargetMachine(llvm::TargetMachine *TM,
+                               const LLVMOptimizerParams &P) {
   const clang::CodeGenOptions &CodeGenOpts = P.CodeGenOpts;
   const clang::TargetOptions &TargetOpts = P.TargetOpts;
-
-  // Create the TargetMachine for generating code.
-  std::string Error;
-  auto *TheTarget = TargetRegistry::lookupTarget(P.TargetOpts.Triple, Error);
-  if (!TheTarget)
-    return nullptr;
-
-  unsigned CodeModel =
-    StringSwitch<unsigned>(CodeGenOpts.CodeModel)
-      .Case("small", CodeModel::Small)
-      .Case("kernel", CodeModel::Kernel)
-      .Case("medium", CodeModel::Medium)
-      .Case("large", CodeModel::Large)
-      .Case("default", CodeModel::Default)
-      .Default(~0u);
-  assert(CodeModel != ~0u && "invalid code model!");
-  CodeModel::Model CM = static_cast<CodeModel::Model>(CodeModel);
-
-  std::string FeaturesStr;
-  if (!TargetOpts.Features.empty()) {
-    SubtargetFeatures Features;
-    for (const std::string &Feature : TargetOpts.Features)
-      Features.AddFeature(Feature);
-    FeaturesStr = Features.getString();
-  }
-
-  Reloc::Model RM = Reloc::Default;
-  if (CodeGenOpts.RelocationModel == "static") {
-    RM = Reloc::Static;
-  } else if (CodeGenOpts.RelocationModel == "pic") {
-    RM = Reloc::PIC_;
-  } else {
-    assert(CodeGenOpts.RelocationModel == "dynamic-no-pic" &&
-           "Invalid PIC model!");
-    RM = Reloc::DynamicNoPIC;
-  }
 
   CodeGenOpt::Level OptLevel = CodeGenOpt::Default;
   switch (CodeGenOpts.OptimizationLevel) {
@@ -140,70 +104,30 @@ static TargetMachine *createTargetMachine(LLVMOptimizerParams &P) {
   case 3: OptLevel = CodeGenOpt::Aggressive; break;
   }
 
-  llvm::TargetOptions Options;
+  TM->setOptLevel(OptLevel);
 
   if (!TargetOpts.Reciprocals.empty())
-    Options.Reciprocals = TargetRecip(TargetOpts.Reciprocals);
-
-  Options.ThreadModel =
-    StringSwitch<ThreadModel::Model>(CodeGenOpts.ThreadModel)
-      .Case("posix", ThreadModel::POSIX)
-      .Case("single", ThreadModel::Single);
-
-  if (CodeGenOpts.DisableIntegratedAS)
-    Options.DisableIntegratedAS = true;
-
-  if (CodeGenOpts.CompressDebugSections)
-    Options.CompressDebugSections = true;
-
-  if (CodeGenOpts.UseInitArray)
-    Options.UseInitArray = true;
-
-  // Set float ABI type.
-  if (CodeGenOpts.FloatABI == "soft" || CodeGenOpts.FloatABI == "softfp")
-    Options.FloatABIType = FloatABI::Soft;
-  else if (CodeGenOpts.FloatABI == "hard")
-    Options.FloatABIType = FloatABI::Hard;
-  else {
-    assert(CodeGenOpts.FloatABI.empty() && "Invalid float abi!");
-    Options.FloatABIType = FloatABI::Default;
-  }
+    TM->Options.Reciprocals = TargetRecip(TargetOpts.Reciprocals);
+  else
+    TM->Options.Reciprocals = TargetRecip();
 
   // Set FP fusion mode.
   switch (CodeGenOpts.getFPContractMode()) {
   case CodeGenOptions::FPC_Off:
-    Options.AllowFPOpFusion = FPOpFusion::Strict;
+    TM->Options.AllowFPOpFusion = FPOpFusion::Strict;
     break;
   case CodeGenOptions::FPC_On:
-    Options.AllowFPOpFusion = FPOpFusion::Standard;
+    TM->Options.AllowFPOpFusion = FPOpFusion::Standard;
     break;
   case CodeGenOptions::FPC_Fast:
-    Options.AllowFPOpFusion = FPOpFusion::Fast;
+    TM->Options.AllowFPOpFusion = FPOpFusion::Fast;
     break;
   }
 
-  Options.LessPreciseFPMADOption = CodeGenOpts.LessPreciseFPMAD;
-  Options.NoInfsFPMath = CodeGenOpts.NoInfsFPMath;
-  Options.NoNaNsFPMath = CodeGenOpts.NoNaNsFPMath;
-  Options.NoZerosInBSS = CodeGenOpts.NoZeroInitializedInBSS;
-  Options.UnsafeFPMath = CodeGenOpts.UnsafeFPMath;
-  Options.StackAlignmentOverride = CodeGenOpts.StackAlignment;
-  Options.PositionIndependentExecutable = LangOpts.PIELevel != 0;
-  Options.FunctionSections = CodeGenOpts.FunctionSections;
-  Options.DataSections = CodeGenOpts.DataSections;
-  Options.UniqueSectionNames = CodeGenOpts.UniqueSectionNames;
-  Options.EmulatedTLS = CodeGenOpts.EmulatedTLS;
-
-  Options.MCOptions.MCRelaxAll = CodeGenOpts.RelaxAll;
-  Options.MCOptions.MCSaveTempLabels = CodeGenOpts.SaveTempLabels;
-  Options.MCOptions.MCUseDwarfDirectory = !CodeGenOpts.NoDwarfDirectoryAsm;
-  Options.MCOptions.MCNoExecStack = CodeGenOpts.NoExecStack;
-  Options.MCOptions.MCFatalWarnings = CodeGenOpts.FatalWarnings;
-  Options.MCOptions.AsmVerbose = CodeGenOpts.AsmVerbose;
-  Options.MCOptions.ABIName = TargetOpts.ABI;
-
-  return TheTarget->createTargetMachine(TargetOpts.Triple, TargetOpts.CPU,
-                                        FeaturesStr, Options, RM, CM, OptLevel);
+  TM->Options.LessPreciseFPMADOption = CodeGenOpts.LessPreciseFPMAD;
+  TM->Options.NoInfsFPMath = CodeGenOpts.NoInfsFPMath;
+  TM->Options.NoNaNsFPMath = CodeGenOpts.NoNaNsFPMath;
+  TM->Options.UnsafeFPMath = CodeGenOpts.UnsafeFPMath;
 }
 
 static Pass *createTTI(TargetMachine *TM) {
@@ -215,7 +139,8 @@ void LLVMOptimizer::run(Module *M) {
   if (!M)
     return;
 
-  TargetMachine *TM = createTargetMachine(Params);
+  auto *TM = Dev.getTargetMachine();
+  setupTargetMachine(TM, Params);
 
   // Set up the per-function pass manager.
   legacy::FunctionPassManager *FPM = new legacy::FunctionPassManager(M);

@@ -9,6 +9,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Target/TargetMachine.h"
 
 // OpenCL extensions defines macro that clashes with clang internal symbols.
 // This is a workaround to include clang needed headers. Is this the right
@@ -299,11 +300,8 @@ bool DeviceInfo::isImageFormatSupported(const cl_image_format *Fmt) const {
 // Device implementation.
 //
 
-Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
- : DeviceInfo(Ty), Parent(nullptr),
-  Triple(Triple.str()) {
-  // Force initialization here, I do not want to pass explicit parameter to
-  // DeviceInfo.
+Device::Device(DeviceType Ty, llvm::StringRef Name)
+ : DeviceInfo(Ty), Parent(nullptr) {
   this->Name = Name;
 
   // Initialize the device.
@@ -314,10 +312,8 @@ Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
   Retain();
 }
 
-Device::Device(Device &Parent, const DevicePartition &Part) :
-  DeviceInfo(Parent),
-  Parent(&Parent), Partition(Part),
-  Triple(Parent.GetTriple()) {
+Device::Device(Device &Parent, const DevicePartition &Part)
+ : DeviceInfo(Parent), Parent(&Parent), Partition(Part) {
   this->Name = Parent.GetName();  
   
   InitLibrary();
@@ -469,6 +465,8 @@ Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   // Set target triple.
   auto &TargetOpts = Invocation->getTargetOpts();
   TargetOpts.Triple = Triple;
+  TargetOpts.CPU = TargetCPU;
+  TargetOpts.Features = TargetFeatures;
 
   // Code generation options: emit kernel arg metadata + no optimizations
   auto &CodeGenOpts = Invocation->getCodeGenOpts();

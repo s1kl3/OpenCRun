@@ -2,6 +2,7 @@
 #include "CPUDevice.h"
 #include "CPUKernelInfo.h"
 #include "InternalCalls.h"
+#include "JITCompiler.h"
 
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
@@ -13,12 +14,14 @@
 #include "opencrun/Util/BuiltinInfo.h"
 
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ThreadLocal.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -69,8 +72,7 @@ void CPUMemoryDescriptor::unmap() {
 //
 
 CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
-  Device(CPUType, "CPU", llvm::sys::getProcessTriple()),
-  Machine(Machine), JIT(GetTriple()) {
+  Device(CPUType, "CPU"), Machine(Machine) {
   HardwareCPUsContainer CPUs;
   for(auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
     CPUs.insert(&*I);
@@ -79,15 +81,16 @@ CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
   InitSubDeviceInfo(CPUs);
 
   InitMultiprocessors();
+  InitTargetMachine();
   InitJIT();
 }
 
 CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
                      const HardwareCPUsContainer &CPUs) :
-  Device(Parent, Part),
-  Machine(Parent.GetHardwareMachine()), JIT(GetTriple()) {
+  Device(Parent, Part), Machine(Parent.GetHardwareMachine()) {
   InitSubDeviceInfo(CPUs);
   InitMultiprocessors(CPUs);
+  InitTargetMachine();
   InitJIT();
 }
 
@@ -468,15 +471,46 @@ void CPUDevice::computeSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
     SupportedPartitionTypes.push_back(PartitionByAffinityDomain);
 }
 
+void CPUDevice::InitTargetMachine() {
+  Triple = llvm::sys::getProcessTriple();
+  TargetCPU = llvm::sys::getHostCPUName();
+
+  llvm::StringMap<bool> Features;
+  if (llvm::sys::getHostCPUFeatures(Features)) {
+    for (const auto &E : Features)
+      TargetFeatures.push_back(((E.getValue() ? "+" : "-") + E.getKey()).str());
+  }
+
+  // Init the native target.
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+
+  std::string Err;
+  auto *TheTarget = llvm::TargetRegistry::lookupTarget(Triple.c_str(), Err);
+
+  auto FeaturesString =
+    llvm::join(TargetFeatures.begin(), TargetFeatures.end(), ",");
+
+  if (!TheTarget)
+    llvm::report_fatal_error("No valid target!", true);
+
+  llvm::TargetOptions Options;
+  TM.reset(TheTarget->createTargetMachine(Triple, TargetCPU, FeaturesString,
+                                          Options, llvm::Reloc::Model::Default,
+                                          llvm::CodeModel::JITDefault,
+                                          llvm::CodeGenOpt::None));
+  JIT = llvm::make_unique<JITCompiler>(*TM);
+}
+
 void CPUDevice::InitJIT() {
   void *Addr;
   #define INTERNAL_CALL(N, Fmt, F)               \
     Addr = reinterpret_cast<void *>(F);          \
-    JIT.addSymbolMapping("__internal_" #N, Addr);
+    JIT->addSymbolMapping("__internal_" #N, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
 
-  JIT.addModule(BitCodeLibrary.get());
+  JIT->addModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::InitMultiprocessors() {
@@ -489,7 +523,7 @@ void CPUDevice::InitMultiprocessors(const HardwareCPUsContainer &CPUs) {
 }
 
 void CPUDevice::DestroyJIT() {
-  JIT.removeModule(BitCodeLibrary.get());
+  JIT->removeModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::DestroyMultiprocessors() {
@@ -779,8 +813,8 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   // Retrieve it.
   std::string EntryName = MangleBlockParallelKernelName(KernName);
 
-  JIT.addModule(&Mod);
-  void *EntryPtr = (void*)JIT.findSymbol(EntryName).getAddress();
+  JIT->addModule(&Mod);
+  void *EntryPtr = (void*)JIT->findSymbol(EntryName).getAddress();
 
   // Cache it. In order to correctly cast the EntryPtr to a function pointer we
   // must pass through a uintptr_t. Otherwise, a warning is issued by the

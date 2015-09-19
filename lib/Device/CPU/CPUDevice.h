@@ -2,13 +2,14 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
-#include "JITCompiler.h"
 #include "Multiprocessor.h"
 
 #include "opencrun/Core/Device.h"
 
 namespace opencrun {
 namespace cpu {
+
+class JITCompiler;
 
 class CPUDevice : public Device {
 public:
@@ -67,6 +68,7 @@ private:
   void InitJIT();
   void InitMultiprocessors();
   void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
+  void InitTargetMachine();
 
   void computeSubDeviceInfo(const HardwareCPUsContainer &CPUs);
 
@@ -124,7 +126,7 @@ private:
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
 
-  JITCompiler JIT;
+  std::unique_ptr<JITCompiler> JIT;
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;

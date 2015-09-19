@@ -1,13 +1,21 @@
 #include "JITCompiler.h"
 
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
 
 #include <dlfcn.h>
 
 using namespace opencrun;
 using namespace opencrun::cpu;
+
+static void setupTargetMachine(llvm::TargetMachine &TM) {
+  TM.setOptLevel(llvm::CodeGenOpt::Default);
+  TM.Options.Reciprocals = llvm::TargetRecip();
+  TM.Options.AllowFPOpFusion = llvm::FPOpFusion::Strict;
+  TM.Options.LessPreciseFPMADOption = false;
+  TM.Options.NoInfsFPMath = false;
+  TM.Options.NoNaNsFPMath = false;
+  TM.Options.UnsafeFPMath = false;
+}
 
 void JITCompiler::addModule(llvm::Module *M) {
   if (HandleMap.count(M))
@@ -26,6 +34,11 @@ void JITCompiler::addModule(llvm::Module *M) {
       return nullptr;
     }
   );
+
+  // The target machine is shared between the optimizer and the jit-compiler,
+  // thus we need to reset some critical options.
+  setupTargetMachine(TM);
+
   HandleMap[M] =
     CompileLayer.addModuleSet(std::vector<llvm::Module*>(1, M),
                               llvm::make_unique<llvm::SectionMemoryManager>(),
@@ -47,21 +60,4 @@ llvm::orc::JITSymbol JITCompiler::findSymbol(const std::string &Name) {
     return llvm::orc::JITSymbol(llvm::orc::TargetAddress(I->getValue()),
                                 llvm::JITSymbolFlags::Exported);
   return CompileLayer.findSymbol(Name, false);
-}
-
-llvm::TargetMachine *JITCompiler::initTargetMachine(llvm::StringRef Triple) {
-  // Init the native target.
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-
-  std::string Err;
-  auto *TheTarget = llvm::TargetRegistry::lookupTarget(Triple.data(), Err);
-
-  if (!TheTarget)
-    return nullptr;
-
-  llvm::TargetOptions Options;
-  return TheTarget->createTargetMachine(Triple, "", "", Options,
-                                        llvm::Reloc::Model::Default,
-                                        llvm::CodeModel::JITDefault);
 }
