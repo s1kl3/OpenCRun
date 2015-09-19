@@ -3,6 +3,7 @@
 #include "opencrun/Util/LLVMOptimizer.h"
 
 #include "clang/Basic/Version.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Parse/ParseAST.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/Path.h"
@@ -20,20 +21,6 @@
 #include <sstream>
 
 using namespace opencrun;
-
-namespace opencrun {
-
-template<>
-class LLVMOptimizerInterfaceTraits<Device> {
-public:
-  static void registerExtensions(Device &Dev,
-                                 llvm::PassManagerBuilder &PMB,
-                                 LLVMOptimizerParams &Params) {
-    Dev.addOptimizerExtensions(PMB, Params);
-  }
-};
-
-}
 
 DeviceInfo::DeviceInfo(DeviceType Ty) : Type(Ty) {
   Vendor = "";
@@ -314,7 +301,6 @@ bool DeviceInfo::isImageFormatSupported(const cl_image_format *Fmt) const {
 
 Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
  : DeviceInfo(Ty), Parent(nullptr),
-  EnvCompilerOpts(sys::GetEnv("OPENCRUN_COMPILER_OPTIONS")),
   Triple(Triple.str()) {
   // Force initialization here, I do not want to pass explicit parameter to
   // DeviceInfo.
@@ -331,7 +317,6 @@ Device::Device(DeviceType Ty, llvm::StringRef Name, llvm::StringRef Triple)
 Device::Device(Device &Parent, const DevicePartition &Part) :
   DeviceInfo(Parent),
   Parent(&Parent), Partition(Part),
-  EnvCompilerOpts(Parent.GetEnvCompilerOpts()),
   Triple(Parent.GetTriple()) {
   this->Name = Parent.GetName();  
   
@@ -354,35 +339,16 @@ Device::~Device() {
   }
 }
 
-bool Device::TranslateToBitCode(llvm::StringRef Opts,
-                                clang::DiagnosticConsumer &Diag,
-                                llvm::MemoryBuffer &Src,
-                                llvm::Module *&Mod) {
-  llvm::sys::ScopedLock Lock(ThisLock);
+void Device::InitCompiler() {
+  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
 
-  // Create the compiler.
-  clang::CompilerInstance Compiler;
- 
-  // Create default DiagnosticsEngine and setup client.
-  Compiler.createDiagnostics(&Diag, false);
-
-  // Configure compiler invocation.
-  clang::CompilerInvocation *Invocation = new clang::CompilerInvocation();
-  BuildCompilerInvocation(Opts, Src, *Invocation, Compiler.getDiagnostics());
-  Compiler.setInvocation(Invocation);
-
-  // Launch compiler.
-  LLVMCodeGenAction ToBitCode(&LLVMCtx);
-  bool Success = Compiler.ExecuteAction(ToBitCode);
-
-  Mod = ToBitCode.takeModule();
-  Success = Success && !Mod->materializeAll();
-
-  LLVMOptimizer<Device> Opt(Compiler.getLangOpts(), Compiler.getCodeGenOpts(),
-                            Compiler.getTargetOpts(), *this);
-  Opt.run(Mod);
-
-  return Success;
+  llvm::initializeCore(Registry);
+  llvm::initializeScalarOpts(Registry);
+  llvm::initializeIPO(Registry);
+  llvm::initializeAnalysis(Registry);
+  llvm::initializeTransformUtils(Registry);
+  llvm::initializeInstCombine(Registry);
+  llvm::initializeInstrumentation(Registry);
 }
 
 void Device::InitLibrary() {
@@ -409,23 +375,47 @@ void Device::InitLibrary() {
                              " for device " + Name);
 }
 
-void Device::InitCompiler() {
-  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
+std::unique_ptr<llvm::Module>
+Device::TranslateToBitCode(llvm::MemoryBuffer &Src, llvm::StringRef Opts,
+                           llvm::raw_ostream &OS) {
+  llvm::sys::ScopedLock Lock(ThisLock);
 
-  llvm::initializeCore(Registry);
-  llvm::initializeScalarOpts(Registry);
-  llvm::initializeIPO(Registry);
-  llvm::initializeAnalysis(Registry);
-  llvm::initializeTransformUtils(Registry);
-  llvm::initializeInstCombine(Registry);
-  llvm::initializeInstrumentation(Registry);
+  // Create the compiler.
+  clang::CompilerInstance Compiler;
+
+  // Create default DiagnosticsEngine and setup client.
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> DiagOpts;
+  DiagOpts = new clang::DiagnosticOptions();
+  Compiler.createDiagnostics(
+    new clang::TextDiagnosticPrinter(OS, DiagOpts.get()));
+
+  // Configure compiler invocation.
+  auto Invocation =
+    BuildCompilerInvocation(Opts, Src, Compiler.getDiagnostics());
+  Compiler.setInvocation(Invocation.release());
+
+  // Launch compiler.
+  LLVMCodeGenAction GenBitCode(LLVMCtx);
+  bool Success = Compiler.ExecuteAction(GenBitCode);
+
+  auto Mod = GenBitCode.takeModule();
+  if (Success && !Mod->materializeAll()) {
+    LLVMOptimizer(Compiler.getLangOpts(), Compiler.getCodeGenOpts(),
+                  Compiler.getTargetOpts(), *this).run(Mod.get());
+  } else {
+    Mod.reset();
+  }
+
+  return Mod;
 }
 
-void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
-                                     llvm::MemoryBuffer &Src,
-                                     clang::CompilerInvocation &Invocation,
-                                     clang::DiagnosticsEngine &Diags) {
-  std::istringstream ISS(EnvCompilerOpts + UserOpts.str());
+std::unique_ptr<clang::CompilerInvocation>
+Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
+                                llvm::MemoryBuffer &Src,
+                                clang::DiagnosticsEngine &Diags) {
+  llvm::StringRef DefaultOpts = "-cl-std=CL ";
+  llvm::StringRef EnvOpts = sys::GetEnv("OPENCRUN_COMPILER_OPTIONS");
+  std::istringstream ISS(DefaultOpts.str() + EnvOpts.str() + UserOpts.str());
   std::string Token;
   llvm::SmallVector<const char *, 16> Argv;
 
@@ -438,17 +428,15 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   }
   Argv.push_back("<opencl-sources.cl>");
 
+  using CompilerInvocation = clang::CompilerInvocation;
+  auto Invocation = llvm::make_unique<CompilerInvocation>();
+
   // Create invocation.
-  clang::CompilerInvocation::CreateFromArgs(Invocation,
-                                            Argv.data(),
-                                            Argv.data() + Argv.size(),
-                                            Diags);
-  clang::CompilerInvocation::setLangDefaults(*Invocation.getLangOpts(),
-                                             clang::IK_OpenCL,
-                                            clang::LangStandard::lang_opencl11);
+  CompilerInvocation::CreateFromArgs(*Invocation, Argv.data(),
+                                     Argv.data() + Argv.size(), Diags);
 
   // Remap file to in-memory buffer.
-  clang::PreprocessorOptions &PreprocOpts = Invocation.getPreprocessorOpts();
+  auto &PreprocOpts = Invocation->getPreprocessorOpts();
   PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
   PreprocOpts.RetainRemappedFileBuffers = true;
 
@@ -458,9 +446,8 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   InclName += ".h";
   PreprocOpts.Includes.push_back(InclName.str());
 
-
   // Add include paths.
-  clang::HeaderSearchOptions &HdrSearchOpts = Invocation.getHeaderSearchOpts();
+  auto &HdrSearchOpts = Invocation->getHeaderSearchOpts();
   
   llvm::SmallString<32> Path;
   if (sys::HasEnv("OPENCRUN_PREFIX_LLVM"))
@@ -480,13 +467,13 @@ void Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
 
   // Set target triple.
-  clang::TargetOptions &TargetOpts = Invocation.getTargetOpts();
+  auto &TargetOpts = Invocation->getTargetOpts();
   TargetOpts.Triple = Triple;
 
   // Code generation options: emit kernel arg metadata + no optimizations
-  clang::CodeGenOptions &CodeGenOpts = Invocation.getCodeGenOpts();
+  auto &CodeGenOpts = Invocation->getCodeGenOpts();
   CodeGenOpts.EmitOpenCLArgMetadata = true;
-  //CodeGenOpts.DisableLLVMOpts = true;
   CodeGenOpts.StackRealignment = true;
-  CodeGenOpts.OptimizationLevel = 2;
+
+  return Invocation;
 }

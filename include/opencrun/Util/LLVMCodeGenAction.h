@@ -14,10 +14,10 @@ class LLVMCodeGenConsumer;
 
 class LLVMCodeGenAction : public clang::ASTFrontendAction {
 public:
-  LLVMCodeGenAction(llvm::LLVMContext *Ctx = 0);
+  LLVMCodeGenAction(llvm::LLVMContext &Ctx);
   ~LLVMCodeGenAction();
 
-  llvm::Module *takeModule() { return TheModule.release(); }
+  std::unique_ptr<llvm::Module> takeModule() { return std::move(TheModule); }
 
 protected:
   std::unique_ptr<clang::ASTConsumer>
@@ -29,8 +29,7 @@ protected:
 private:
   LLVMCodeGenConsumer *Consumer;
   std::unique_ptr<llvm::Module> TheModule;
-  llvm::LLVMContext *Context;
-  bool OwnContext;
+  llvm::LLVMContext &Context;
 };
 
 }

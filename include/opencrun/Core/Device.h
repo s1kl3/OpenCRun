@@ -419,15 +419,13 @@ public:
   
   virtual bool Submit(Command &Cmd) = 0;
 
-  bool TranslateToBitCode(llvm::StringRef Opts,
-                          clang::DiagnosticConsumer &Diag,
-                          llvm::MemoryBuffer &Src,
-                          llvm::Module *&Mod);
+  std::unique_ptr<llvm::Module> TranslateToBitCode(llvm::MemoryBuffer &Src,
+                                                   llvm::StringRef Opts,
+                                                   llvm::raw_ostream &OS);
 
   virtual void RegisterKernel(const KernelDescriptor &Kern) { }
   virtual void UnregisterKernel(const KernelDescriptor &Kern) { }
 
-protected:
   virtual void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
                                       LLVMOptimizerParams &Params) const {}
 
@@ -435,15 +433,13 @@ private:
   void InitLibrary();
   void InitCompiler();
 
-  void BuildCompilerInvocation(llvm::StringRef UserOpts,
-                               llvm::MemoryBuffer &Src,
-                               clang::CompilerInvocation &Invocation,
-                               clang::DiagnosticsEngine &Diags);
+  std::unique_ptr<clang::CompilerInvocation>
+  BuildCompilerInvocation(llvm::StringRef UserOpts, llvm::MemoryBuffer &Src,
+                          clang::DiagnosticsEngine &Diags);
 
 public:
   llvm::LLVMContext &GetContext() { return LLVMCtx; }
   llvm::StringRef GetTriple() const { return Triple; }
-  llvm::StringRef GetEnvCompilerOpts() const { return EnvCompilerOpts; }
   llvm::Module *GetBitCodeLibrary() const { return BitCodeLibrary.get(); }
 
 protected:
@@ -456,13 +452,8 @@ protected:
   DevicePartition Partition;
 
 private:
-  std::string EnvCompilerOpts;
-
   std::string Triple;
-  std::string SystemResourcePath;
 
-
-  friend class LLVMOptimizerInterfaceTraits<Device>;
   friend class DeviceBuiltinInfo;
 };
 

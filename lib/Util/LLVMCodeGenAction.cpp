@@ -28,12 +28,13 @@ public:
                       llvm::LLVMContext &C)
    : Gen(clang::CreateLLVMCodeGen(Diags, InFile, HeaderSearchOpts, PPOpts,
                                   CodeGenOpts, C)),
-     TheModule(Gen->GetModule()), TyGen(*TheModule) {}
+     TyGen(*Gen->GetModule()) {}
 
-  llvm::Module *takeModule() { return TheModule.release(); }
+  std::unique_ptr<llvm::Module> takeModule() { return std::move(TheModule); }
 
   void Initialize(clang::ASTContext &Ctx) override {
     Gen->Initialize(Ctx);
+    TheModule.reset(Gen->GetModule());
   }
 
   void HandleTranslationUnit(clang::ASTContext &Ctx) override {
@@ -194,13 +195,11 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   replaceKernelMD(Kernels, F, NewKernMD);
 }
 
-LLVMCodeGenAction::LLVMCodeGenAction(llvm::LLVMContext *Ctx)
- : Context(Ctx ? Ctx : new llvm::LLVMContext), OwnContext(!Ctx) {}
+LLVMCodeGenAction::LLVMCodeGenAction(llvm::LLVMContext &Ctx)
+ : Context(Ctx) {}
 
 LLVMCodeGenAction::~LLVMCodeGenAction() {
   TheModule.reset();
-  if (OwnContext)
-    delete Context;
 }
 
 std::unique_ptr<clang::ASTConsumer> LLVMCodeGenAction::
@@ -208,7 +207,7 @@ CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef InFile) {
   std::unique_ptr<LLVMCodeGenConsumer> Result(
     new LLVMCodeGenConsumer(CI.getDiagnostics(), CI.getHeaderSearchOpts(),
                             CI.getPreprocessorOpts(), CI.getCodeGenOpts(),
-                            InFile, *Context));
+                            InFile, Context));
   Consumer = Result.get();
   return std::move(Result);
 }
@@ -217,5 +216,5 @@ void LLVMCodeGenAction::EndSourceFileAction() {
   if (!getCompilerInstance().hasASTConsumer())
     return;
 
-  TheModule.reset(Consumer->takeModule());
+  TheModule = std::move(Consumer->takeModule());
 }

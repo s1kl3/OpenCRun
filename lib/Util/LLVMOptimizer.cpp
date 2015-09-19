@@ -1,4 +1,6 @@
 #include "opencrun/Util/LLVMOptimizer.h"
+#include "opencrun/Core/Device.h"
+
 #include "clang/Basic/LangOptions.h"
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Frontend/CodeGenOptions.h"
@@ -20,12 +22,6 @@ using namespace opencrun;
 using namespace clang;
 using namespace llvm;
 
-LLVMOptimizerBase::LLVMOptimizerBase(const clang::LangOptions &langopts,
-                                     const clang::CodeGenOptions &cgopts,
-                                     const clang::TargetOptions &targetopts)
- : Params(langopts, cgopts, targetopts) {
-}
-
 static TargetLibraryInfoImpl *createTLII(Triple &TargetTriple,
                                          const CodeGenOptions &CGOpts) {
   auto *TLII = new TargetLibraryInfoImpl(TargetTriple);
@@ -42,54 +38,56 @@ static TargetLibraryInfoImpl *createTLII(Triple &TargetTriple,
   return TLII;
 }
 
-void LLVMOptimizerBase::init() {
-  // Setup code copied from clang/lib/CodeGen/BackendUtil.cpp
-  const clang::CodeGenOptions &CodeGenOpts = Params.CodeGenOpts;
+LLVMOptimizer::LLVMOptimizer(const clang::LangOptions &LangOpts,
+                             const clang::CodeGenOptions &CodeGenOpts,
+                             const clang::TargetOptions &TargetOpts,
+                             Device &Dev)
+ : Params(LangOpts, CodeGenOpts, TargetOpts), Dev(Dev) {
+  Dev.addOptimizerExtensions(PMBuilder, Params);
 
-  if (CodeGenOpts.DisableLLVMPasses)
-    return;
+  if (!CodeGenOpts.DisableLLVMPasses) {
+    auto Inlining = CodeGenOpts.getInlining();
+    unsigned OptLevel = CodeGenOpts.OptimizationLevel;
 
-  unsigned OptLevel = CodeGenOpts.OptimizationLevel;
-  clang::CodeGenOptions::InliningMethod Inlining = CodeGenOpts.getInlining();
+    // Handle disabling of LLVM optimization, where we want to preserve the
+    // internal module before any optimization.
+    if (CodeGenOpts.DisableLLVMOpts) {
+      OptLevel = 0;
+      Inlining = CodeGenOpts.NoInlining;
+    }
 
-  // Handle disabling of LLVM optimization, where we want to preserve the
-  // internal module before any optimization.
-  if (CodeGenOpts.DisableLLVMOpts) {
-    OptLevel = 0;
-    Inlining = CodeGenOpts.NoInlining;
-  }
+    PMBuilder.OptLevel = OptLevel;
+    PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
+    PMBuilder.BBVectorize = CodeGenOpts.VectorizeBB;
+    PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
+    PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
 
-  PMBuilder.OptLevel = OptLevel;
-  PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
-  PMBuilder.BBVectorize = CodeGenOpts.VectorizeBB;
-  PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
-  PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
+    PMBuilder.DisableUnitAtATime = !CodeGenOpts.UnitAtATime;
+    PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
+    PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
+    PMBuilder.PrepareForLTO = CodeGenOpts.PrepareForLTO;
+    PMBuilder.RerollLoops = CodeGenOpts.RerollLoops;
 
-  PMBuilder.DisableUnitAtATime = !CodeGenOpts.UnitAtATime;
-  PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
-  PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
-  PMBuilder.PrepareForLTO = CodeGenOpts.PrepareForLTO;
-  PMBuilder.RerollLoops = CodeGenOpts.RerollLoops;
+    // Figure out TargetLibraryInfo.
+    Triple TargetTriple(Params.TargetOpts.Triple);
+    PMBuilder.LibraryInfo = createTLII(TargetTriple, CodeGenOpts);
 
-  // Figure out TargetLibraryInfo.
-  Triple TargetTriple(Params.TargetOpts.Triple);
-  PMBuilder.LibraryInfo = createTLII(TargetTriple, CodeGenOpts);
-
-  switch (Inlining) {
-  case clang::CodeGenOptions::NoInlining: break;
-  case clang::CodeGenOptions::NormalInlining: {
-    PMBuilder.Inliner =
-        createFunctionInliningPass(OptLevel, CodeGenOpts.OptimizeSize);
-    break;
-  }
-  case clang::CodeGenOptions::OnlyAlwaysInlining:
-    // Respect always_inline.
-    if (OptLevel == 0)
-      // Do not insert lifetime intrinsics at -O0.
-      PMBuilder.Inliner = createAlwaysInlinerPass(false);
-    else
-      PMBuilder.Inliner = createAlwaysInlinerPass();
-    break;
+    switch (Inlining) {
+    case clang::CodeGenOptions::NoInlining: break;
+    case clang::CodeGenOptions::NormalInlining: {
+      PMBuilder.Inliner =
+          createFunctionInliningPass(OptLevel, CodeGenOpts.OptimizeSize);
+      break;
+    }
+    case clang::CodeGenOptions::OnlyAlwaysInlining:
+      // Respect always_inline.
+      if (OptLevel == 0)
+        // Do not insert lifetime intrinsics at -O0.
+        PMBuilder.Inliner = createAlwaysInlinerPass(false);
+      else
+        PMBuilder.Inliner = createAlwaysInlinerPass();
+      break;
+    }
   }
 }
 
@@ -213,7 +211,7 @@ static Pass *createTTI(TargetMachine *TM) {
   return createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis());
 }
 
-void LLVMOptimizerBase::run(Module *M) {
+void LLVMOptimizer::run(Module *M) {
   if (!M)
     return;
 

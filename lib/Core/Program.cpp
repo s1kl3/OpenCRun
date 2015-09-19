@@ -260,48 +260,33 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
 
   // Needed to log compilation results into the program structure.
   llvm::raw_string_ostream Log(Info.GetBuildLog());
-  auto ToLog =
-    llvm::make_unique<clang::TextDiagnosticPrinter>(Log, &DiagOptions);
-
-  // Needed to log compilation results for internal diagnostic.
-  auto ToCtx = llvm::make_unique<clang::TextDiagnosticBuffer>();
-
-  // Chain diagnostics.
-  clang::ChainedDiagnosticConsumer *Diag;
-  Diag = new clang::ChainedDiagnosticConsumer(std::move(ToLog),
-                                              std::move(ToCtx));
 
   // Build in progress.
+  Info.SetBuildOptions(Opts);
   Info.RegisterBuildInProgress();
 
   // Invoke the compiler.
-  llvm::Module *BitCode = NULL;
-  bool Success = Dev.TranslateToBitCode(Opts, *Diag, *Src, BitCode);
+  auto BitCode = Dev.TranslateToBitCode(*Src, Opts, Log);
 
-  if(Success) {
+  if (BitCode) {
     // TODO: The generated LLVM bitcode is stored as the binary code for every
     // device but, in some cases, a device may require a shared object as a binary.
     std::string BitCodeDump;
     llvm::raw_string_ostream BitCodeOS(BitCodeDump);
-    llvm::WriteBitcodeToFile(BitCode, BitCodeOS);
+    llvm::WriteBitcodeToFile(BitCode.get(), BitCodeOS);
     BitCodeOS.flush();
 
     auto Binary = llvm::MemoryBuffer::getMemBufferCopy(BitCodeDump);
 
-    Info.SetBitCode(BitCode);
     Info.SetBinary(Binary.release());
-  } else if(BitCode)
-    delete BitCode;
+  }
 
-  Info.SetBuildOptions(Opts);
+  bool Success = BitCode != nullptr;
+
+  Info.SetBitCode(BitCode.release());
 
   // Build done.
   Info.RegisterBuildDone(Success);
-
-  // Dump log for debug purposes, only if needed.
-  Ctx->ReportDiagnostic(*ToCtx);
-
-
   return Success ? CL_SUCCESS : CL_BUILD_PROGRAM_FAILURE;
 }
 
