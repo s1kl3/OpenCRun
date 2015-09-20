@@ -431,7 +431,6 @@ public:
 
 private:
   void InitLibrary();
-  void InitCompiler();
 
   std::unique_ptr<clang::CompilerInvocation>
   BuildCompilerInvocation(llvm::StringRef UserOpts, llvm::MemoryBuffer &Src,

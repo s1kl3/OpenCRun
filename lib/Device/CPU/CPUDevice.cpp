@@ -482,8 +482,6 @@ void CPUDevice::InitTargetMachine() {
   }
 
   // Init the native target.
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
 
   std::string Err;
   auto *TheTarget = llvm::TargetRegistry::lookupTarget(Triple.c_str(), Err);
@@ -1060,6 +1058,8 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
 }
 
 void opencrun::initializeCPUDevice(Platform &P) {
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
   sys::Hardware &HW = sys::GetHardware();
 
   // A device for each Machine in the System (it may be a cluster system).

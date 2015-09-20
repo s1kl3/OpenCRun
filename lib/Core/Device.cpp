@@ -306,7 +306,6 @@ Device::Device(DeviceType Ty, llvm::StringRef Name)
 
   // Initialize the device.
   InitLibrary();
-  InitCompiler();
 
   // Reference Counter intiially set to 1.
   Retain();
@@ -317,7 +316,6 @@ Device::Device(Device &Parent, const DevicePartition &Part)
   this->Name = Parent.GetName();  
   
   InitLibrary();
-  InitCompiler();
 
   // Reference Counter intiially set to 1.
   Retain();
@@ -333,18 +331,6 @@ Device::~Device() {
     if(Parent->IsSubDevice())
       Parent->Release();
   }
-}
-
-void Device::InitCompiler() {
-  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
-
-  llvm::initializeCore(Registry);
-  llvm::initializeScalarOpts(Registry);
-  llvm::initializeIPO(Registry);
-  llvm::initializeAnalysis(Registry);
-  llvm::initializeTransformUtils(Registry);
-  llvm::initializeInstCombine(Registry);
-  llvm::initializeInstrumentation(Registry);
 }
 
 void Device::InitLibrary() {

@@ -10,7 +10,20 @@ using namespace opencrun;
 
 static llvm::ManagedStatic<Platform> OpenCRunPlat;
 
+static void initializeLLVM() {
+  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
+
+  llvm::initializeCore(Registry);
+  llvm::initializeScalarOpts(Registry);
+  llvm::initializeIPO(Registry);
+  llvm::initializeAnalysis(Registry);
+  llvm::initializeTransformUtils(Registry);
+  llvm::initializeInstCombine(Registry);
+  llvm::initializeInstrumentation(Registry);
+}
+
 Platform::Platform() {
+  initializeLLVM();
   initializeCPUDevice(*this);
 }
 
