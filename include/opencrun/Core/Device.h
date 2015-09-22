@@ -2,10 +2,6 @@
 #ifndef OPENCRUN_CORE_DEVICE_H
 #define OPENCRUN_CORE_DEVICE_H
 
-#include "opencrun/Core/Command.h"
-#include "opencrun/Core/Profiler.h"
-#include "opencrun/System/Env.h"
-#include "opencrun/Util/Footprint.h"
 #include "opencrun/Util/MTRefCounted.h"
 
 #include "clang/Basic/Diagnostic.h"
@@ -13,7 +9,11 @@
 #include "clang/Basic/TargetOptions.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Mutex.h"
 
+#include "CL/cl.h"
 struct _cl_device_id { };
 
 namespace llvm {
@@ -22,8 +22,12 @@ class PassManagerBuilder;
 
 namespace opencrun {
 
+class Command;
 class LLVMOptimizerParams;
 template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
+class KernelDescriptor;
+class Footprint;
+class MemoryDescriptor;
 class MemoryObject;
 
 class DeviceInfo {

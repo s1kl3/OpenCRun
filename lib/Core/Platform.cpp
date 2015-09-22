@@ -4,6 +4,8 @@
 #include "opencrun/Device/Devices.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/PassRegistry.h"
 #include "llvm/Support/ManagedStatic.h"
 
 using namespace opencrun;

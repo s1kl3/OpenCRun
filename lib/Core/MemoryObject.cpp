@@ -3,6 +3,8 @@
 #include "opencrun/Core/Device.h"
 #include "opencrun/Util/OptionalOutput.h"
 
+#include "llvm/ADT/STLExtras.h"
+
 using namespace opencrun;
 
 MemoryObject::~MemoryObject() {
