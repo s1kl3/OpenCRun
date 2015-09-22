@@ -4,9 +4,6 @@
 
 #include "opencrun/Util/MTRefCounted.h"
 
-#include "clang/Basic/Diagnostic.h"
-#include "clang/Basic/LangOptions.h"
-#include "clang/Basic/TargetOptions.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -14,17 +11,13 @@
 #include "llvm/Support/Mutex.h"
 
 #include "CL/cl.h"
-struct _cl_device_id { };
 
-namespace llvm {
-class PassManagerBuilder;
-}
+struct _cl_device_id { };
 
 namespace opencrun {
 
 class Command;
-class LLVMOptimizerParams;
-template<class InterfaceTy> class LLVMOptimizerInterfaceTraits;
+class DeviceCompiler;
 class KernelDescriptor;
 class Footprint;
 class MemoryDescriptor;
@@ -380,6 +373,7 @@ protected:
   size_t PreferredWorkGroupSizeMultiple;
 };
 
+
 class Device : public _cl_device_id,
                public DeviceInfo,
                public MTRefCountedBaseVPTR<Device> {
@@ -423,30 +417,13 @@ public:
   
   virtual bool Submit(Command &Cmd) = 0;
 
-  std::unique_ptr<llvm::Module> TranslateToBitCode(llvm::MemoryBuffer &Src,
-                                                   llvm::StringRef Opts,
-                                                   llvm::raw_ostream &OS);
-
   virtual void RegisterKernel(const KernelDescriptor &Kern) { }
   virtual void UnregisterKernel(const KernelDescriptor &Kern) { }
 
-  virtual void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
-                                      LLVMOptimizerParams &Params) const {}
+  template<typename Ty>
+  Ty &getCompilerAs() const { return static_cast<Ty&>(*Compiler); }
 
-private:
-  void InitLibrary();
-
-  std::unique_ptr<clang::CompilerInvocation>
-  BuildCompilerInvocation(llvm::StringRef UserOpts, llvm::MemoryBuffer &Src,
-                          clang::DiagnosticsEngine &Diags);
-
-public:
-  llvm::LLVMContext &GetContext() { return LLVMCtx; }
-  llvm::StringRef GetTriple() const { return Triple; }
-  llvm::Module *GetBitCodeLibrary() const { return BitCodeLibrary.get(); }
-  llvm::StringRef getTargetCPU() const { return TargetCPU; }
-  llvm::ArrayRef<std::string> getTargetFeatures() const {return TargetFeatures;}
-  llvm::TargetMachine *getTargetMachine() const { return TM.get(); }
+  DeviceCompiler *getCompiler() const { return Compiler.get(); }
 
 protected:
   mutable llvm::sys::Mutex ThisLock;
@@ -454,16 +431,13 @@ protected:
   Device *Parent;
   DevicePartition Partition;
 
-  llvm::LLVMContext LLVMCtx;
-  std::unique_ptr<llvm::TargetMachine> TM;
-  std::unique_ptr<llvm::Module> BitCodeLibrary;
-  std::string Triple;
-  std::string TargetCPU;
-  std::vector<std::string> TargetFeatures;
+  std::unique_ptr<DeviceCompiler> Compiler;
 
 private:
   friend class DeviceBuiltinInfo;
 };
+
+
 
 } // End namespace opencrun.
 

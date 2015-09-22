@@ -1,6 +1,10 @@
-#include "JITCompiler.h"
+#include "CPUCompiler.h"
 
+#include "opencrun/Device/CPUPasses/AllPasses.h"
+
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
+#include "llvm/Support/TargetRegistry.h"
 
 #include <dlfcn.h>
 
@@ -60,4 +64,40 @@ llvm::orc::JITSymbol JITCompiler::findSymbol(const std::string &Name) {
     return llvm::orc::JITSymbol(llvm::orc::TargetAddress(I->getValue()),
                                 llvm::JITSymbolFlags::Exported);
   return CompileLayer.findSymbol(Name, false);
+}
+
+CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
+  auto Triple = llvm::sys::getProcessTriple();
+  auto TargetCPU = llvm::sys::getHostCPUName();
+  std::string Err;
+  auto *TheTarget = llvm::TargetRegistry::lookupTarget(Triple.c_str(), Err);
+
+  if (!TheTarget)
+    llvm::report_fatal_error("No valid target!", true);
+
+  std::vector<std::string> Features;
+  llvm::StringMap<bool> FeaturesMap;
+  if (llvm::sys::getHostCPUFeatures(FeaturesMap)) {
+    TargetFeatures.reserve(FeaturesMap.size());
+    for (const auto &E : FeaturesMap)
+      Features.push_back(((E.getValue() ? "+" : "-") + E.getKey()).str());
+  }
+
+  llvm::TargetOptions Options;
+  auto TargetFeatures = llvm::join(Features.begin(), Features.end(), ",");
+  TM.reset(TheTarget->createTargetMachine(Triple, TargetCPU, TargetFeatures,
+                                          Options, llvm::Reloc::Model::Default,
+                                          llvm::CodeModel::JITDefault,
+                                          llvm::CodeGenOpt::None));
+
+  JIT = llvm::make_unique<JITCompiler>(*TM);
+  JIT->addModule(Builtins.get());
+}
+
+CPUCompiler::~CPUCompiler() {
+  JIT->removeModule(Builtins.get());
+}
+
+void CPUCompiler::addInitialLoweringPasses(llvm::legacy::PassManager &PM) {
+  PM.add(createAutomaticLocalVariablesPass());
 }

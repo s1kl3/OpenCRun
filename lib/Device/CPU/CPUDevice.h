@@ -9,8 +9,6 @@
 namespace opencrun {
 namespace cpu {
 
-class JITCompiler;
-
 class CPUDevice : public Device {
 public:
   static bool classof(const Device *Dev) { return true; }
@@ -58,21 +56,15 @@ public:
   void NotifyDone(CPUServiceCommand *Cmd) { delete Cmd; }
   void NotifyDone(CPUExecCommand *Cmd, int ExitStatus);
 
-protected:
-  void addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
-                              LLVMOptimizerParams &Params) const override;
-
 private:
   void InitDeviceInfo();
   void InitSubDeviceInfo(const HardwareCPUsContainer &CPUs);
-  void InitJIT();
   void InitMultiprocessors();
   void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
-  void InitTargetMachine();
+  void InitCompiler();
 
   void computeSubDeviceInfo(const HardwareCPUsContainer &CPUs);
 
-  void DestroyJIT();
   void DestroyMultiprocessors();
 
   const sys::HardwareMachine &GetHardwareMachine() const { return Machine; }
@@ -125,8 +117,6 @@ private:
   // a cluster system). In general it uses a subset of its logical cores.
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
-
-  std::unique_ptr<JITCompiler> JIT;
 
   BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;

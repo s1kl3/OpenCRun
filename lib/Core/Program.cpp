@@ -2,6 +2,7 @@
 #include "opencrun/Core/Program.h"
 #include "opencrun/Core/Context.h"
 #include "opencrun/Core/Device.h"
+#include "opencrun/Core/DeviceCompiler.h"
 #include "opencrun/Core/Kernel.h"
 
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -50,11 +51,9 @@ Program::Program(Context &Ctx, BinariesContainer &Binaries) : Ctx(&Ctx) {
 
     Info.SetBinary(Binary);
 
-    llvm::LLVMContext &LLVMCtx = Dev.GetContext();
-
-    auto MBR = Binary->getMemBufferRef();
-    if (auto BCOrErr = llvm::parseBitcodeFile(MBR, LLVMCtx)) {
-      Info.SetBitCode(BCOrErr.get().release());
+    auto BC = Dev.getCompiler()->loadBitcode(Binary->getMemBufferRef());
+    if (BC) {
+      Info.SetBitCode(BC.release());
       Info.RegisterBuildDone(true);
     }
   }
@@ -266,7 +265,9 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
   Info.RegisterBuildInProgress();
 
   // Invoke the compiler.
-  auto BitCode = Dev.TranslateToBitCode(*Src, Opts, Log);
+  auto BitCode = Dev.getCompiler()->compileSource(*Src, Opts, Log);
+  if (Opts.find("-cl-opt-disable") == llvm::StringRef::npos)
+    Dev.getCompiler()->optimize(*BitCode);
 
   if (BitCode) {
     // TODO: The generated LLVM bitcode is stored as the binary code for every

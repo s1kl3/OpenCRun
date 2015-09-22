@@ -1,25 +1,5 @@
 #include "opencrun/Core/Device.h"
-#include "opencrun/Util/LLVMCodeGenAction.h"
-#include "opencrun/Util/LLVMOptimizer.h"
-
-#include "clang/Basic/Version.h"
-#include "clang/Frontend/TextDiagnosticPrinter.h"
-#include "clang/Parse/ParseAST.h"
-#include "llvm/Bitcode/ReaderWriter.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/Errc.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Target/TargetMachine.h"
-
-// OpenCL extensions defines macro that clashes with clang internal symbols.
-// This is a workaround to include clang needed headers. Is this the right
-// solution?
-#define cl_khr_gl_sharing_save cl_khr_gl_sharing
-#undef cl_khr_gl_sharing
-#include "clang/Frontend/CompilerInstance.h"
-#define cl_khr_gl_sharing cl_khr_gl_sharing_save
-
-#include <sstream>
+#include "opencrun/Core/DeviceCompiler.h"
 
 using namespace opencrun;
 
@@ -304,9 +284,6 @@ Device::Device(DeviceType Ty, llvm::StringRef Name)
  : DeviceInfo(Ty), Parent(nullptr) {
   this->Name = Name;
 
-  // Initialize the device.
-  InitLibrary();
-
   // Reference Counter intiially set to 1.
   Retain();
 }
@@ -315,8 +292,6 @@ Device::Device(Device &Parent, const DevicePartition &Part)
  : DeviceInfo(Parent), Parent(&Parent), Partition(Part) {
   this->Name = Parent.GetName();  
   
-  InitLibrary();
-
   // Reference Counter intiially set to 1.
   Retain();
  
@@ -331,133 +306,4 @@ Device::~Device() {
     if(Parent->IsSubDevice())
       Parent->Release();
   }
-}
-
-void Device::InitLibrary() {
-  // Library name depends on the device name.
-  llvm::SmallString<20> LibName("opencrun");
-  LibName += Name;
-  LibName += "Lib.bc";
-
-  llvm::SmallString<32> Path;
-  if (sys::HasEnv("OPENCRUN_PREFIX"))
-    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
-  else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
-  llvm::sys::path::append(Path, "lib", LibName.str());
-
-  if (auto MBOrErr = llvm::MemoryBuffer::getFile(Path.str())) {
-    auto MB = std::move(MBOrErr.get());
-    if (auto BCOrErr = llvm::parseBitcodeFile(MB->getMemBufferRef(), LLVMCtx))
-      BitCodeLibrary = std::move(BCOrErr.get());
-  }
-
-  if (!BitCodeLibrary)
-    llvm::report_fatal_error("Unable to find class library " + LibName +
-                             " for device " + Name);
-}
-
-std::unique_ptr<llvm::Module>
-Device::TranslateToBitCode(llvm::MemoryBuffer &Src, llvm::StringRef Opts,
-                           llvm::raw_ostream &OS) {
-  llvm::sys::ScopedLock Lock(ThisLock);
-
-  // Create the compiler.
-  clang::CompilerInstance Compiler;
-
-  // Create default DiagnosticsEngine and setup client.
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> DiagOpts;
-  DiagOpts = new clang::DiagnosticOptions();
-  Compiler.createDiagnostics(
-    new clang::TextDiagnosticPrinter(OS, DiagOpts.get()));
-
-  // Configure compiler invocation.
-  auto Invocation =
-    BuildCompilerInvocation(Opts, Src, Compiler.getDiagnostics());
-  Compiler.setInvocation(Invocation.release());
-
-  // Launch compiler.
-  LLVMCodeGenAction GenBitCode(LLVMCtx);
-  bool Success = Compiler.ExecuteAction(GenBitCode);
-
-  auto Mod = GenBitCode.takeModule();
-  if (Success && !Mod->materializeAll()) {
-    LLVMOptimizer(Compiler.getLangOpts(), Compiler.getCodeGenOpts(),
-                  Compiler.getTargetOpts(), *this).run(Mod.get());
-  } else {
-    Mod.reset();
-  }
-
-  return Mod;
-}
-
-std::unique_ptr<clang::CompilerInvocation>
-Device::BuildCompilerInvocation(llvm::StringRef UserOpts,
-                                llvm::MemoryBuffer &Src,
-                                clang::DiagnosticsEngine &Diags) {
-  llvm::StringRef DefaultOpts = "-cl-std=CL ";
-  llvm::StringRef EnvOpts = sys::GetEnv("OPENCRUN_COMPILER_OPTIONS");
-  std::istringstream ISS(DefaultOpts.str() + EnvOpts.str() + UserOpts.str());
-  std::string Token;
-  llvm::SmallVector<const char *, 16> Argv;
-
-  // Build command line.
-  while(ISS >> Token) {
-    char *CurArg = new char[Token.size() + 1];
-
-    std::strcpy(CurArg, Token.c_str());
-    Argv.push_back(CurArg);
-  }
-  Argv.push_back("<opencl-sources.cl>");
-
-  using CompilerInvocation = clang::CompilerInvocation;
-  auto Invocation = llvm::make_unique<CompilerInvocation>();
-
-  // Create invocation.
-  CompilerInvocation::CreateFromArgs(*Invocation, Argv.data(),
-                                     Argv.data() + Argv.size(), Diags);
-
-  // Remap file to in-memory buffer.
-  auto &PreprocOpts = Invocation->getPreprocessorOpts();
-  PreprocOpts.addRemappedFile("<opencl-sources.cl>", &Src);
-  PreprocOpts.RetainRemappedFileBuffers = true;
-
-  // Implicit target include
-  llvm::SmallString<16> InclName("ocltarget.");
-  InclName += Name;
-  InclName += ".h";
-  PreprocOpts.Includes.push_back(InclName.str());
-
-  // Add include paths.
-  auto &HdrSearchOpts = Invocation->getHeaderSearchOpts();
-  
-  llvm::SmallString<32> Path;
-  if (sys::HasEnv("OPENCRUN_PREFIX_LLVM"))
-    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX_LLVM"));
-  else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
-  llvm::sys::path::append(Path, "lib", "clang", CLANG_VERSION_STRING, "include");
-  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
-
-  Path.clear();
-  if (sys::HasEnv("OPENCRUN_PREFIX"))
-    llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
-  else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
-  llvm::sys::path::append(Path, "lib", "opencrun", "include");
-  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Quoted, false, false);
-  HdrSearchOpts.AddPath(Path.str(), clang::frontend::Angled, false, false);
-
-  // Set target triple.
-  auto &TargetOpts = Invocation->getTargetOpts();
-  TargetOpts.Triple = Triple;
-  TargetOpts.CPU = TargetCPU;
-  TargetOpts.Features = TargetFeatures;
-
-  // Code generation options: emit kernel arg metadata + no optimizations
-  auto &CodeGenOpts = Invocation->getCodeGenOpts();
-  CodeGenOpts.EmitOpenCLArgMetadata = true;
-  CodeGenOpts.StackRealignment = true;
-
-  return Invocation;
 }

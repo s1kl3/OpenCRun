@@ -1,8 +1,8 @@
 
 #include "CPUDevice.h"
+#include "CPUCompiler.h"
 #include "CPUKernelInfo.h"
 #include "InternalCalls.h"
-#include "JITCompiler.h"
 
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
@@ -23,7 +23,6 @@
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;
@@ -81,8 +80,7 @@ CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
   InitSubDeviceInfo(CPUs);
 
   InitMultiprocessors();
-  InitTargetMachine();
-  InitJIT();
+  InitCompiler();
 }
 
 CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
@@ -90,13 +88,11 @@ CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
   Device(Parent, Part), Machine(Parent.GetHardwareMachine()) {
   InitSubDeviceInfo(CPUs);
   InitMultiprocessors(CPUs);
-  InitTargetMachine();
-  InitJIT();
+  InitCompiler();
 }
 
 CPUDevice::~CPUDevice() {
   DestroyMultiprocessors();
-  DestroyJIT();
 }
 
 bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -174,9 +170,6 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   // TODO: modules must be ref-counted -- unregister a kernel does not
   // necessary enforce module unloading?
   llvm::sys::ScopedLock Lock(ThisLock);
-
-  // Remove module from the JIT.
-  llvm::Module &Mod = *Kern.getFunction(this)->getParent();
 
   // Erase kernel from the cache.
   BlockParallelEntriesCache.erase(&Kern);
@@ -407,7 +400,7 @@ void CPUDevice::InitDeviceInfo() {
   // TODO: set LittleEndian, by the compiler?
   // Available is a virtual property.
 
-  CompilerAvailable = false;
+  CompilerAvailable = true;
   LinkerAvailable = false;
 
   ExecutionCapabilities = DeviceInfo::CanExecKernel |
@@ -471,44 +464,15 @@ void CPUDevice::computeSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
     SupportedPartitionTypes.push_back(PartitionByAffinityDomain);
 }
 
-void CPUDevice::InitTargetMachine() {
-  Triple = llvm::sys::getProcessTriple();
-  TargetCPU = llvm::sys::getHostCPUName();
+void CPUDevice::InitCompiler() {
+  Compiler = llvm::make_unique<CPUCompiler>();
 
-  llvm::StringMap<bool> Features;
-  if (llvm::sys::getHostCPUFeatures(Features)) {
-    for (const auto &E : Features)
-      TargetFeatures.push_back(((E.getValue() ? "+" : "-") + E.getKey()).str());
-  }
-
-  // Init the native target.
-
-  std::string Err;
-  auto *TheTarget = llvm::TargetRegistry::lookupTarget(Triple.c_str(), Err);
-
-  auto FeaturesString =
-    llvm::join(TargetFeatures.begin(), TargetFeatures.end(), ",");
-
-  if (!TheTarget)
-    llvm::report_fatal_error("No valid target!", true);
-
-  llvm::TargetOptions Options;
-  TM.reset(TheTarget->createTargetMachine(Triple, TargetCPU, FeaturesString,
-                                          Options, llvm::Reloc::Model::Default,
-                                          llvm::CodeModel::JITDefault,
-                                          llvm::CodeGenOpt::None));
-  JIT = llvm::make_unique<JITCompiler>(*TM);
-}
-
-void CPUDevice::InitJIT() {
   void *Addr;
   #define INTERNAL_CALL(N, Fmt, F)               \
     Addr = reinterpret_cast<void *>(F);          \
-    JIT->addSymbolMapping("__internal_" #N, Addr);
+    getCompilerAs<CPUCompiler>().addSymbolMapping("__internal_" #N, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
-
-  JIT->addModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::InitMultiprocessors() {
@@ -518,10 +482,6 @@ void CPUDevice::InitMultiprocessors() {
 
 void CPUDevice::InitMultiprocessors(const HardwareCPUsContainer &CPUs) {
   Multiprocessors.insert(new Multiprocessor(*this, CPUs));
-}
-
-void CPUDevice::DestroyJIT() {
-  JIT->removeModule(BitCodeLibrary.get());
 }
 
 void CPUDevice::DestroyMultiprocessors() {
@@ -811,8 +771,8 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   // Retrieve it.
   std::string EntryName = MangleBlockParallelKernelName(KernName);
 
-  JIT->addModule(&Mod);
-  void *EntryPtr = (void*)JIT->findSymbol(EntryName).getAddress();
+  getCompilerAs<CPUCompiler>().addModule(&Mod);
+  void *EntryPtr = getCompilerAs<CPUCompiler>().getSymbolAddr(EntryName);
 
   // Cache it. In order to correctly cast the EntryPtr to a function pointer we
   // must pass through a uintptr_t. Otherwise, a warning is issued by the
@@ -920,19 +880,6 @@ void CPUDevice::LocateMemoryObjArgAddresses(
     }
     GlobalArgs[I->getIndex()] = Ptr;
   }
-}
-
-static void createAutoLocalVarsPass(const llvm::PassManagerBuilder &PMB,
-                                    llvm::PassManagerBase &PM) {
-  PM.add(createAutomaticLocalVariablesPass());
-}
-
-void CPUDevice::addOptimizerExtensions(llvm::PassManagerBuilder &PMB,
-                                       LLVMOptimizerParams &Params) const {
-  PMB.addExtension(llvm::PassManagerBuilder::EP_ModuleOptimizerEarly,
-                   createAutoLocalVarsPass);
-  PMB.addExtension(llvm::PassManagerBuilder::EP_EnabledOnOptLevel0,
-                   createAutoLocalVarsPass);
 }
 
 bool CPUDevice::isPartitionSupported(const DevicePartition &Part) const {
