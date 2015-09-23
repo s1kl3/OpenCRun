@@ -118,9 +118,12 @@ public:
     return Infos.size() == 1;
   }
 
-  KernelInfo getKernelInfo() const {
+  KernelInfo getKernelInfo(const Device *Dev = nullptr) const {
     assert(!Infos.empty());
-    return Infos.begin()->second;
+    if (Dev == nullptr)
+      return Infos.begin()->second;
+    assert(isBuiltForDevice(Dev));
+    return Infos.find(const_cast<Device*>(Dev))->second;
   }
 
   bool hasRequiredWorkGroupSizes(const Device *Dev) const;

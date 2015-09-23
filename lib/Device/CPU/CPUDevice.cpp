@@ -795,7 +795,7 @@ unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &Kern
     return I->second;
 
   // Cache miss.
-  CPUKernelInfo Info(KernDesc.getKernelInfo());
+  CPUKernelInfo Info(KernDesc.getKernelInfo(this));
 
   unsigned StaticLocalSize = Info.getStaticLocalSize();
   BlockParallelStaticLocalsCache[&KernDesc] = StaticLocalSize;
@@ -815,6 +815,7 @@ CPUDevice::GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
     SLVec = I->second;
   else {
     // Cache miss.
+    CPUKernelInfo Info(KernDesc.getKernelInfo(this));
     CPUKernelInfo Info(KernDesc.getKernelInfo());
 
     for (unsigned i = 0; i < Info.getNumStaticLocalAreas(); ++i) {
