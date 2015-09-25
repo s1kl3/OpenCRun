@@ -266,10 +266,15 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
 
   // Invoke the compiler.
   auto BitCode = Dev.getCompiler()->compileSource(*Src, Opts, Log);
-  if (Opts.find("-cl-opt-disable") == llvm::StringRef::npos)
-    Dev.getCompiler()->optimize(*BitCode);
+  bool Success = BitCode != nullptr;
 
-  if (BitCode) {
+  // FIXME: make proper parsing of build options.
+  if (Opts.find("-cl-opt-disable") == llvm::StringRef::npos)
+    Success = Success && Dev.getCompiler()->optimize(*BitCode);
+
+  Success = Success && Dev.getCompiler()->linkInBuiltins(*BitCode);
+
+  if (Success) {
     // TODO: The generated LLVM bitcode is stored as the binary code for every
     // device but, in some cases, a device may require a shared object as a binary.
     std::string BitCodeDump;
@@ -280,11 +285,8 @@ cl_int Program::Build(Device &Dev, llvm::StringRef Opts) {
     auto Binary = llvm::MemoryBuffer::getMemBufferCopy(BitCodeDump);
 
     Info.SetBinary(Binary.release());
+    Info.SetBitCode(BitCode.release());
   }
-
-  bool Success = BitCode != nullptr;
-
-  Info.SetBitCode(BitCode.release());
 
   // Build done.
   Info.RegisterBuildDone(Success);
