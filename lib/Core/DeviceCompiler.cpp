@@ -10,10 +10,13 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <sstream>
 
@@ -214,7 +217,26 @@ DeviceCompiler::linkModules(llvm::ArrayRef<llvm::Module*> Modules) {
 }
 
 bool DeviceCompiler::linkInBuiltins(llvm::Module &M) {
-  llvm_unreachable("Not implemented yet!");
+  auto BuiltinsCopy =
+    std::unique_ptr<llvm::Module>{llvm::CloneModule(Builtins.get())};
+
+  bool Failed =
+    llvm::Linker::LinkModules(&M, BuiltinsCopy.get(),
+                              llvm::Linker::LinkOnlyNeeded |
+                              llvm::Linker::InternalizeLinkedSymbols);
+
+  llvm::legacy::PassManager PM;
+  PM.add(createTTI(*TM));
+  PM.add(llvm::createFunctionInliningPass(100));
+  PM.add(llvm::createConstantPropagationPass());
+  PM.add(llvm::createInstructionCombiningPass());
+  PM.add(llvm::createReassociatePass());
+  PM.add(llvm::createEarlyCSEPass());
+  PM.add(llvm::createCFGSimplificationPass());
+  PM.add(llvm::createDeadCodeEliminationPass());
+  PM.run(M);
+
+  return !Failed;
 }
 
 std::unique_ptr<llvm::Module>
