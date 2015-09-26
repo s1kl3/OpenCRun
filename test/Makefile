@@ -43,14 +43,14 @@ LIT_ALL_TESTSUITES := $(LIT_TESTSUITE)
 extra-site-cfgs::
 .PHONY: extra-site-cfgs
 
-check-local:: lit.site.cfg Unit/lit.site.cfg
+check-local:: lit.site.cfg
 	( $(ULIMIT) \
 	  $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py $(LIT_ARGS) $(LIT_TESTSUITE) )
 
 # This is a legacy alias dating from when both DejaGNU and lit were in use.
 check-local-lit:: check-local
 
-check-local-all:: lit.site.cfg Unit/lit.site.cfg extra-site-cfgs
+check-local-all:: lit.site.cfg extra-site-cfgs
 	( $(ULIMIT) \
 	  $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py $(LIT_ARGS) $(LIT_ALL_TESTSUITES) )
 
@@ -114,22 +114,3 @@ lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@PROJ_BINARY_DIR@=$(PROJ_OBJ_ROOT)=g >> lit.tmp
 	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
 	@-rm -f lit.tmp
-
-Unit/lit.site.cfg: $(PROJ_OBJ_DIR)/Unit/.dir FORCE
-	@echo "Making OpenCRun unittest 'lit.site.cfg' file..."
-	@$(ECHOPATH) s=@LLVM_SOURCE_DIR@=$(LLVM_SRC_ROOT)=g > unit.tmp
-	@$(ECHOPATH) s=@LLVM_BINARY_DIR@=$(LLVM_OBJ_ROOT)=g >> unit.tmp
-	@$(ECHOPATH) s=@LLVM_TOOLS_DIR@=$(LLVM_TOOL_DIR)=g >> unit.tmp
-	@$(ECHOPATH) s=@LLVM_BUILD_MODE@=$(BuildMode)=g >> unit.tmp
-	@$(ECHOPATH) s=@ENABLE_SHARED@=$(ENABLE_SHARED)=g >> unit.tmp
-	@$(ECHOPATH) s=@SHLIBDIR@=$(SharedLibDir)=g >> unit.tmp
-	@$(ECHOPATH) s=@SHLIBPATH_VAR@=$(SHLIBPATH_VAR)=g >> unit.tmp
-	@$(ECHOPATH) s=@HOST_OS@=$(HOST_OS)=g >> unit.tmp
-	@$(ECHOPATH) s=@HOST_ARCH@=$(HOST_ARCH)=g >> lit.tmp
-	@$(ECHOPATH) s=@PROJ_SOURCE_DIR@=$(PROJ_SRC_ROOT)=g >> unit.tmp
-	@$(ECHOPATH) s=@PROJ_BINARY_DIR@=$(PROJ_OBJ_ROOT)=g >> unit.tmp
-	@$(ECHOPATH) s=@PROJ_LIB_DIR@=$(LibDir)=g >> unit.tmp
-	@$(ECHOPATH) s=@PROJ_INC_DIR@=$(LibDir)/opencrun/include=g >> unit.tmp
-	@$(ECHOPATH) s=@LLVM_DIR@=$(LLVM_OBJ_ROOT)/$(BuildMode)=g >> unit.tmp
-	@sed -f unit.tmp $(PROJ_SRC_DIR)/Unit/lit.site.cfg.in > $@
-	@-rm -f unit.tmp
