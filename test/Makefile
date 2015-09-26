@@ -63,11 +63,6 @@ else
   DSYMUTIL := true
 endif
 
-ifneq ($(OCAMLOPT),)
-CC_FOR_OCAMLOPT := $(shell $(OCAMLOPT) -config | grep native_c_compiler | sed -e 's/native_c_compiler: //')
-CXX_FOR_OCAMLOPT := $(subst gcc,g++,$(CC_FOR_OCAMLOPT))
-endif
-
 ifdef TargetCommonOpts
   BUGPOINT_TOPTS := "-gcc-tool-args $(TargetCommonOpts)"
 else
@@ -99,18 +94,12 @@ lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@LLVM_SOURCE_DIR@=$(LLVM_SRC_ROOT)=g >> lit.tmp
 	@$(ECHOPATH) s=@LLVM_BINARY_DIR@=$(LLVM_OBJ_ROOT)=g >> lit.tmp
 	@$(ECHOPATH) s=@LLVM_TOOLS_DIR@=$(LLVM_TOOL_DIR)=g >> lit.tmp
-	@$(ECHOPATH) s=@SHLIBDIR@=$(SharedLibDir)=g >> lit.tmp
 	@$(ECHOPATH) s=@SHLIBEXT@=$(SHLIBEXT)=g >> lit.tmp
-	@$(ECHOPATH) s=@PYTHON_EXECUTABLE@=$(PYTHON)=g >> lit.tmp
-	@$(ECHOPATH) s=@OCAMLOPT@=$(OCAMLOPT) -cc $(subst *,'\\\"',*$(subst =,"\\=",$(CXX_FOR_OCAMLOPT))*) -I $(LibDir)/ocaml=g >> lit.tmp
-	@$(ECHOPATH) s=@ENABLE_SHARED@=$(ENABLE_SHARED)=g >> lit.tmp
-	@$(ECHOPATH) s=@ENABLE_ASSERTIONS@=$(ENABLE_ASSERTIONS)=g >> lit.tmp
 	@$(ECHOPATH) s=@LTO_IS_ENABLED@=$(LTO_IS_ENABLED)=g >> lit.tmp
-	@$(ECHOPATH) s=@TARGETS_TO_BUILD@=$(TARGETS_TO_BUILD)=g >> lit.tmp
-	@$(ECHOPATH) s=@LLVM_BINDINGS@=$(BINDINGS_TO_BUILD)=g >> lit.tmp
 	@$(ECHOPATH) s=@HOST_OS@=$(HOST_OS)=g >> lit.tmp
 	@$(ECHOPATH) s=@HOST_ARCH@=$(HOST_ARCH)=g >> lit.tmp
 	@$(ECHOPATH) s=@PROJ_SOURCE_DIR@=$(PROJ_SRC_ROOT)=g >> lit.tmp
 	@$(ECHOPATH) s=@PROJ_BINARY_DIR@=$(PROJ_OBJ_ROOT)=g >> lit.tmp
+	@$(ECHOPATH) s=@PROJ_SHLIB_DIR@=$(SharedLibDir)=g >> lit.tmp
 	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
 	@-rm -f lit.tmp
