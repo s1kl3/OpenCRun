@@ -19,6 +19,7 @@ export OPENCRUN_PREFIX_LLVM=$(LLVM_OBJ_ROOT)/$(BuildMode)
 export OPENCRUN_PREFIX=$(PROJ_OBJ_ROOT)/$(BuildMode)
 
 # Define CXX.Flags after including rules.
-CXX.Flags += -Wno-cast-qual $(RPATH) -Wl,$(SharedLibDir)
+CXX.Flags += -Wno-cast-qual
+LD.Flags += $(RPATH) -Wl,$(SharedLibDir)
 
 LIBS += -lOpenCRun
