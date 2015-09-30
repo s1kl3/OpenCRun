@@ -1,4 +1,5 @@
-#define DEBUG_TYPE "automatic-local-variables"
+#include "CPUPasses.h"
+
 #include "opencrun/Util/ModuleInfo.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -14,11 +15,9 @@
 #include <iterator>
 #include <algorithm>
 
-using namespace opencrun;
+#define DEBUG_TYPE "automatic-local-variables"
 
-namespace opencrun {
-llvm::Pass *createAutomaticLocalVariablesPass();
-}
+using namespace opencrun;
 
 namespace {
 
@@ -694,7 +693,7 @@ bool AutomaticLocalVariables::runOnModule(llvm::Module &M) {
   return !ModifiedFunctions.empty();
 }
 
-llvm::Pass *opencrun::createAutomaticLocalVariablesPass() {
+llvm::Pass *opencrun::cpu::createAutomaticLocalVariablesPass() {
   return new AutomaticLocalVariables();
 }
 

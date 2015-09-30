@@ -8,10 +8,9 @@ class Pass;
 }
 
 namespace opencrun {
-llvm::Pass *createAutomaticLocalVariablesPass();
-
 namespace cpu {
 
+llvm::Pass *createAutomaticLocalVariablesPass();
 llvm::Pass *createGroupParallelStubPass(llvm::StringRef Name = "");
 
 }
