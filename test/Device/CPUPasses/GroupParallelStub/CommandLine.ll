@@ -7,15 +7,17 @@
 
 declare void @__builtin_ocl_barrier(i64);
 
-define void @foo() nounwind {
+define void @foo() #0 {
 entry:
   ret void
 }
 
-define void @bar() nounwind {
+define void @bar() #0 {
 entry:
   ret void
 }
+
+attributes #0 = { nounwind }
 
 ; CHECK:      define void @_GroupParallelStub_foo(i8** %args) {
 ; CHECK-NEXT: entry:
@@ -26,14 +28,7 @@ entry:
 
 ; CHECK-NOT: define void @_GroupParallelStub_bar(i8** %args)
 
-!opencl.kernels = !{!0, !2}
-!opencl.global_address_space = !{!3}
-!opencl.local_address_space = !{!4}
-!opencl.constant_address_space = !{!5}
+!opencl.kernels = !{!0, !1}
 
-!0 = metadata !{void ()* @foo, metadata !1}
-!1 = metadata !{}
-!2 = metadata !{void ()* @bar, metadata !1}
-!3 = metadata !{i32 16776960}
-!4 = metadata !{i32 16776961}
-!5 = metadata !{i32 16776962}
+!0 = !{void ()* @foo}
+!1 = !{void ()* @bar}
