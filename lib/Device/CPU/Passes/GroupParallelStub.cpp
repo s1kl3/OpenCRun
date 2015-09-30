@@ -1,10 +1,9 @@
 
-#include "opencrun/Device/CPUPasses/AllPasses.h"
+#include "CPUPasses.h"
+
 #include "opencrun/Util/BuiltinInfo.h"
 #include "opencrun/Util/ModuleInfo.h"
 #include "opencrun/Util/PassOptions.h"
-
-#define DEBUG_TYPE "CPU-group-parallel-stub"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Constants.h"
@@ -12,6 +11,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+
+#define DEBUG_TYPE "CPU-group-parallel-stub"
 
 using namespace opencrun;
 
@@ -168,6 +169,6 @@ static llvm::RegisterPass<GroupParallelStub> X("cpu-group-parallel-stub",
                                                "Create kernel stub for "
                                                "cpu group parallel scheduler");
 
-llvm::Pass *opencrun::CreateGroupParallelStubPass(llvm::StringRef Kernel) {
+llvm::Pass *opencrun::cpu::createGroupParallelStubPass(llvm::StringRef Kernel) {
   return new GroupParallelStub(Kernel);
 }

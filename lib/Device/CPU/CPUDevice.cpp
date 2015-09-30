@@ -2,12 +2,12 @@
 #include "CPUDevice.h"
 #include "CPUCompiler.h"
 #include "CPUKernelInfo.h"
+#include "CPUPasses.h"
 #include "InternalCalls.h"
 
 #include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/Core/Platform.h"
-#include "opencrun/Device/CPUPasses/AllPasses.h"
 #include "opencrun/Device/Devices.h"
 #include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
@@ -761,7 +761,7 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   // Build the entry point and optimize.
   llvm::legacy::PassManager PM;
   PM.add(Inliner);
-  PM.add(CreateGroupParallelStubPass(KernName));
+  PM.add(createGroupParallelStubPass(KernName));
   PM.run(Mod);
 
   // Check whether there was a problem at inline time.

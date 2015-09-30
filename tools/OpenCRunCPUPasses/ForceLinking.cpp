@@ -1,7 +1,7 @@
 
-#include "opencrun/Device/CPUPasses/AllPasses.h"
+#include "../../lib/Device/CPU/CPUPasses.h"
 
-using namespace opencrun;
+#include <cstdlib>
 
 namespace {
 

@@ -1,6 +1,5 @@
 #include "CPUCompiler.h"
-
-#include "opencrun/Device/CPUPasses/AllPasses.h"
+#include "CPUPasses.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
