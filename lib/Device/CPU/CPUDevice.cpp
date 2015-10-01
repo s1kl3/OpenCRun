@@ -167,8 +167,6 @@ bool CPUDevice::Submit(Command &Cmd) {
 }
 
 void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
-  // TODO: modules must be ref-counted -- unregister a kernel does not
-  // necessary enforce module unloading?
   llvm::sys::ScopedLock Lock(ThisLock);
 
   // Erase kernel from the cache.
@@ -176,6 +174,11 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   BlockParallelStaticLocalsCache.erase(&Kern);
   BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
+
+  llvm::Module &Mod = *Kern.getFunction(this)->getParent();
+  llvm::StringRef KernName = Kern.getFunction(this)->getName();
+  auto *Stub = Mod.getFunction(MangleBlockParallelKernelName(KernName));
+  getCompilerAs<CPUCompiler>().removeKernel(Stub);
 }
 
 void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
@@ -768,21 +771,11 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   if(!Inliner->IsAllInlined())
     return NULL;
 
-  // Retrieve it.
-  std::string EntryName = MangleBlockParallelKernelName(KernName);
+  auto *Stub = Mod.getFunction(MangleBlockParallelKernelName(KernName));
+  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(Stub);
 
-  getCompilerAs<CPUCompiler>().addModule(&Mod);
-  void *EntryPtr = getCompilerAs<CPUCompiler>().getSymbolAddr(EntryName);
-
-  // Cache it. In order to correctly cast the EntryPtr to a function pointer we
-  // must pass through a uintptr_t. Otherwise, a warning is issued by the
-  // compiler.
-  uintptr_t EntryPtrInt = reinterpret_cast<uintptr_t>(EntryPtr);
-  CPUDevice::BlockParallelEntryPoint Entry;
-  Entry = reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtrInt);
-  BlockParallelEntriesCache[&KernDesc] = Entry;
-
-  return Entry;
+  return BlockParallelEntriesCache[&KernDesc] =
+            reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtr);
 }
 
 unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc) {

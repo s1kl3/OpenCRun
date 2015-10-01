@@ -9,6 +9,7 @@
 #include "llvm/ExecutionEngine/Orc/LazyEmittingLayer.h"
 
 namespace llvm {
+class Function;
 class TargetMachine;
 }
 
@@ -16,32 +17,34 @@ namespace opencrun {
 namespace cpu {
 
 class JITCompiler {
-public:
+private:
   using ObjectLayerT = llvm::orc::ObjectLinkingLayer<>;
   using IRCompileLayerT = llvm::orc::IRCompileLayer<ObjectLayerT>;
 
-  using ModuleHandleT = IRCompileLayerT::ModuleSetHandleT;
+  using KernelModuleHandleT = IRCompileLayerT::ModuleSetHandleT;
 
 public:
   JITCompiler(llvm::TargetMachine &TM)
    : TM(TM), CompileLayer(ObjLayer, llvm::orc::SimpleCompiler(TM)) {}
 
-  void addModule(llvm::Module *M);
-  void removeModule(llvm::Module *M);
-
-  llvm::orc::JITSymbol findSymbol(const std::string &Name);
+  void *addKernel(llvm::Function *Kern);
+  void removeKernel(llvm::Function *Kern);
 
   void addSymbolMapping(llvm::StringRef Sym, void *Addr) {
-    SymbolMap[Sym] = Addr;
+    Symbols[Sym] = Addr;
   }
+
+private:
+  llvm::orc::JITSymbol findSymbolForKernel(llvm::Function *Kern,
+                                           const std::string &Name);
 
 private:
   llvm::TargetMachine &TM;
   ObjectLayerT ObjLayer;
   IRCompileLayerT CompileLayer;
 
-  llvm::DenseMap<llvm::Module*, ModuleHandleT> HandleMap;
-  llvm::StringMap<void*> SymbolMap;
+  llvm::DenseMap<llvm::Function *, KernelModuleHandleT> Kernels;
+  llvm::StringMap<void*> Symbols;
 };
 
 class CPUCompiler : public DeviceCompiler {
@@ -49,23 +52,18 @@ public:
   CPUCompiler();
   ~CPUCompiler();
 
-  void addModule(llvm::Module *M) {
+  void *addKernel(llvm::Function *Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);
-    JIT->addModule(M);
+    return JIT->addKernel(Kern);
   }
 
-  void removeModule(llvm::Module *M) {
-    JIT->removeModule(M);
+  void removeKernel(llvm::Function *Kern) {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    JIT->removeKernel(Kern);
   }
 
   void addSymbolMapping(llvm::StringRef Sym, void *Addr) {
     JIT->addSymbolMapping(Sym, Addr);
-  }
-
-  void *getSymbolAddr(const std::string &Name) {
-    if (auto Sym = JIT->findSymbol(Name))
-      return reinterpret_cast<void*>(Sym.getAddress());
-    return nullptr;
   }
 
   void addInitialLoweringPasses(llvm::legacy::PassManager &PM) override;
