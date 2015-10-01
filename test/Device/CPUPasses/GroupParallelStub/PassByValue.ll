@@ -4,8 +4,6 @@
 ; RUN:     -S -o - %s | FileCheck %s
 ; REQUIRES: loadable_module
 
-declare void @__builtin_ocl_barrier(i64);
-
 define void @foo(i32 %a) nounwind {
 entry:
   ret void
@@ -18,7 +16,7 @@ entry:
 ; CHECK-NEXT:   %2 = bitcast i8* %1 to i32*
 ; CHECK-NEXT:   %3 = load i32, i32* %2
 ; CHECK-NEXT:   call void @foo(i32 %3)
-; CHECK-NEXT:   tail call void @__builtin_ocl_barrier(i64 0)
+; CHECK-NEXT:   tail call void @__internal_barrier(i32 0)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

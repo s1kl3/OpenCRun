@@ -69,7 +69,7 @@ private:
 bool GroupParallelStub::runOnModule(llvm::Module &Mod) {
   ModuleInfo Info(Mod);
 
-  Barrier = DeviceBuiltinInfo::getPrototype(Mod, "__builtin_ocl_barrier", "vi");
+  Barrier = DeviceBuiltinInfo::getPrototype(Mod, "__internal_barrier", "vi");
 
   bool Modified = false;
 
