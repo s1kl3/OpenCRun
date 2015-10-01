@@ -9,7 +9,7 @@ entry:
   ret void
 }
 
-; CHECK:      define void @_GroupParallelStub_foo(i8** %args) {
+; CHECK:      define void @foo.stub(i8** %args) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = getelementptr i8*, i8** %args, i32 0
 ; CHECK-NEXT:   %1 = bitcast i8** %0 to i32**
@@ -21,4 +21,5 @@ entry:
 
 !opencl.kernels = !{!0}
 
-!0 = !{void (i32*)* @foo}
+!0 = !{void (i32*)* @foo, !1}
+!1 = !{!"custom_info"}

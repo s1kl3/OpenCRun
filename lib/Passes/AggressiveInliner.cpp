@@ -33,12 +33,11 @@ bool AggressiveInliner::doInitialization(llvm::CallGraph &CG) {
   llvm::SmallPtrSet<const llvm::Function *, 16> Visited;
 
   // First, get the roots of the graph.
-  if(Kernel != "" && Info.hasKernel(Kernel))
-    ToVisit.push_back(Info.getKernelInfo(Kernel).getFunction());
+  if(Kernel != "" && Info.contains(Kernel))
+    ToVisit.push_back(Info.get(Kernel).getFunction());
   else
-    for(ModuleInfo::kernel_info_iterator I = Info.kernel_info_begin(),
-        E = Info.kernel_info_end(); I != E; ++I)
-      ToVisit.push_back(I->getFunction());
+    for(const auto &KI : Info)
+      ToVisit.push_back(KI.getFunction());
 
   // Then, find all reachable functions.
   while(!ToVisit.empty()) {

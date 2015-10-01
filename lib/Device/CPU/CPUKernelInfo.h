@@ -56,6 +56,12 @@ struct CPUKernelInfo : public KernelInfo {
       llvm::mdconst::extract<llvm::ConstantInt>(StructMD->getOperand(1));
     return Cst->getZExtValue();
   }
+
+  llvm::Function *getStub() const {
+    if (llvm::MDNode *MD = getCustomInfo("stub"))
+      return llvm::mdconst::extract<llvm::Function>(MD->getOperand(1));
+    return nullptr;
+  }
 };
 
 }

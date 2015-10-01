@@ -9,7 +9,7 @@ entry:
   ret void
 }
 
-; CHECK:      define void @_GroupParallelStub_foo(i8** %args) {
+; CHECK:      define void @foo.stub(i8** %args) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   call void @foo()
 ; CHECK-NEXT:   tail call void @__internal_barrier(i32 0)
@@ -18,4 +18,5 @@ entry:
 
 !opencl.kernels = !{!0}
 
-!0 = !{void ()* @foo}
+!0 = !{void ()* @foo, !1}
+!1 = !{!"custom_info"}

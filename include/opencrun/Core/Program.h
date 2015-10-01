@@ -55,15 +55,15 @@ private:
 
 class BuildInformation {
 public:
-  typedef ModuleInfo::kernel_info_iterator kernel_info_iterator;
+  typedef ModuleInfo::iterator kernel_info_iterator;
 
 public:
   kernel_info_iterator kernel_begin() {
-    return ModuleInfo(*BitCode).kernel_info_begin();
+    return ModuleInfo(*BitCode).begin();
   }
 
   kernel_info_iterator kernel_end() {
-    return ModuleInfo(*BitCode).kernel_info_end();
+    return ModuleInfo(*BitCode).end();
   }
 
 public:
@@ -103,9 +103,9 @@ public:
       return NULL;
 
     ModuleInfo Info(*BitCode); 
-    kernel_info_iterator I = Info.findKernel(KernName);
+    auto I = Info.find(KernName);
 
-    return I != Info.kernel_info_end() ? *I : NULL;
+    return I != Info.end() ? *I : NULL;
   }
 
   KernelSignature GetKernelSignature(llvm::StringRef KernName) {
@@ -113,9 +113,9 @@ public:
       return NULL;
 
     ModuleInfo Info(*BitCode); 
-    kernel_info_iterator I = Info.findKernel(KernName);
+    auto I = Info.find(KernName);
 
-    return I != Info.kernel_info_end() ? I->getSignature() : NULL;
+    return I != Info.end() ? I->getSignature() : NULL;
   }
 
   llvm::StringRef GetBinary() { return Binary->getBuffer(); }
@@ -128,7 +128,7 @@ public:
   bool HasBitCode() const { return bool(BitCode); }
 
   bool DefineKernel(llvm::StringRef KernName) {
-    return ModuleInfo(*BitCode).hasKernel(KernName);
+    return ModuleInfo(*BitCode).contains(KernName);
   }
 
 private:

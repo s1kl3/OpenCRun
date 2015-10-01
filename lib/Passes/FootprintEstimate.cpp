@@ -18,7 +18,7 @@ bool FootprintEstimate::runOnFunction(llvm::Function &Fun) {
   if (Kernel.size() && Name != Kernel)
     return false;
 
-  if (!ModuleInfo(*Fun.getParent()).hasKernel(Name))
+  if (!ModuleInfo(*Fun.getParent()).contains(Name))
     return false;
 
   for(llvm::inst_iterator I = inst_begin(Fun), E = inst_end(Fun); I != E; ++I)

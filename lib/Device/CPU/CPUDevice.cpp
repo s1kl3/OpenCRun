@@ -175,10 +175,8 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
 
-  llvm::Module &Mod = *Kern.getFunction(this)->getParent();
-  llvm::StringRef KernName = Kern.getFunction(this)->getName();
-  auto *Stub = Mod.getFunction(MangleBlockParallelKernelName(KernName));
-  getCompilerAs<CPUCompiler>().removeKernel(Stub);
+  CPUKernelInfo Info(Kern.getKernelInfo(this));
+  getCompilerAs<CPUCompiler>().removeKernel(Info.getStub());
 }
 
 void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
@@ -771,8 +769,8 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   if(!Inliner->IsAllInlined())
     return NULL;
 
-  auto *Stub = Mod.getFunction(MangleBlockParallelKernelName(KernName));
-  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(Stub);
+  CPUKernelInfo Info(KernDesc.getKernelInfo(this));
+  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(Info.getStub());
 
   return BlockParallelEntriesCache[&KernDesc] =
             reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtr);

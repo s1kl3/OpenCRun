@@ -102,14 +102,6 @@ private:
   void LocateMemoryObjArgAddresses(Kernel &Kern,
                                    GlobalArgMappingsContainer &GlobalArgs);
 
-  std::string MangleBlockParallelKernelName(llvm::StringRef Name) {
-    return MangleKernelName("_GroupParallelStub_", Name);
-  }
-
-  std::string MangleKernelName(llvm::StringRef Prefix, llvm::StringRef Name) {
-    return Prefix.str() + Name.str();
-  }
-
   MemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
 
 private:

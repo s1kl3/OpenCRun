@@ -178,10 +178,7 @@ cl_int Program::CreateKernelsInProgram(cl_uint num_kernels,
     if(!Cur.IsBuilt())
       continue;
 
-    BuildInformation::kernel_info_iterator KI = Cur.kernel_begin(),
-                                           KE = Cur.kernel_end();
-
-    for(; KI != KE; ++KI) {
+    for (auto KI = Cur.kernel_begin(), KE = Cur.kernel_end(); KI != KE; ++KI) {
       llvm::StringRef KernName = KI->getName();
       SignMap[KernName].push_back(std::make_pair(&Dev, *KI));
     }

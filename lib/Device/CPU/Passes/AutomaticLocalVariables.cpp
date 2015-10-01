@@ -344,7 +344,7 @@ AutomaticLocalVariables::getReachableKernels(llvm::Function &F,
           ModifiedFunctions.find(Callee) == ModifiedFunctions.end())
         continue;
 
-      if (ModuleInfo(M).hasKernel(Callee->getName())) {
+      if (ModuleInfo(M).contains(Callee->getName())) {
         isKR = true;
         Tmp_RKSet.insert(Callee);
         Tmp_CInstSet.insert(CInst);
@@ -466,7 +466,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
  
   Module &M = *F.getParent();
   LLVMContext &Ctx = F.getContext();
-  bool isKernel = ModuleInfo(M).hasKernel(F.getName());
+  bool isKernel = ModuleInfo(M).contains(F.getName());
 
   FunctionSet RKSet, Visited;
   getReachableKernels(F, RKSet, CInstSet, Visited);
@@ -508,7 +508,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
     // within the LLVM module, while <sz> is the total size (in bytes) for the
     // structure belonging to the call-chain having F as its root.
     const DataLayout &DL = M.getDataLayout();
-    KernelInfo KI = ModuleInfo(M).getKernelInfo(F.getName());
+    KernelInfo KI = ModuleInfo(M).get(F.getName());
     llvm::MDNode *InfoMD = KI.getCustomInfo();
 
     SmallVector<Metadata *, 8> Info;
@@ -665,12 +665,9 @@ bool AutomaticLocalVariables::runOnModule(llvm::Module &M) {
   // For each kernel function collect the automatic local variables inside
   // a struct data type.
   unsigned Idx = 0;
-  for (ModuleInfo::kernel_info_iterator KI = MI.kernel_info_begin(),
-       KE = MI.kernel_info_end(); KI != KE; ++KI) {
-    Function *Kern = KI->getFunction();
-    if (collectKernelLocals(*Kern))
-      K2IdxMap[Kern] = Idx++;
-  }
+  for (const auto &KI : MI)
+    if (collectKernelLocals(*KI.getFunction()))
+      K2IdxMap[KI.getFunction()] = Idx++;
 
   for (Module::iterator FI = M.begin(), FE = M.end(); FI != FE; ++FI)
     prepareFunctionForLocals(*FI);

@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "CPU-group-parallel-stub"
 
+using namespace llvm;
 using namespace opencrun;
 
 STATISTIC(GroupParallelStubs, "Number of CPU group parallel stubs created");
@@ -37,125 +38,126 @@ namespace {
 ///          |
 ///          +-> a: [ int ]
 //===----------------------------------------------------------------------===//
-class GroupParallelStub : public llvm::ModulePass {
+class GroupParallelStub : public ModulePass {
 public:
   static char ID;
 
 public:
-  GroupParallelStub(llvm::StringRef Kernel = "")
-   : llvm::ModulePass(ID), Kernel(GetKernelOption(Kernel)) {}
+  GroupParallelStub(StringRef Kernel = "")
+   : ModulePass(ID), Kernel(opencrun::GetKernelOption(Kernel)) {}
 
 public:
-  virtual bool runOnModule(llvm::Module &Mod);
+  bool runOnModule(Module &Mod) override;
 
-  virtual const char *getPassName() const {
+  const char *getPassName() const override {
     return "Group parallel stub builder";
   }
 
 private:
-  bool BuildStub(llvm::Function &Kern);
-
-  std::string MangleKernelName(llvm::StringRef Name) {
-    return "_GroupParallelStub_" + Name.str();
-  }
+  bool BuildStub(KernelInfo KI);
 
 private:
   std::string Kernel;
-  llvm::Function *Barrier;
+  Function *Barrier;
 };
 
-} // End anonymous namespace.
+char GroupParallelStub::ID = 0;
 
-bool GroupParallelStub::runOnModule(llvm::Module &Mod) {
+RegisterPass<GroupParallelStub> X(
+  "cpu-group-parallel-stub",
+  "Create kernel stub for cpu group parallel scheduler"
+);
+
+}
+
+bool GroupParallelStub::runOnModule(Module &Mod) {
   ModuleInfo Info(Mod);
 
   Barrier = DeviceBuiltinInfo::getPrototype(Mod, "__internal_barrier", "vi");
 
+  if (!Kernel.empty()) {
+    auto I = Info.find(Kernel);
+    if (I != Info.end())
+      return BuildStub(*I);
+
+    return false;
+  }
+
   bool Modified = false;
 
-  if (Kernel != "")
-    return BuildStub(*Info.getKernelInfo(Kernel).getFunction());
-
-  for(ModuleInfo::kernel_info_iterator I = Info.kernel_info_begin(),
-      E = Info.kernel_info_end(); I != E; ++I)
-    Modified |= BuildStub(*I->getFunction());
+  for (const auto &KI : Info)
+    Modified |= BuildStub(KI);
 
   return Modified;
 }
 
-bool GroupParallelStub::BuildStub(llvm::Function &Kern) {  
-  llvm::Module *Mod = Kern.getParent();
+bool GroupParallelStub::BuildStub(KernelInfo KI) {
+  Function *Kern = KI.getFunction();
+  Module *Mod = Kern->getParent();
   
-  if(!Mod)
+  if (!Mod)
     return false;
 
-  llvm::LLVMContext &Ctx = Mod->getContext();
+  LLVMContext &Ctx = Mod->getContext();
 
   // Make function type.
-  llvm::Type *RetTy = llvm::Type::getVoidTy(Ctx);
-  llvm::Type *Int8PtrTy = llvm::Type::getInt8PtrTy(Ctx);
-  llvm::Type *ArgTy = llvm::PointerType::getUnqual(Int8PtrTy);
-  llvm::FunctionType *StubTy = llvm::FunctionType::get(RetTy, ArgTy, false);
+  Type *RetTy = Type::getVoidTy(Ctx);
+  Type *Int8PtrTy = Type::getInt8PtrTy(Ctx);
+  Type *ArgTy = PointerType::getUnqual(Int8PtrTy);
+  FunctionType *StubTy = FunctionType::get(RetTy, ArgTy, false);
 
   // Create the stub.
-  llvm::Function *Stub;
-  Stub = llvm::Function::Create(StubTy,
-                                llvm::Function::ExternalLinkage,
-                                MangleKernelName(Kern.getName()),
-                                Mod);
+  auto StubName = Kern->getName() + ".stub";
+  auto *Stub = Function::Create(StubTy, Function::ExternalLinkage,
+                                StubName.str(), Mod);
+
+  // Register stub in kernel's metadata.
+  SmallVector<Metadata*, 8> Info;
+  for (auto &MD : KI.getCustomInfo()->operands())
+    Info.push_back(MD.get());
+  Info.push_back(MDNode::get(Ctx, {
+    MDString::get(Ctx, "stub"),
+    ConstantAsMetadata::get(Stub)
+  }));
+  KI.updateCustomInfo(MDNode::get(Ctx, Info));
 
   // Set argument name.
-  llvm::Argument *Arg = Stub->arg_begin();
-  Arg->setName("args");
+  Argument *Args = Stub->arg_begin();
+  Args->setName("args");
 
   // Entry basic block.
-  llvm::BasicBlock *Entry = llvm::BasicBlock::Create(Ctx, "entry", Stub);
+  auto *Entry = BasicBlock::Create(Ctx, "entry", Stub);
 
-  llvm::SmallVector<llvm::Value *, 8> KernArgs;
+  SmallVector<Value *, 8> KernArgs;
 
   // Copy each argument into a local variable.
-  for(llvm::Function::const_arg_iterator I = Kern.arg_begin(),
-                                         E = Kern.arg_end();
-                                         I != E;
-                                         ++I) {
+  for (const auto &Arg : Kern->args()) {
     // Get J-th element address.
-    llvm::Value *J = llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx),
-                                            I->getArgNo());
-    llvm::Value *Addr =
-      llvm::GetElementPtrInst::Create(nullptr, Arg, J, "", Entry);
-
-    // Get its type.
-    llvm::Type *ArgTy = I->getType();
+    auto *J = ConstantInt::get(Type::getInt32Ty(Ctx), Arg.getArgNo());
+    Value *Addr = GetElementPtrInst::Create(nullptr, Args, J, "", Entry);
 
     // If it is passed by value, then we have to do an extra load.
-    if(!ArgTy->isPointerTy())
-      Addr = new llvm::LoadInst(Addr, "", Entry);
+    if (!Arg.getType()->isPointerTy())
+      Addr = new LoadInst(Addr, "", Entry);
 
     // Cast to the appropriate type.
-    llvm::Type *ArgPtrTy = llvm::PointerType::getUnqual(I->getType());
-    llvm::CastInst *CastedAddr = llvm::CastInst::CreatePointerCast(Addr,
-                                                                   ArgPtrTy,
-                                                                   "",
-                                                                   Entry);
+    auto *ArgPtrTy = PointerType::getUnqual(Arg.getType());
+    auto *CastedAddr = CastInst::CreatePointerCast(Addr, ArgPtrTy, "", Entry);
 
     // Load argument.
-    KernArgs.push_back(new llvm::LoadInst(CastedAddr, "", Entry));
+    KernArgs.push_back(new LoadInst(CastedAddr, "", Entry));
   }
 
   // Call the kernel.
-  llvm::CallInst::Create(&Kern, KernArgs, "", Entry);
+  CallInst::Create(Kern, KernArgs, "", Entry);
 
   // Call the implicit barrier.
-  llvm::Value *Flag = llvm::ConstantInt::get(Barrier->arg_begin()->getType(), 0);
-  llvm::CallInst *BarrierCall;
-  BarrierCall = llvm::CallInst::Create(Barrier,
-                                       Flag,
-                                       "",
-                                       Entry);
+  auto *Flag = ConstantInt::get(Barrier->arg_begin()->getType(), 0);
+  auto *BarrierCall = CallInst::Create(Barrier, Flag, "", Entry);
   BarrierCall->setTailCall();
 
   // End stub.
-  llvm::ReturnInst::Create(Ctx, Entry);
+  ReturnInst::Create(Ctx, Entry);
 
   // Update statistics.
   ++GroupParallelStubs;
@@ -163,12 +165,6 @@ bool GroupParallelStub::BuildStub(llvm::Function &Kern) {
   return true;
 }
 
-char GroupParallelStub::ID = 0;
-
-static llvm::RegisterPass<GroupParallelStub> X("cpu-group-parallel-stub",
-                                               "Create kernel stub for "
-                                               "cpu group parallel scheduler");
-
-llvm::Pass *opencrun::cpu::createGroupParallelStubPass(llvm::StringRef Kernel) {
+Pass *opencrun::cpu::createGroupParallelStubPass(StringRef Kernel) {
   return new GroupParallelStub(Kernel);
 }

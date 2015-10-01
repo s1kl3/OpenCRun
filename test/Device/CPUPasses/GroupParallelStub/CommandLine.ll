@@ -17,16 +17,17 @@ entry:
 
 attributes #0 = { nounwind }
 
-; CHECK:      define void @_GroupParallelStub_foo(i8** %args) {
+; CHECK:      define void @foo.stub(i8** %args) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   call void @foo()
 ; CHECK-NEXT:   tail call void @__internal_barrier(i32 0)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK-NOT: define void @_GroupParallelStub_bar(i8** %args)
+; CHECK-NOT: define void @bar.stub(i8** %args)
 
 !opencl.kernels = !{!0, !1}
 
-!0 = !{void ()* @foo}
-!1 = !{void ()* @bar}
+!0 = !{void ()* @foo, !2}
+!1 = !{void ()* @bar, !2}
+!2 = !{!"custom_info"}

@@ -66,12 +66,22 @@ llvm::MDNode *KernelInfo::getKernelArgInfo(llvm::StringRef Name) const {
   return 0;
 }
 
-ModuleInfo::kernel_info_iterator
-ModuleInfo::findKernel(llvm::StringRef Name) const {
-  kernel_info_iterator I = kernel_info_begin(),
-                       E = kernel_info_end();
-  for (; I != E; ++I)
+void KernelInfo::updateCustomInfo(llvm::MDNode *CMD) {
+  assert(CMD);
+
+  unsigned Idx = 0;
+  for (; Idx < MD->getNumOperands(); ++Idx)
+    if (MD->getOperand(Idx).get() == CustomInfoMD)
+      break;
+
+  assert(Idx < MD->getNumOperands());
+  MD->replaceOperandWith(Idx, CMD);
+  CustomInfoMD = CMD;
+}
+
+ModuleInfo::iterator ModuleInfo::find(llvm::StringRef Name) const {
+  for (auto I = begin(), E = end(); I != E; ++I)
     if (I->getName() == Name)
       return I;
-  return E;
+  return end();
 }

@@ -131,6 +131,8 @@ public:
   llvm::MDNode *getKernelInfo() const { return MD; }
   llvm::MDNode *getCustomInfo() const { return CustomInfoMD; }
 
+  void updateCustomInfo(llvm::MDNode *CMD);
+
 protected:
   llvm::MDNode *getCustomInfo(llvm::StringRef Name) const;
 
@@ -147,7 +149,7 @@ private:
 
 class ModuleInfo {
 public:
-  class kernel_info_iterator {
+  class iterator {
   public:
     typedef const KernelInfo value_type;
     typedef ptrdiff_t difference_type;
@@ -156,16 +158,17 @@ public:
     typedef std::forward_iterator_tag iterator_category;
   
   public:
-    kernel_info_iterator(llvm::NamedMDNode *Kernels, bool Sentinel = false)
+    iterator(llvm::NamedMDNode *Kernels, bool Sentinel = false)
      : KernelsMD(Kernels),
        CurIdx(Kernels && Sentinel ? Kernels->getNumOperands() : 0) {
       updateKernelInfo();
     }
 
-    bool operator==(const kernel_info_iterator &I) const {
+    bool operator==(const iterator &I) const {
       return KernelsMD == I.KernelsMD && CurIdx == I.CurIdx;
     }
-    bool operator!=(const kernel_info_iterator &I) const {
+
+    bool operator!=(const iterator &I) const {
       return !(*this == I);
     }
 
@@ -177,13 +180,13 @@ public:
       return &CurInfo;
     }
 
-    kernel_info_iterator &operator++() {
+    iterator &operator++() {
       advance();
       return *this;
     }
 
-    kernel_info_iterator operator++(int Ign) {
-      kernel_info_iterator That = *this;
+    iterator operator++(int Ign) {
+      iterator That = *this;
       ++*this;
       return That;
     }
@@ -209,24 +212,23 @@ public:
 public:
   ModuleInfo(llvm::Module &M) : Mod(M) {}
 
-  kernel_info_iterator kernel_info_begin() const {
-    return kernel_info_iterator(Mod.getNamedMetadata("opencl.kernels"));
+  iterator begin() const {
+    return iterator(Mod.getNamedMetadata("opencl.kernels"));
   }
 
-  kernel_info_iterator kernel_info_end() const {
-    return kernel_info_iterator(Mod.getNamedMetadata("opencl.kernels"), true);
+  iterator end() const {
+    return iterator(Mod.getNamedMetadata("opencl.kernels"), true);
   }
 
-  kernel_info_iterator findKernel(llvm::StringRef Name) const;
+  iterator find(llvm::StringRef Name) const;
 
-  bool hasKernel(llvm::StringRef Name) const {
-    return findKernel(Name) != kernel_info_end();
+  bool contains(llvm::StringRef Name) const {
+    return find(Name) != end();
   }
 
-  KernelInfo getKernelInfo(llvm::StringRef Name) const {
-    kernel_info_iterator I = findKernel(Name);
-    assert(I != kernel_info_end());
-    return *I;
+  KernelInfo get(llvm::StringRef Name) const {
+    assert(contains(Name));
+    return *find(Name);
   }
 
 private:
