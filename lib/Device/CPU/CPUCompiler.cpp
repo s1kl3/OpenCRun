@@ -90,12 +90,9 @@ CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
                                           llvm::CodeGenOpt::None));
 
   JIT = llvm::make_unique<JITCompiler>(*TM);
-  JIT->addModule(Builtins.get());
 }
 
-CPUCompiler::~CPUCompiler() {
-  JIT->removeModule(Builtins.get());
-}
+CPUCompiler::~CPUCompiler() {}
 
 void CPUCompiler::addInitialLoweringPasses(llvm::legacy::PassManager &PM) {
   PM.add(createAutomaticLocalVariablesPass());
