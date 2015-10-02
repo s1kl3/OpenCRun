@@ -9,7 +9,6 @@
 #include "opencrun/Core/Event.h"
 #include "opencrun/Core/Platform.h"
 #include "opencrun/Device/Devices.h"
-#include "opencrun/Passes/AggressiveInliner.h"
 #include "opencrun/Passes/AllPasses.h"
 #include "opencrun/Util/BuiltinInfo.h"
 
@@ -175,8 +174,7 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
 
-  CPUKernelInfo Info(Kern.getKernelInfo(this));
-  getCompilerAs<CPUCompiler>().removeKernel(Info.getStub());
+  getCompilerAs<CPUCompiler>().removeKernel(Kern.getFunction(this));
 }
 
 void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
@@ -747,30 +745,8 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
     return I->second;
 
   // Cache miss.
-  llvm::Module &Mod = *KernDesc.getFunction(this)->getParent();
-  llvm::StringRef KernName = KernDesc.getFunction(this)->getName();
-
-  // Link opencrunCPULib.bc with kernel module.
-  llvm::Linker::LinkModules(&Mod,
-                            &(*BitCodeLibrary),
-                            llvm::Linker::PreserveSource,
-                            NULL);
-
-  // The aggressive inliner cache info about call graph shape.
-  AggressiveInliner *Inliner = CreateAggressiveInlinerPass(KernName);
-
-  // Build the entry point and optimize.
-  llvm::legacy::PassManager PM;
-  PM.add(Inliner);
-  PM.add(createGroupParallelStubPass(KernName));
-  PM.run(Mod);
-
-  // Check whether there was a problem at inline time.
-  if(!Inliner->IsAllInlined())
-    return NULL;
-
-  CPUKernelInfo Info(KernDesc.getKernelInfo(this));
-  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(Info.getStub());
+  auto *KernFn = KernDesc.getFunction(this);
+  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(KernFn);
 
   return BlockParallelEntriesCache[&KernDesc] =
             reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtr);

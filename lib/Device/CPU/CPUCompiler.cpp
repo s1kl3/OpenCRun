@@ -1,4 +1,5 @@
 #include "CPUCompiler.h"
+#include "CPUKernelInfo.h"
 #include "CPUPasses.h"
 
 #include "opencrun/Util/ModuleInfo.h"
@@ -158,6 +159,10 @@ void *JITCompiler::addKernel(llvm::Function *Kern) {
 
   auto M = extractKernelModule(Kern);
 
+  llvm::legacy::PassManager PM;
+  PM.add(createGroupParallelStubPass(Kern->getName()));
+  PM.run(*M);
+
   auto Resolver = llvm::orc::createLambdaResolver(
     [this, Kern](const std::string &Name) {
       auto Sym = findSymbolForKernel(Kern, Name);
@@ -178,11 +183,16 @@ void *JITCompiler::addKernel(llvm::Function *Kern) {
   TM.Options.NoNaNsFPMath = false;
   TM.Options.UnsafeFPMath = false;
 
+  ModuleInfo Info(*M);
+  CPUKernelInfo KI(Info.get(Kern->getName()));
+  auto StubName = KI.getStub()->getName().str();
+
   Kernels[Kern] =
     CompileLayer.addModuleSet(makeSingleton(std::move(M)),
                               llvm::make_unique<llvm::SectionMemoryManager>(),
                               std::move(Resolver));
-  return (void*)findSymbolForKernel(Kern, Kern->getName()).getAddress();
+
+  return (void*)findSymbolForKernel(Kern, StubName).getAddress();
 }
 
 void JITCompiler::removeKernel(llvm::Function *Kern) {
