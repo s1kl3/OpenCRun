@@ -42,6 +42,36 @@ TYPED_TEST_P(LocalMemoryTest, ByAPI) {
     EXPECT_EQ(3 - I, HostOut[I]);
 }
 
-REGISTER_TYPED_TEST_CASE_P(LocalMemoryTest, ByAPI);
+TYPED_TEST_P(LocalMemoryTest, ByKernel) {
+  // This syntax force zeroing all elements of HostOut.
+  cl_uint HostOut[4] = { 0 };
+
+  cl::Buffer Out = this->AllocReturnBuffer(4 * sizeof(cl_uint));
+
+  const char *Src = "kernel void butterfly(global uint *out) {    \n"
+                    "  uint id = get_global_id(0);                \n"
+                    "                                             \n"
+                    "  local int tmp[4];                          \n"
+                    "  tmp[id] = id;                              \n"
+                    "  barrier(0);                                \n"
+                    "  out[id] = tmp[get_global_size(0) - 1 - id];\n"
+                    "}                                            \n";
+  cl::Kernel Kern = this->BuildKernel("butterfly", Src);
+
+  Kern.setArg(0, Out);
+
+  cl::CommandQueue Queue = this->GetQueue();
+
+  Queue.enqueueNDRangeKernel(Kern,
+                             cl::NullRange,
+                             cl::NDRange(4),
+                             cl::NDRange(4));
+  Queue.enqueueReadBuffer(Out, true, 0, 4 * sizeof(cl_uint), &HostOut);
+
+  for(unsigned I = 0; I < 4; ++I)
+    EXPECT_EQ(3 - I, HostOut[I]);
+}
+
+REGISTER_TYPED_TEST_CASE_P(LocalMemoryTest, ByAPI, ByKernel);
 
 INSTANTIATE_TYPED_TEST_CASE_P(OCLDev, LocalMemoryTest, OCLDevicesType);
