@@ -73,30 +73,6 @@ public:
   void SwitchToNextWorkItem();
 
 private:
-  bool Submit(CPUServiceCommand *Cmd);
-  bool Submit(StopDeviceCPUCommand *Cmd) { Mode = TearDown; return true; }
-
-  bool Submit(CPUExecCommand *Cmd);
-  bool Submit(ReadBufferCPUCommand *Cmd) { return true; }
-  bool Submit(WriteBufferCPUCommand *Cmd) { return true; }
-  bool Submit(CopyBufferCPUCommand *Cmd) { return true; }
-  bool Submit(ReadImageCPUCommand *Cmd) { return true; }
-  bool Submit(WriteImageCPUCommand *Cmd) { return true; }
-  bool Submit(CopyImageCPUCommand *Cmd) { return true; }
-  bool Submit(CopyImageToBufferCPUCommand *Cmd) { return true; }
-  bool Submit(CopyBufferToImageCPUCommand *Cmd) { return true; }
-  bool Submit(MapBufferCPUCommand *Cmd) { return true; }
-  bool Submit(MapImageCPUCommand *Cmd) { return true; }
-  bool Submit(UnmapMemObjectCPUCommand *Cmd) { return true; }
-  bool Submit(ReadBufferRectCPUCommand *Cmd) { return true; }
-  bool Submit(WriteBufferRectCPUCommand *Cmd) { return true; }
-  bool Submit(CopyBufferRectCPUCommand *Cmd) { return true; }
-  bool Submit(FillBufferCPUCommand *Cmd) { return true; }
-  bool Submit(FillImageCPUCommand *Cmd) { return true; }
-  bool Submit(NoOpCPUCommand *Cmd) { return true; }
-  bool Submit(NDRangeKernelBlockCPUCommand *Cmd) { return true; }
-  bool Submit(NativeKernelCPUCommand *Cmd) { return true; }
-
   void Execute(CPUCommand *Cmd);
 
   void Execute(CPUServiceCommand *Cmd);

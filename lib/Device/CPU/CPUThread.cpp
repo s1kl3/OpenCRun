@@ -198,26 +198,43 @@ CPUThread::~CPUThread() {
 }
 
 bool CPUThread::Submit(CPUCommand *Cmd) {
-  bool Enqueued;
-
   sys::ScopedMonitor Mnt(ThisMnt);
 
   if(Mode & NoNewJobs)
     return false;
 
-  if(CPUServiceCommand *Enq = llvm::dyn_cast<CPUServiceCommand>(Cmd))
-    Enqueued = Submit(Enq);
-  else if(CPUExecCommand *Enq = llvm::dyn_cast<CPUExecCommand>(Cmd))
-    Enqueued = Submit(Enq);
-  else
-    Enqueued = false;
-
-  if(Enqueued) {
-    Commands.push_back(Cmd);
-    Mnt.Signal();
+  switch (Cmd->GetType()) {
+  default:
+    llvm::report_fatal_error("unknown command submitted");
+  case CPUCommand::StopDevice:
+    Mode = TearDown;
+    break;
+  case CPUCommand::ReadBuffer:
+  case CPUCommand::WriteBuffer:
+  case CPUCommand::CopyBuffer:
+  case CPUCommand::ReadImage:
+  case CPUCommand::WriteImage:
+  case CPUCommand::CopyImage:
+  case CPUCommand::CopyImageToBuffer:
+  case CPUCommand::CopyBufferToImage:
+  case CPUCommand::MapBuffer:
+  case CPUCommand::MapImage:
+  case CPUCommand::UnmapMemObject:
+  case CPUCommand::ReadBufferRect:
+  case CPUCommand::WriteBufferRect:
+  case CPUCommand::CopyBufferRect:
+  case CPUCommand::FillBuffer:
+  case CPUCommand::FillImage:
+  case CPUCommand::NativeKernel:
+  case CPUCommand::NoOp:
+  case CPUCommand::NDRangeKernelBlock:
+    break;
   }
 
-  return Enqueued;
+  Commands.push_back(Cmd);
+  Mnt.Signal();
+
+  return true;
 }
 
 void CPUThread::Run() {
@@ -251,98 +268,6 @@ void CPUThread::SwitchToNextWorkItem() {
     Cur = Begin;
 
   Stack.SwitchToNextWorkItem();
-}
-
-bool CPUThread::Submit(CPUServiceCommand *Cmd) {
-  if(StopDeviceCPUCommand *Enq = llvm::dyn_cast<StopDeviceCPUCommand>(Cmd))
-    return Submit(Enq);
-
-  else
-    llvm::report_fatal_error("unknown command submitted");
-
-  return false;
-}
-
-bool CPUThread::Submit(CPUExecCommand *Cmd) {
-  if(ReadBufferCPUCommand *Read = llvm::dyn_cast<ReadBufferCPUCommand>(Cmd))
-    return Submit(Read);
-
-  else if(WriteBufferCPUCommand *Write =
-            llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
-    return Submit(Write);
-  
-  else if(CopyBufferCPUCommand *Copy =
-            llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
-    return Submit(Copy);
-
-  else if(ReadImageCPUCommand *ReadImg = 
-            llvm::dyn_cast<ReadImageCPUCommand>(Cmd))
-    return Submit(ReadImg);
-
-  else if(WriteImageCPUCommand *WriteImg = 
-            llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
-    return Submit(WriteImg);
-
-  else if(CopyImageCPUCommand *CopyImg = 
-            llvm::dyn_cast<CopyImageCPUCommand>(Cmd))
-    return Submit(CopyImg);
-
-  else if(CopyImageToBufferCPUCommand *CopyImgToBuf = 
-            llvm::dyn_cast<CopyImageToBufferCPUCommand>(Cmd))
-    return Submit(CopyImgToBuf);
-
-  else if(CopyBufferToImageCPUCommand *CopyBufToImg = 
-            llvm::dyn_cast<CopyBufferToImageCPUCommand>(Cmd))
-    return Submit(CopyBufToImg);
-
-  else if(MapBufferCPUCommand *MapBuf =
-            llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
-    return Submit(MapBuf);
-  
-  else if(MapImageCPUCommand *MapImg =
-            llvm::dyn_cast<MapImageCPUCommand>(Cmd))
-    return Submit(MapImg);
-
-  else if(UnmapMemObjectCPUCommand *Unmap =
-            llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
-    return Submit(Unmap);
-  
-  else if(ReadBufferRectCPUCommand *ReadRect =
-            llvm::dyn_cast<ReadBufferRectCPUCommand>(Cmd))
-    return Submit(ReadRect);
-  
-  else if(WriteBufferRectCPUCommand *WriteRect =
-            llvm::dyn_cast<WriteBufferRectCPUCommand>(Cmd))
-    return Submit(WriteRect);
-  
-  else if(CopyBufferRectCPUCommand *CopyRect =
-            llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
-    return Submit(CopyRect);
-  
-  else if(FillBufferCPUCommand *FillBuf =
-            llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
-    return Submit(FillBuf);
-  
-  else if(FillImageCPUCommand *FillImg =
-            llvm::dyn_cast<FillImageCPUCommand>(Cmd))
-    return Submit(FillImg);
-  
-  else if(NDRangeKernelBlockCPUCommand *NDBlock =
-            llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
-    return Submit(NDBlock);
-
-  else if(NativeKernelCPUCommand *Native =
-            llvm::dyn_cast<NativeKernelCPUCommand>(Cmd))
-    return Submit(Native);
-
-  else if(NoOpCPUCommand *NoOp =
-            llvm::dyn_cast<NoOpCPUCommand>(Cmd))
-    return Submit(NoOp);
-
-  else
-    llvm::report_fatal_error("unknown command submitted");
-
-  return false;
 }
 
 void CPUThread::Execute(CPUCommand *Cmd) {
