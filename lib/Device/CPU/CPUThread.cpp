@@ -1,6 +1,6 @@
 
 #include "CPUThread.h"
-#include "Multiprocessor.h"
+#include "CPUDevice.h"
 
 #include "opencrun/Core/Event.h"
 #include "opencrun/System/OS.h"
@@ -179,10 +179,10 @@ void ExecutionStack::Dump(void *StartAddr, void *EndAddr) const {
 // CPUThread implementation.
 //
 
-CPUThread::CPUThread(Multiprocessor &MP, const sys::HardwareCPU &CPU) :
+CPUThread::CPUThread(CPUDevice &Dev, const sys::HardwareCPU &CPU) :
   Thread(CPU),
   Mode(FullyOperational),
-  MP(MP),
+  Dev(Dev),
   Stack(*CPU.GetFirstLevelCache()),
   Local(*CPU.GetFirstLevelCache()) {
   Start();
@@ -282,7 +282,7 @@ void CPUThread::Execute(CPUServiceCommand *Cmd) {
             llvm::dyn_cast<StopDeviceCPUCommand>(Cmd))
     Execute(OnFly);
 
-  MP.NotifyDone(Cmd);
+  Dev.NotifyDone(Cmd);
 }
 
 void CPUThread::Execute(CPUExecCommand *Cmd) {
@@ -382,7 +382,7 @@ void CPUThread::Execute(CPUExecCommand *Cmd) {
   else
     ExitStatus = CPUCommand::Unsupported;
   
-  MP.NotifyDone(Cmd, ExitStatus);
+  Dev.NotifyDone(Cmd, ExitStatus);
 }
 
 int CPUThread::Execute(ReadBufferCPUCommand &Cmd) {

@@ -2,6 +2,7 @@
 #include "CPUDevice.h"
 #include "CPUCompiler.h"
 #include "CPUPasses.h"
+#include "CPUThread.h"
 #include "InternalCalls.h"
 
 #include "opencrun/Core/CommandQueue.h"
@@ -21,6 +22,8 @@
 #include "llvm/Support/ThreadLocal.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
+
+#include <limits>
 
 using namespace opencrun;
 using namespace opencrun::cpu;
@@ -68,29 +71,32 @@ void CPUMemoryDescriptor::unmap() {
 // CPUDevice implementation.
 //
 
-CPUDevice::CPUDevice(const sys::HardwareMachine &Machine) :
-  Device(CPUType, "CPU"), Machine(Machine) {
-  HardwareCPUsContainer CPUs;
-  for(auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
-    CPUs.insert(&*I);
+CPUDevice::CPUDevice(const sys::HardwareMachine &Machine)
+ : Device(CPUType, "CPU"), Machine(Machine) {
+  for (auto I = Machine.cpu_begin(), E = Machine.cpu_end(); I != E; ++I)
+    HWCPUs.push_back(&*I);
 
   InitDeviceInfo();
-  InitSubDeviceInfo(CPUs);
-
-  InitMultiprocessors();
+  InitSubDeviceInfo();
+  InitThreads();
   InitCompiler();
 }
 
 CPUDevice::CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
-                     const HardwareCPUsContainer &CPUs) :
-  Device(Parent, Part), Machine(Parent.GetHardwareMachine()) {
-  InitSubDeviceInfo(CPUs);
-  InitMultiprocessors(CPUs);
+                     llvm::ArrayRef<const sys::HardwareCPU*> CPUs)
+ : Device(Parent, Part), Machine(Parent.Machine),
+   HWCPUs(CPUs.begin(), CPUs.end()) {
+  InitSubDeviceInfo();
+  InitThreads();
   InitCompiler();
 }
 
-CPUDevice::~CPUDevice() {
-  DestroyMultiprocessors();
+CPUDevice::~CPUDevice() {}
+
+void CPUDevice::InitThreads() {
+  Threads.reserve(HWCPUs.size());
+  for (auto *CPU : HWCPUs)
+    Threads.push_back(llvm::make_unique<CPUThread>(*this, *CPU));
 }
 
 bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
@@ -405,10 +411,10 @@ void CPUDevice::InitDeviceInfo() {
   PrivateMemorySize = LocalMemorySize;
 }
 
-void CPUDevice::InitSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
-  assert(!CPUs.empty());
+void CPUDevice::InitSubDeviceInfo() {
+  assert(!HWCPUs.empty());
 
-  MaxComputeUnits = CPUs.size();
+  MaxComputeUnits = HWCPUs.size();
   MaxSubDevices = MaxComputeUnits;
   SupportedPartitionTypes.clear();
 
@@ -420,7 +426,7 @@ void CPUDevice::InitSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
   std::set<const void*> Nodes;
   std::vector<std::set<const void*>> Caches(4);
 
-  for (auto *C : CPUs) {
+  for (auto *C : HWCPUs) {
     if (auto *NUMANode = C->GetNUMANode())
       Nodes.insert(NUMANode);
 
@@ -463,165 +469,117 @@ void CPUDevice::InitCompiler() {
   #undef INTERNAL_CALL
 }
 
-void CPUDevice::InitMultiprocessors() {
-  for (auto I = Machine.socket_begin(), E = Machine.socket_end(); I != E; ++I)
-    Multiprocessors.insert(new Multiprocessor(*this, *I));
-}
-
-void CPUDevice::InitMultiprocessors(const HardwareCPUsContainer &CPUs) {
-  Multiprocessors.insert(new Multiprocessor(*this, CPUs));
-}
-
-void CPUDevice::DestroyMultiprocessors() {
-  llvm::DeleteContainerPointers(Multiprocessors);
-}
-
-void CPUDevice::GetPinnedCPUs(HardwareCPUsContainer &CPUs) const {
-  for(MultiprocessorsContainer::iterator I = Multiprocessors.begin(),
-                                         E = Multiprocessors.end();
-                                         I != E;
-                                         ++I)
-    (*I)->GetPinnedCPUs(CPUs);
-}
-
 MemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {
   return Obj.getDescriptorFor(*this);
 }
 
-bool CPUDevice::Submit(EnqueueReadBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
+CPUThread &CPUDevice::pickThread() {
+  // FIXME: maybe this is a too much dumb policy.
+  return *Threads.front();
+}
 
+CPUThread &CPUDevice::pickLeastLoadedThread() {
+  float MinLoad = std::numeric_limits<float>::max();
+
+  CPUThread *Thr = nullptr;
+
+  for (const auto &T : Threads) {
+    float CurLoad = T->GetLoadIndicator();
+    if (CurLoad < MinLoad) {
+      Thr = T.get();
+      MinLoad = CurLoad;
+    }
+  }
+
+  return *Thr;
+}
+
+bool CPUDevice::Submit(EnqueueReadBuffer &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return MP.Submit(new ReadBufferCPUCommand(Cmd, SrcPtr));
+  return pickThread().Submit(new ReadBufferCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new WriteBufferCPUCommand(Cmd, TgtPtr));
+  return pickThread().Submit(new WriteBufferCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new CopyBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().Submit(new CopyBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueReadImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return MP.Submit(new ReadImageCPUCommand(Cmd, SrcPtr));
+  return pickThread().Submit(new ReadImageCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new WriteImageCPUCommand(Cmd, TgtPtr));
+  return pickThread().Submit(new WriteImageCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new CopyImageCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().Submit(new CopyImageCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyImageToBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new CopyImageToBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().Submit(new CopyImageToBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferToImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new CopyBufferToImageCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().Submit(new CopyBufferToImageCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   // FIXME: Map operations are no-op!
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return MP.Submit(new MapBufferCPUCommand(Cmd, SrcPtr));
+  return pickThread().Submit(new MapBufferCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueMapImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   // FIXME: Map operations are no-op!
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return MP.Submit(new MapImageCPUCommand(Cmd, SrcPtr));
+  return pickThread().Submit(new MapImageCPUCommand(Cmd, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   // FIXME: Unmap operations are no-op!
   void *DataPtr = getMemoryDescriptor(Cmd.GetMemObj()).ptr();
-  return MP.Submit(new UnmapMemObjectCPUCommand(Cmd, DataPtr, Cmd.GetMappedPtr()));
+  return pickThread().Submit(new UnmapMemObjectCPUCommand(Cmd, DataPtr, Cmd.GetMappedPtr()));
 }
 
 bool CPUDevice::Submit(EnqueueReadBufferRect &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return MP.Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), SrcPtr));
+  return pickThread().Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueWriteBufferRect &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new WriteBufferRectCPUCommand(Cmd, TgtPtr, Cmd.GetSource()));
+  return pickThread().Submit(new WriteBufferRectCPUCommand(Cmd, TgtPtr, Cmd.GetSource()));
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferRect &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new CopyBufferRectCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().Submit(new CopyBufferRectCPUCommand(Cmd, TgtPtr, SrcPtr));
 }
 
 bool CPUDevice::Submit(EnqueueFillBuffer &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new FillBufferCPUCommand(Cmd, TgtPtr));
+  return pickThread().Submit(new FillBufferCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return MP.Submit(new FillImageCPUCommand(Cmd, TgtPtr));
+  return pickThread().Submit(new FillImageCPUCommand(Cmd, TgtPtr));
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
@@ -634,9 +592,6 @@ bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
 }
 
 bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-
   auto Base = reinterpret_cast<uintptr_t>(Cmd.GetArgumentsPointer());
 
   // Patching arguments buffer copy.
@@ -645,19 +600,15 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
     *Addr = getMemoryDescriptor(*P.second).ptr();
   }
 
-  return MP.Submit(new NativeKernelCPUCommand(Cmd));
+  return pickThread().Submit(new NativeKernelCPUCommand(Cmd));
 }
 
 bool CPUDevice::Submit(EnqueueMarker &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-  return MP.Submit(new NoOpCPUCommand(Cmd));
+  return pickThread().Submit(new NoOpCPUCommand(Cmd));
 }
 
 bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
-  // TODO: implement a smarter selection policy.
-  Multiprocessor &MP = **Multiprocessors.begin();
-  return MP.Submit(new NoOpCPUCommand(Cmd));
+  return pickThread().Submit(new NoOpCPUCommand(Cmd));
 }
 
 bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
@@ -681,7 +632,7 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   unsigned AutoLocalsSize = Cmplr.getAutomaticLocalsSize(Kern);
 
   // Decide the work group size.
-  if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
+  if (!Cmd.IsLocalWorkGroupSizeSpecified()) {
     llvm::SmallVector<size_t, 4> Sizes;
 
     for(unsigned I = 0; I < DimInfo.GetDimensions(); ++I)
@@ -694,32 +645,16 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   llvm::IntrusiveRefCntPtr<CPUCommand::ResultRecorder> Result;
   Result = new CPUCommand::ResultRecorder(Cmd.GetWorkGroupsCount());
 
-  MultiprocessorsContainer::iterator S = Multiprocessors.begin(),
-                                     F = Multiprocessors.end(),
-                                     J = S;
-  size_t WorkGroupSize = DimInfo.GetLocalWorkItems();
+  size_t WGSize = DimInfo.GetLocalWorkItems();
   bool AllSent = true;
 
-  // Perfect load balancing.
-  for(DimensionInfo::iterator I = DimInfo.begin(),
-                              E = DimInfo.end();
-                              I != E;
-                              I += WorkGroupSize) {
-    NDRangeKernelBlockCPUCommand *NDRangeCmd;
-    NDRangeCmd = new NDRangeKernelBlockCPUCommand(Cmd,
-                                                  Entry,
-                                                  GlobalArgs,
-                                                  I,
-                                                  I + WorkGroupSize,
-                                                  AutoLocalsSize,
-                                                  *Result);
+  for (auto I = DimInfo.begin(), E = DimInfo.end(); I != E; I += WGSize) {
+    auto *NDRangeCmd =
+        new NDRangeKernelBlockCPUCommand(Cmd, Entry, GlobalArgs, I, I + WGSize,
+                                         AutoLocalsSize, *Result);
 
     // Submit command.
-    AllSent = AllSent && (*J)->Submit(NDRangeCmd);
-
-    // Reset counter, round robin.
-    if(++J == F)
-      J = S;
+    AllSent = AllSent && pickLeastLoadedThread().Submit(NDRangeCmd);
   }
 
   return AllSent;
@@ -842,8 +777,7 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
   if (!isPartitionSupported(Part))
     return false;
 
-  HardwareCPUsContainer CPUs;
-  GetPinnedCPUs(CPUs);
+  using HardwareCPUsContainer = llvm::SmallVector<const sys::HardwareCPU*, 8>;
 
   switch (Part.getType()) {
   case PartitionByAffinityDomain: {
@@ -853,14 +787,14 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
 
     std::map<sys::HardwareComponent*, HardwareCPUsContainer> Partitions;
     if (Affinity == AffinityDomainNUMA) {
-      for (auto C : CPUs)
+      for (auto C : HWCPUs)
         if (auto *NUMANode = C->GetNUMANode())
-          Partitions[NUMANode].insert(C);
+          Partitions[NUMANode].push_back(C);
     } else {
       unsigned Level = getCacheLevel(Affinity);
-      for (auto C : CPUs)
+      for (auto C : HWCPUs)
         if (auto *Cache = C->GetCache(Level))
-          Partitions[Cache].insert(C);
+          Partitions[Cache].push_back(C);
     }
 
     for (auto &P : Partitions) {
@@ -872,15 +806,15 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
   }
   case PartitionEqually: {
     unsigned N = Part.getNumComputeUnits();
-    unsigned Groups = CPUs.size() / N;
+    unsigned Groups = HWCPUs.size() / N;
 
     assert(Groups > 0);
 
-    auto NextCPU = CPUs.begin();
+    auto NextCPU = HWCPUs.begin();
     for (unsigned i = 0; i != Groups; ++i) {
       HardwareCPUsContainer SubDevCPUs;
       for (unsigned j = 0; j != N; ++j)
-        SubDevCPUs.insert(*NextCPU++);
+        SubDevCPUs.push_back(*NextCPU++);
       std::unique_ptr<Device> D(new CPUDevice(*this, Part, SubDevCPUs));
       Devs.push_back(std::move(D));
     }
@@ -888,11 +822,11 @@ bool CPUDevice::createSubDevices(const DevicePartition &Part,
     return true;
   }
   case PartitionByCounts: {
-    auto NextCPU = CPUs.begin();
+    auto NextCPU = HWCPUs.begin();
     for (unsigned i = 0, e = Part.getNumCounts(); i != e; ++i) {
       HardwareCPUsContainer SubDevCPUs;
       for (unsigned j = 0; j != Part.getCount(i); ++j)
-        SubDevCPUs.insert(*NextCPU++);
+        SubDevCPUs.push_back(*NextCPU++);
       std::unique_ptr<Device> D(new CPUDevice(*this, Part, SubDevCPUs));
       Devs.push_back(std::move(D));
     }

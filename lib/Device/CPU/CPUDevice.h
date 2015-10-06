@@ -2,12 +2,15 @@
 #ifndef OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
-#include "Multiprocessor.h"
+#include "Command.h"
 
 #include "opencrun/Core/Device.h"
+#include "opencrun/System/Hardware.h"
 
 namespace opencrun {
 namespace cpu {
+
+class CPUThread;
 
 class CPUDevice : public Device {
 public:
@@ -19,14 +22,10 @@ public:
 
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
 
-  typedef llvm::SmallPtrSet<Multiprocessor *, 4> MultiprocessorsContainer;
-  typedef llvm::SmallPtrSet<const sys::HardwareCPU *, 16> HardwareCPUsContainer;
-
 public:
   CPUDevice(const sys::HardwareMachine &Machine);
-  CPUDevice(CPUDevice &Parent,
-            const DevicePartition &Part,
-            const HardwareCPUsContainer &CPUs);
+  CPUDevice(CPUDevice &Parent, const DevicePartition &Part,
+            llvm::ArrayRef<const sys::HardwareCPU*> CPUs);
   ~CPUDevice();
 
 protected:
@@ -52,15 +51,12 @@ public:
 
 private:
   void InitDeviceInfo();
-  void InitSubDeviceInfo(const HardwareCPUsContainer &CPUs);
-  void InitMultiprocessors();
-  void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
+  void InitSubDeviceInfo();
+  void InitThreads();
   void InitCompiler();
 
-  void DestroyMultiprocessors();
-
-  const sys::HardwareMachine &GetHardwareMachine() const { return Machine; }
-  void GetPinnedCPUs(HardwareCPUsContainer &CPUs) const;
+  CPUThread &pickThread();
+  CPUThread &pickLeastLoadedThread();
 
   bool Submit(EnqueueReadBuffer &Cmd);
   bool Submit(EnqueueWriteBuffer &Cmd);
@@ -92,10 +88,12 @@ private:
   MemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
 
 private:
+  std::vector<std::unique_ptr<CPUThread>> Threads;
+
   // A CPUDevice is associated to an hardware machine (i.e. a single node in
   // a cluster system). In general it uses a subset of its logical cores.
   const sys::HardwareMachine &Machine;
-  MultiprocessorsContainer Multiprocessors;
+  llvm::SmallVector<const sys::HardwareCPU*, 16> HWCPUs;
 
   mutable FootprintsContainer KernelFootprints;
 };

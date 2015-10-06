@@ -11,10 +11,9 @@
 #include <deque>
 
 namespace opencrun {
-
 namespace cpu {
 
-class Multiprocessor;
+class CPUDevice;
 
 class ExecutionStack {
 public:
@@ -57,7 +56,7 @@ public:
   };
 
 public:
-  CPUThread(Multiprocessor &MP, const sys::HardwareCPU &CPU);
+  CPUThread(CPUDevice &Dev, const sys::HardwareCPU &CPU);
   virtual ~CPUThread();
 
 public:
@@ -165,7 +164,7 @@ private:
 
   volatile WorkingMode Mode;
   CPUCommands Commands;
-  Multiprocessor &MP;
+  CPUDevice &Dev;
 
   DimensionInfo::iterator Begin;
   DimensionInfo::iterator End;
