@@ -169,7 +169,6 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
   // Erase kernel from the cache.
-  BlockParallelEntriesCache.erase(&Kern);
   BlockParallelStaticLocalsCache.erase(&Kern);
   BlockParallelStaticLocalVectorsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
@@ -674,8 +673,16 @@ bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
 bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                     GlobalArgMappingsContainer &GlobalArgs) {
   const KernelDescriptor &KernDesc = Cmd.GetKernel().getDescriptor();
+  auto *Kern = KernDesc.getFunction(this);
+  auto &Cmplr = getCompilerAs<CPUCompiler>();
+
+  // Add the kernel to the JIT-compiler.
+  Cmplr.addKernel(Kern);
+
   // Native launcher address.
-  BlockParallelEntryPoint Entry = GetBlockParallelEntryPoint(KernDesc);
+  using BlockParallelEntryPoint = NDRangeKernelBlockCPUCommand::Signature;
+  auto Entry =
+    reinterpret_cast<BlockParallelEntryPoint>(Cmplr.getEntryPoint(Kern));
 
   // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
@@ -731,25 +738,6 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   }
 
   return AllSent;
-}
-
-CPUDevice::BlockParallelEntryPoint
-CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
-  llvm::sys::ScopedLock Lock(ThisLock);
-
-  // Cache hit.
-  BlockParallelEntryPoints::iterator I =
-    BlockParallelEntriesCache.find(&KernDesc);
-
-  if (I != BlockParallelEntriesCache.end())
-    return I->second;
-
-  // Cache miss.
-  auto *KernFn = KernDesc.getFunction(this);
-  void *EntryPtr = getCompilerAs<CPUCompiler>().addKernel(KernFn);
-
-  return BlockParallelEntriesCache[&KernDesc] =
-            reinterpret_cast<CPUDevice::BlockParallelEntryPoint>(EntryPtr);
 }
 
 unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc) {

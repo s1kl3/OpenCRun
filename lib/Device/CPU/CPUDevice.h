@@ -14,11 +14,7 @@ public:
   static bool classof(const Device *Dev) { return true; }
 
 public:
-  typedef NDRangeKernelBlockCPUCommand::Signature BlockParallelEntryPoint;
-  typedef NDRangeKernelBlockCPUCommand::IndexOffsetVector BlockParallelStaticLocalVector;
-
   typedef const KernelDescriptor *KernelID;
-  typedef std::map<KernelID, BlockParallelEntryPoint> BlockParallelEntryPoints;
   typedef std::map<KernelID, unsigned> BlockParallelStaticLocalSizes;
   typedef std::map<KernelID, BlockParallelStaticLocalVector> BlockParallelStaticLocalVectors;
   typedef std::map<KernelID, Footprint> FootprintsContainer;
@@ -94,7 +90,6 @@ private:
   bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                            GlobalArgMappingsContainer &GlobalArgs);
 
-  CPUDevice::BlockParallelEntryPoint GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc);
   unsigned GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc);
   void GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
                                          BlockParallelStaticLocalVector &SLVec);
@@ -110,7 +105,6 @@ private:
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
 
-  BlockParallelEntryPoints BlockParallelEntriesCache;
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
   BlockParallelStaticLocalVectors BlockParallelStaticLocalVectorsCache;
   mutable FootprintsContainer KernelFootprints;

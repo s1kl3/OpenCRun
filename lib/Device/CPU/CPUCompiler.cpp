@@ -154,8 +154,9 @@ static std::unique_ptr<llvm::Module> extractKernelModule(llvm::Function *F) {
   return NewM;
 }
 
-void *JITCompiler::addKernel(llvm::Function *Kern) {
-  assert(!Kernels.count(Kern));
+void JITCompiler::addKernel(llvm::Function *Kern) {
+  if (Kernels.count(Kern))
+    return;
 
   auto M = extractKernelModule(Kern);
 
@@ -183,24 +184,28 @@ void *JITCompiler::addKernel(llvm::Function *Kern) {
   TM.Options.NoNaNsFPMath = false;
   TM.Options.UnsafeFPMath = false;
 
-  ModuleInfo Info(*M);
-  CPUKernelInfo KI(Info.get(Kern->getName()));
-  auto StubName = KI.getStub()->getName().str();
-
-  Kernels[Kern] =
-    CompileLayer.addModuleSet(makeSingleton(std::move(M)),
+  Kernels[Kern] = KernelHandleT {
+    CompileLayer.addModuleSet(makeSingleton(M.get()),
                               llvm::make_unique<llvm::SectionMemoryManager>(),
-                              std::move(Resolver));
-
-  return (void*)findSymbolForKernel(Kern, StubName).getAddress();
+                              std::move(Resolver)),
+    std::move(M)
+  };
 }
 
 void JITCompiler::removeKernel(llvm::Function *Kern) {
   auto I = Kernels.find(Kern);
   if (I != Kernels.end()) {
-    CompileLayer.removeModuleSet(I->second);
+    CompileLayer.removeModuleSet(I->second.Handle);
     Kernels.erase(I);
   }
+}
+
+void *JITCompiler::getEntryPoint(llvm::Function *Kern) {
+  assert(Kernels.count(Kern));
+  ModuleInfo Info(*Kernels[Kern].Module);
+  CPUKernelInfo KI(Info.get(Kern->getName()));
+  auto StubName = KI.getStub()->getName().str();
+  return (void*)findSymbolForKernel(Kern, StubName).getAddress();
 }
 
 llvm::orc::JITSymbol
@@ -216,7 +221,7 @@ JITCompiler::findSymbolForKernel(llvm::Function *Kern,
   if (auto Addr = (llvm::orc::TargetAddress)dlsym(nullptr, Name.c_str()))
     return llvm::orc::JITSymbol(Addr, llvm::JITSymbolFlags::Exported);
 
-  return CompileLayer.findSymbolIn(I->second, Name, false);
+  return CompileLayer.findSymbolIn(I->second.Handle, Name, false);
 }
 
 CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
