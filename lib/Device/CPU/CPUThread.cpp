@@ -786,7 +786,7 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
   // Reserve space for local buffers.
   Local.Reset(Cmd.GetStaticLocalSize());
-  Cmd.SetLocalParams(Local, StaticLocalPtrs);
+  Cmd.SetLocalParams(Local);
 
   // Get function and arguments.
   NDRangeKernelBlockCPUCommand::Signature Func = Cmd.GetFunction();

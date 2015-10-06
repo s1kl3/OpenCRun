@@ -189,7 +189,6 @@ private:
 
   volatile WorkingMode Mode;
   CPUCommands Commands;
-  StaticLocalPointers StaticLocalPtrs;
   Multiprocessor &MP;
 
   DimensionInfo::iterator Begin;

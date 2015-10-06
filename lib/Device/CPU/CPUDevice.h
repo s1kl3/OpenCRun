@@ -16,7 +16,6 @@ public:
 public:
   typedef const KernelDescriptor *KernelID;
   typedef std::map<KernelID, unsigned> BlockParallelStaticLocalSizes;
-  typedef std::map<KernelID, BlockParallelStaticLocalVector> BlockParallelStaticLocalVectors;
   typedef std::map<KernelID, Footprint> FootprintsContainer;
 
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
@@ -91,8 +90,6 @@ private:
                            GlobalArgMappingsContainer &GlobalArgs);
 
   unsigned GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc);
-  void GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
-                                         BlockParallelStaticLocalVector &SLVec);
 
   void LocateMemoryObjArgAddresses(Kernel &Kern,
                                    GlobalArgMappingsContainer &GlobalArgs);
@@ -106,7 +103,6 @@ private:
   MultiprocessorsContainer Multiprocessors;
 
   BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
-  BlockParallelStaticLocalVectors BlockParallelStaticLocalVectorsCache;
   mutable FootprintsContainer KernelFootprints;
 };
 
