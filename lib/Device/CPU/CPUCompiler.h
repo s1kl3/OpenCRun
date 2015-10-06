@@ -84,8 +84,6 @@ public:
     JIT->addSymbolMapping(Sym, Addr);
   }
 
-  void addInitialLoweringPasses(llvm::legacy::PassManager &PM) override;
-
 private:
   std::unique_ptr<JITCompiler> JIT;
 };

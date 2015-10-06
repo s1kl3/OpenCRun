@@ -259,6 +259,3 @@ CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
 }
 
 CPUCompiler::~CPUCompiler() {}
-
-void CPUCompiler::addInitialLoweringPasses(llvm::legacy::PassManager &PM) {
-}
