@@ -17,8 +17,10 @@ class LocalMemory;
 class CPUCommand {
 public:
   enum Type {
+    // Service Commands
     StopDevice,
-    LastCPUServiceCommand,
+
+    // Single Exec Commands
     ReadBuffer,
     WriteBuffer,
     CopyBuffer,
@@ -37,8 +39,17 @@ public:
     FillImage,
     NativeKernel,
     NoOp,
-    LastCPUSingleExecCommand,
-    NDRangeKernelBlock
+
+    // Multi Exec Commands
+    NDRangeKernelBlock,
+
+    // Command Ranges
+    FirstServiceCommand = StopDevice,
+    LastServiceCommand = StopDevice,
+    FirstSingleExecCommand = ReadBuffer,
+    LastSingleExecCommand = NoOp,
+    FirstMultiExecCommand = NDRangeKernelBlock,
+    LastMultiExecCommand = NDRangeKernelBlock
   };
 
   enum {
@@ -131,7 +142,8 @@ private:
 class CPUServiceCommand : public CPUCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
-    return Cmd->GetType() < CPUCommand::LastCPUServiceCommand;
+    return Cmd->GetType() >= FirstServiceCommand &&
+           Cmd->GetType() <= LastServiceCommand;
   }
 
 protected:
@@ -144,7 +156,11 @@ public:
 class CPUExecCommand : public CPUCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
-    return Cmd->GetType() > CPUCommand::LastCPUServiceCommand;
+    return
+      (Cmd->GetType() >= FirstSingleExecCommand &&
+       Cmd->GetType() <= LastSingleExecCommand) ||
+      (Cmd->GetType() >= FirstMultiExecCommand &&
+       Cmd->GetType() <= LastMultiExecCommand);
   }
 
 protected:
@@ -172,8 +188,8 @@ private:
 class CPUSingleExecCommand : public CPUExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
-    return CPUExecCommand::classof(Cmd) &&
-           Cmd->GetType() < CPUCommand::LastCPUSingleExecCommand;
+    return Cmd->GetType() >= FirstSingleExecCommand &&
+           Cmd->GetType() <= LastSingleExecCommand;
   }
 
 protected:
@@ -184,8 +200,8 @@ protected:
 class CPUMultiExecCommand : public CPUExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
-    return CPUExecCommand::classof(Cmd) &&
-           Cmd->GetType() > CPUCommand::LastCPUSingleExecCommand;
+    return Cmd->GetType() >= FirstMultiExecCommand &&
+           Cmd->GetType() <= LastMultiExecCommand;
   }
 
 protected:
