@@ -57,8 +57,6 @@ private:
   void InitMultiprocessors(const HardwareCPUsContainer &CPUs);
   void InitCompiler();
 
-  void computeSubDeviceInfo(const HardwareCPUsContainer &CPUs);
-
   void DestroyMultiprocessors();
 
   const sys::HardwareMachine &GetHardwareMachine() const { return Machine; }

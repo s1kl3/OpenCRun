@@ -406,13 +406,6 @@ void CPUDevice::InitDeviceInfo() {
 }
 
 void CPUDevice::InitSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
-  MaxComputeUnits = CPUs.size();
-  MaxSubDevices = MaxComputeUnits;
-
-  computeSubDeviceInfo(CPUs);
-}
-
-void CPUDevice::computeSubDeviceInfo(const HardwareCPUsContainer &CPUs) {
   assert(!CPUs.empty());
 
   MaxComputeUnits = CPUs.size();
