@@ -1,7 +1,7 @@
 
 #include "InternalCalls.h"
 #include "AsyncCopyThread.h"
-#include "Multiprocessor.h"
+#include "CPUThread.h"
 
 using namespace opencrun;
 using namespace opencrun::cpu;
