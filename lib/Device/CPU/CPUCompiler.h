@@ -25,6 +25,7 @@ public:
   void removeKernel(llvm::Function *Kern);
 
   void *getEntryPoint(llvm::Function *Kern);
+  size_t getAutomaticLocalsSize(llvm::Function *Kern);
 
   void addSymbolMapping(llvm::StringRef Sym, void *Addr) {
     Symbols[Sym] = Addr;
@@ -72,6 +73,11 @@ public:
   void *getEntryPoint(llvm::Function *Kern) {
     llvm::sys::ScopedLock Lock(ThisLock);
     return JIT->getEntryPoint(Kern);
+  }
+
+  size_t getAutomaticLocalsSize(llvm::Function *Kern) {
+    llvm::sys::ScopedLock Lock(ThisLock);
+    return JIT->getAutomaticLocalsSize(Kern);
   }
 
   void addSymbolMapping(llvm::StringRef Sym, void *Addr) {

@@ -1,7 +1,6 @@
 
 #include "CPUDevice.h"
 #include "CPUCompiler.h"
-#include "CPUKernelInfo.h"
 #include "CPUPasses.h"
 #include "InternalCalls.h"
 
@@ -169,7 +168,6 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
   // Erase kernel from the cache.
-  BlockParallelStaticLocalsCache.erase(&Kern);
   KernelFootprints.erase(&Kern);
 
   getCompilerAs<CPUCompiler>().removeKernel(Kern.getFunction(this));
@@ -686,8 +684,8 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
 
-  // Static local size
-  unsigned StaticLocalSize = GetBlockParallelStaticLocalSize(KernDesc);
+  // Automatic locals size
+  unsigned AutoLocalsSize = Cmplr.getAutomaticLocalsSize(Kern);
 
   // Decide the work group size.
   if(!Cmd.IsLocalWorkGroupSizeSpecified()) {
@@ -720,7 +718,7 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                                                   GlobalArgs,
                                                   I,
                                                   I + WorkGroupSize,
-                                                  StaticLocalSize,
+                                                  AutoLocalsSize,
                                                   *Result);
 
     // Submit command.
@@ -732,24 +730,6 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   }
 
   return AllSent;
-}
-
-unsigned CPUDevice::GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc) {
-  llvm::sys::ScopedLock Lock(ThisLock);
-
-  // Cache hit.
-  BlockParallelStaticLocalSizes::iterator I =
-    BlockParallelStaticLocalsCache.find(&KernDesc);
-  if (I != BlockParallelStaticLocalsCache.end())
-    return I->second;
-
-  // Cache miss.
-  CPUKernelInfo Info(KernDesc.getKernelInfo(this));
-
-  unsigned StaticLocalSize = Info.getStaticLocalSize();
-  BlockParallelStaticLocalsCache[&KernDesc] = StaticLocalSize;
-
-  return StaticLocalSize;
 }
 
 const Footprint &

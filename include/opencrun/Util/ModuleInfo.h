@@ -231,7 +231,7 @@ public:
     return *find(Name);
   }
 
-private:
+protected:
   llvm::Module &Mod;
 };
 

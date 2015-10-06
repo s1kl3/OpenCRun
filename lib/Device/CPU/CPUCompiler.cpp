@@ -1,5 +1,5 @@
 #include "CPUCompiler.h"
-#include "CPUKernelInfo.h"
+#include "CPUModuleInfo.h"
 #include "CPUPasses.h"
 
 #include "opencrun/Util/ModuleInfo.h"
@@ -161,6 +161,7 @@ void JITCompiler::addKernel(llvm::Function *Kern) {
   auto M = extractKernelModule(Kern);
 
   llvm::legacy::PassManager PM;
+  PM.add(createAutomaticLocalVariablesPass());
   PM.add(createGroupParallelStubPass(Kern->getName()));
   PM.run(*M);
 
@@ -206,6 +207,12 @@ void *JITCompiler::getEntryPoint(llvm::Function *Kern) {
   CPUKernelInfo KI(Info.get(Kern->getName()));
   auto StubName = KI.getStub()->getName().str();
   return (void*)findSymbolForKernel(Kern, StubName).getAddress();
+}
+
+size_t JITCompiler::getAutomaticLocalsSize(llvm::Function *Kern) {
+  assert(Kernels.count(Kern));
+  CPUModuleInfo Info(*Kernels[Kern].Module);
+  return Info.getAutomaticLocalsSize();
 }
 
 llvm::orc::JITSymbol
@@ -254,5 +261,4 @@ CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
 CPUCompiler::~CPUCompiler() {}
 
 void CPUCompiler::addInitialLoweringPasses(llvm::legacy::PassManager &PM) {
-  PM.add(createAutomaticLocalVariablesPass());
 }

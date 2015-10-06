@@ -15,7 +15,6 @@ public:
 
 public:
   typedef const KernelDescriptor *KernelID;
-  typedef std::map<KernelID, unsigned> BlockParallelStaticLocalSizes;
   typedef std::map<KernelID, Footprint> FootprintsContainer;
 
   typedef llvm::DenseMap<unsigned, void *> GlobalArgMappingsContainer;
@@ -89,8 +88,6 @@ private:
   bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
                            GlobalArgMappingsContainer &GlobalArgs);
 
-  unsigned GetBlockParallelStaticLocalSize(const KernelDescriptor &KernDesc);
-
   void LocateMemoryObjArgAddresses(Kernel &Kern,
                                    GlobalArgMappingsContainer &GlobalArgs);
 
@@ -102,7 +99,6 @@ private:
   const sys::HardwareMachine &Machine;
   MultiprocessorsContainer Multiprocessors;
 
-  BlockParallelStaticLocalSizes BlockParallelStaticLocalsCache;
   mutable FootprintsContainer KernelFootprints;
 };
 
