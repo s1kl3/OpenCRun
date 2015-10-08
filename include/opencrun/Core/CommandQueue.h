@@ -5,6 +5,7 @@
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
 #include "opencrun/Core/Event.h"
+#include "opencrun/Util/SetUniquePtr.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Mutex.h"
@@ -29,10 +30,6 @@ public:
 public:
   static bool classof(const _cl_command_queue *Cmd) { return true; }
 
-public:
-  typedef std::deque<std::unique_ptr<Command> > CommandsContainer;
-  typedef std::set<Command *> PendingCommandsContainer;
-
 protected:                     
   CommandQueue(Type Ty, Context &Ctx, Device &Dev, bool EnableProfile);
   virtual ~CommandQueue();
@@ -53,6 +50,11 @@ public:
   Device &GetDevice() const { return Dev; }
 
   bool ProfilingEnabled() const { return EnableProfile; }
+
+protected:
+  typedef std::deque<std::unique_ptr<Command> > CommandsContainer;
+  typedef std::set<set_unique_ptr<Command>> PendingCommandsContainer;
+
 
 protected:
   bool submit(Command &Cmd);

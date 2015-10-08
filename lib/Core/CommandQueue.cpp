@@ -79,12 +79,8 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
 void CommandQueue::CommandDone(Command &Cmd) {
   RunScheduler();
 
-  {
-    llvm::sys::ScopedLock Lock(ThisLock);
-    PendingCommands.erase(&Cmd);
-  }
-
-  delete &Cmd;
+  llvm::sys::ScopedLock Lock(ThisLock);
+  PendingCommands.erase(make_find_ptr(&Cmd));
 }
 
 void CommandQueue::Flush() {
@@ -104,7 +100,7 @@ void CommandQueue::Finish() {
   // the commands.
   {
     llvm::sys::ScopedLock Lock(ThisLock);
-    for (auto Cmd : PendingCommands)
+    for (const auto &Cmd : PendingCommands)
       WaitList.push_back(&Cmd->GetNotifyEvent());
     for (const auto &Cmd : Commands)
       WaitList.push_back(&Cmd->GetNotifyEvent());
@@ -307,8 +303,8 @@ bool InOrderQueue::RunScheduler() {
     return true;
   }
 
-  PendingCommands.insert(Cmd.release());
   Commands.pop_front();
+  PendingCommands.insert(std::move(Cmd));
   CommandOnFly = true;
 
   return Commands.size();
