@@ -287,23 +287,15 @@ void CPUThread::Execute(CPUServiceCommand *Cmd) {
 
 void CPUThread::Execute(CPUExecCommand *Cmd) {
   InternalEvent &Ev = Cmd->GetQueueCommand().GetNotifyEvent();
-  unsigned Counters = Cmd->IsProfiled() ? Profiler::Time : Profiler::None;
   int ExitStatus;
 
   // Command started.
-  if(Cmd->RegisterStarted()) {
-    ProfileSample *Sample = GetProfilerSample(Counters,
-                                              ProfileSample::CommandRunning);
-    Ev.MarkRunning(Sample);
-  }
+  if(Cmd->RegisterStarted())
+    Ev.MarkRunning(ProfileSample::getRunning());
 
   // This command is part of a large OpenCL command. Register partial execution.
-  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd)) {
-    ProfileSample *Sample = GetProfilerSample(Counters,
-                                              ProfileSample::CommandRunning,
-                                              MultiCmd->GetId());
-    Ev.MarkSubRunning(Sample);
-  }
+  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd))
+    Ev.MarkSubRunning(ProfileSample::getSubRunning(MultiCmd->GetId()));
 
   if(ReadBufferCPUCommand *OnFly = llvm::dyn_cast<ReadBufferCPUCommand>(Cmd))
     ExitStatus = Execute(*OnFly);

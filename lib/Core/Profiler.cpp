@@ -17,91 +17,35 @@
 
 using namespace opencrun;
 
-Profiler::Profiler() : ProfileStream(STDERR_FILENO, false, true),
-                       ToProfile(None) {
-  std::string Raw = sys::GetEnv("OPENCRUN_PROFILED_COUNTERS");
-
-  llvm::SmallVector<llvm::StringRef, 4> RawCounters;
-
-  SplitString(Raw, RawCounters, ":");
-
-  for(llvm::SmallVector<llvm::StringRef, 4>::iterator I = RawCounters.begin(),
-                                                      E = RawCounters.end();
-                                                      I != E;
-                                                      ++I)
-    ToProfile |= llvm::StringSwitch<Counter>(*I)
-                   .Case("time", Time)
-                   .Default(None);
+ProfileSample ProfileSample::getSample(Label L) {
+  return ProfileSample {L, false, 0, sys::Time::GetWallClock()};
 }
 
-ProfileSample *Profiler::GetSample(unsigned Counters,
-                                   ProfileSample::Label Label,
-                                   int SubLabelId) {
-  Counters |= ToProfile;
+ProfileSample ProfileSample::getSubSample(Label L, size_t Id) {
+  return ProfileSample {L, true, Id, sys::Time::GetWallClock()};
+}
 
-  // Fast path for non-profiled runs.
-  if(Counters == None)
-    return NULL;
+ProfileTrace::ProfileTrace(bool Trace)
+ : Enabled(Trace | sys::HasEnv("OPENCRUN_PROFILED_COUNTERS")) {}
 
-  ProfileSample *Sample = new ProfileSample(Label, SubLabelId);
+ProfileTrace &ProfileTrace::operator<<(const ProfileSample &S) {
+  if(Enabled) {
+    llvm::sys::ScopedLock Lock(ThisLock);
 
-  if(Counters & Time) {
-    sys::Time TM = sys::Time::GetWallClock();
-    Sample->SetTime(TM);
+    auto SampleCmp = [](const ProfileSample &S1, const ProfileSample &S2) {
+      return S1.getLabel() < S2.getLabel();
+    };
+    auto IP = std::upper_bound(Samples.begin(), Samples.end(), S, SampleCmp);
+    Samples.insert(IP, S);
   }
 
-  return Sample;
+  return *this;
 }
 
-void Profiler::DumpTrace(unsigned CmdType,
-                         const ProfileTrace &Trace,
-                         bool Force) {
-  llvm::sys::ScopedLock Lock(ThisLock);
-
-  if(!IsProfilingForcedFromEnvironment() && !Force)
-    return;
-
-  util::Table Tab;
-
-  Tab << "Label" << "Time" << "Delta" << util::Table::EOL;
-
-  sys::Time Last;
-  for(ProfileTrace::const_iterator I = Trace.begin(),
-                                   E = Trace.end();
-                                   I != E;
-                                   ++I) {
-    const sys::Time &Now = (*I)->GetTime();
-    ProfileSample::Label Label = (*I)->GetLabel();
-    int SubLabelId = (*I)->GetSubLabelId();
-
-    // First columns must be always printed.
-    Tab << FormatLabel(Label, SubLabelId)
-        << Now;
-
-    // Emit delta with respect to previous event.
-    if(SubLabelId < 0) {
-      Tab << Now - Last;
-      Last = Now;
-    }
-
-    // Do not emit delta for sub-commands.
-    else
-      Tab << util::Table::NA;
-
-    // Terminate the line.
-    Tab << util::Table::EOL;
-  }
-
-  DumpPrefix() << " ";
-  DumpCommandType(CmdType) << "\n";
-  Tab.Dump(ProfileStream, "profile");
-  DumpPrefix() << "\n";
-}
-
-std::string Profiler::FormatLabel(ProfileSample::Label Label, int SubId) {
+static std::string formatLabel(const ProfileSample &S) {
   std::string Text;
 
-  switch(Label) {
+  switch (S.getLabel()) {
   case ProfileSample::Unknown:
     Text = "Unknown";
     break;
@@ -126,28 +70,50 @@ std::string Profiler::FormatLabel(ProfileSample::Label Label, int SubId) {
     llvm_unreachable("Unknown sample label");
   }
 
-  if(SubId >= 0)
-    Text += "-" + llvm::itostr(SubId);
+  if (S.isSubSample())
+    Text += "-" + llvm::itostr(S.getSubId());
 
   return Text;
 }
 
-llvm::raw_ostream &Profiler::DumpPrefix() {
-  ProfileStream.changeColor(llvm::raw_ostream::GREEN) <<  "profile:";
-  ProfileStream.resetColor();
-
-  return ProfileStream;
+static llvm::raw_ostream &printPrefix(llvm::raw_ostream &OS,
+                                      llvm::StringRef Prefix) {
+  OS.changeColor(llvm::raw_ostream::GREEN) << Prefix << ":";
+  return OS.resetColor();
 }
 
-llvm::raw_ostream &Profiler::DumpCommandType(unsigned CmdType) {
-  // TODO: implement meaningful print.
-  ProfileStream << CmdType;
+void ProfileTrace::print(llvm::raw_ostream &OS, unsigned CmdType) const {
+  llvm::sys::ScopedLock Lock(ThisLock);
 
-  return ProfileStream;
-}
+  if (Samples.empty())
+    return;
 
-llvm::ManagedStatic<Profiler> GlobalProfiler;
+  util::Table Tab;
 
-Profiler &opencrun::GetProfiler() {
-  return *GlobalProfiler;
+  Tab << "Label" << "Time" << "Delta" << util::Table::EOL;
+
+  sys::Time Last;
+  for (const auto &S : Samples) {
+    // First columns must be always printed.
+    Tab << formatLabel(S);
+
+    Tab << S.getTime();
+
+    // Emit delta with respect to previous event.
+    if (S.isSubSample()) {
+      Tab << S.getTime() - Last;
+      Last = S.getTime();
+    }
+
+    // Do not emit delta for sub-commands.
+    else
+      Tab << util::Table::NA;
+
+    // Terminate the line.
+    Tab << util::Table::EOL;
+  }
+
+  printPrefix(OS, "profile") << " " << CmdType << "\n";
+  Tab.Dump(OS, "profile");
+  printPrefix(OS, "profile") << "\n";
 }

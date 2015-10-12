@@ -76,16 +76,20 @@ void Event::Signal(int Status) {
 
 InternalEvent::InternalEvent(CommandQueue &Queue,
                              unsigned CmdType,
-                             ProfileSample *Sample) :
+                             const ProfileSample &Sample) :
   Event(Event::InternalEvent, CL_QUEUED),
   Queue(&Queue),
-  CmdType(CmdType) {
-  Profile.SetEnabled(Sample != NULL);
+  CmdType(CmdType),
+  Profile(Queue.ProfilingEnabled()) {
   Profile << Sample;
 }
 
 InternalEvent::~InternalEvent() {
-  GetProfiler().DumpTrace(CmdType, Profile);
+  Profile.print(llvm::errs(), CmdType);
+}
+
+bool InternalEvent::IsProfiled() const {
+  return Queue->ProfilingEnabled();
 }
 
 Context &InternalEvent::GetContext() const {
@@ -109,38 +113,32 @@ unsigned long InternalEvent::GetProfiledCompletedTime() const {
 }
 
 unsigned long InternalEvent::GetProfiledTime(ProfileSample::Label SampleLabel) const {
-  for(ProfileTrace::const_iterator I = Profile.begin(),
-                                   E = Profile.end();
-                                   I != E;
-                                   ++I) {
-    if((*I)->GetLabel() != SampleLabel)
-      continue;
-
-    return (*I)->GetTime().AsLong();
-  }
+  for (const auto &S : Profile)
+    if (S.getLabel() == SampleLabel)
+      return S.getTime().AsLong();
 
   return 0;
 }
 
-void InternalEvent::MarkSubmitted(ProfileSample *Sample) {
+void InternalEvent::MarkSubmitted(const ProfileSample &Sample) {
   Profile << Sample;
   Signal(CL_SUBMITTED);
 }
 
-void InternalEvent::MarkRunning(ProfileSample *Sample) {
+void InternalEvent::MarkRunning(const ProfileSample &Sample) {
   Profile << Sample;
   Signal(CL_RUNNING);
 }
 
-void InternalEvent::MarkSubRunning(ProfileSample *Sample) {
+void InternalEvent::MarkSubRunning(const ProfileSample &Sample) {
   Profile << Sample;
 }
 
-void InternalEvent::MarkSubCompleted(ProfileSample *Sample) {
+void InternalEvent::MarkSubCompleted(const ProfileSample &Sample) {
   Profile << Sample;
 }
 
-void InternalEvent::MarkCompleted(int Status, ProfileSample *Sample) {
+void InternalEvent::MarkCompleted(int Status, const ProfileSample &Sample) {
   if(Status != CL_COMPLETE && Status >= 0)
     RETURN_WITH_ERROR("invalid event status");
 

@@ -54,10 +54,7 @@ CommandQueue::Enqueue(Command &Cmd, cl_int *ErrCode) {
   {
     llvm::sys::ScopedLock Lock(ThisLock);
 
-    unsigned Cnts = EnableProfile ? Profiler::Time : Profiler::None;
-    ProfileSample *Sample = GetProfilerSample(Cnts,
-                                              ProfileSample::CommandEnqueued);
-    Ev = new InternalEvent(*this, Cmd.GetType(), Sample);
+    Ev = new InternalEvent(*this, Cmd.GetType(), ProfileSample::getEnqueued());
 
     Cmd.SetNotifyEvent(Ev.get());
     Commands.push_back(std::unique_ptr<Command>(&Cmd));

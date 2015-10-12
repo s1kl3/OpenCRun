@@ -98,7 +98,7 @@ public:
 
 public:
   InternalEvent(CommandQueue &Queue, unsigned CmdType,
-                ProfileSample *Sample = NULL);
+                const ProfileSample &Sample);
   virtual ~InternalEvent();
 
   InternalEvent(const InternalEvent &That); // Do not implement.
@@ -109,7 +109,7 @@ public:
   CommandQueue &GetCommandQueue() const { return *Queue; }
   unsigned GetCommandType() const { return CmdType; }
 
-  bool IsProfiled() const { return Profile.IsEnabled(); }
+  bool IsProfiled() const;
 
   const ProfileTrace &GetProfile() const { return Profile; }
 
@@ -120,11 +120,11 @@ public:
   unsigned long GetProfiledCompletedTime() const;
 
 public:
-  void MarkSubmitted(ProfileSample *Sample = NULL);
-  void MarkRunning(ProfileSample *Sample = NULL);
-  void MarkSubRunning(ProfileSample *Sample = NULL);
-  void MarkSubCompleted(ProfileSample *Sample = NULL);
-  void MarkCompleted(int Status, ProfileSample *Sample = NULL);
+  void MarkSubmitted(const ProfileSample &Sample);
+  void MarkRunning(const ProfileSample &Sample);
+  void MarkSubRunning(const ProfileSample &Sample);
+  void MarkSubCompleted(const ProfileSample &Sample);
+  void MarkCompleted(int Status, const ProfileSample &Sample);
 
 protected:
   unsigned long GetProfiledTime(ProfileSample::Label SampleLabel) const;

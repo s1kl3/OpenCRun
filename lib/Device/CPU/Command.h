@@ -121,8 +121,6 @@ public:
 public:
   Type GetType() const { return CommandTy; }
 
-  virtual bool IsProfiled() const = 0;
-
   int GetExitStatus() { return Result->GetExitStatus(); }
 
 public:
@@ -148,9 +146,6 @@ public:
 
 protected:
   CPUServiceCommand(CPUCommand::Type CommandTy) : CPUCommand(CommandTy) { }
-
-public:
-  virtual bool IsProfiled() const { return false; }
 };
 
 class CPUExecCommand : public CPUCommand {
@@ -179,7 +174,6 @@ public:
   template <typename Ty>
   Ty &GetQueueCommandAs() const { return llvm::cast<Ty>(Cmd); }
 
-  virtual bool IsProfiled() const { return Cmd.IsProfiled(); }
 
 private:
   Command &Cmd;

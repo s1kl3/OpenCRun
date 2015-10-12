@@ -125,12 +125,10 @@ CPUDevice::createMemoryDescriptor(const MemoryObject &Obj) {
 
 bool CPUDevice::Submit(Command &Cmd) {
   bool Submitted = false;
-  std::unique_ptr<ProfileSample> Sample;
 
   // Take the profiling information here, in order to force this sample
   // happening before the subsequents samples.
-  unsigned Counters = Cmd.IsProfiled() ? Profiler::Time : Profiler::None;
-  Sample.reset(GetProfilerSample(Counters, ProfileSample::CommandSubmitted));
+  auto Sample = ProfileSample::getSubmitted();
 
 #define DISPATCH(CmdType)                                          \
   case Command::CmdType:                                           \
@@ -165,7 +163,7 @@ bool CPUDevice::Submit(Command &Cmd) {
 
   // The command has been submitted, register the sample.
   if (Submitted)
-    Cmd.GetNotifyEvent().MarkSubmitted(Sample.release());
+    Cmd.GetNotifyEvent().MarkSubmitted(Sample);
 
   return Submitted;
 }
@@ -184,22 +182,15 @@ void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
   Command &QueueCmd = Cmd->GetQueueCommand();
   InternalEvent &Ev = QueueCmd.GetNotifyEvent();
   CommandQueue &Queue = Ev.GetCommandQueue();
-  unsigned Counters = Cmd->IsProfiled() ? Profiler::Time : Profiler::None;
 
   // This command does not directly translate to an OpenCL command. Register
   // partial acknowledgment.
-  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd)) {
-    ProfileSample *Sample = GetProfilerSample(Counters,
-                                              ProfileSample::CommandCompleted,
-                                              MultiCmd->GetId());
-    Ev.MarkSubCompleted(Sample);
-  }
+  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd))
+    Ev.MarkSubCompleted(ProfileSample::getSubCompleted(MultiCmd->GetId()));
 
   // All acknowledgment received.
   if(Cmd->RegisterCompleted(ExitStatus)) {
-    ProfileSample *Sample = GetProfilerSample(Counters,
-                                              ProfileSample::CommandCompleted);
-    Ev.MarkCompleted(Cmd->GetExitStatus(), Sample);
+    Ev.MarkCompleted(Cmd->GetExitStatus(), ProfileSample::getCompleted());
     Queue.CommandDone(QueueCmd);
   }
 
