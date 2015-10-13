@@ -2,7 +2,6 @@
 #include "CPUThread.h"
 #include "CPUDevice.h"
 
-#include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/System/OS.h"
 
@@ -296,35 +295,11 @@ void CPUThread::Execute(StopDeviceCPUCommand &Cmd) {
   Mode = Stopped;
 }
 
-static void NotifyDone(CPUExecCommand &Cmd, int ExitStatus) {
-  // Get counters to profile.
-  Command &QueueCmd = Cmd.GetQueueCommand();
-  InternalEvent &Ev = QueueCmd.GetNotifyEvent();
-  CommandQueue &Queue = Ev.GetCommandQueue();
-
-  // This command does not directly translate to an OpenCL command. Register
-  // partial acknowledgment.
-  if (auto *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(&Cmd))
-    Ev.MarkSubCompleted(ProfileSample::getSubCompleted(MultiCmd->GetId()));
-
-  // All acknowledgment received.
-  if (Cmd.RegisterCompleted(ExitStatus)) {
-    Ev.MarkCompleted(Cmd.GetExitStatus(), ProfileSample::getCompleted());
-    Queue.CommandDone(QueueCmd);
-  }
-}
-
 void CPUThread::Execute(CPUExecCommand &Cmd) {
-  InternalEvent &Ev = Cmd.GetQueueCommand().GetNotifyEvent();
   int ExitStatus;
 
   // Command started.
-  if (Cmd.RegisterStarted())
-    Ev.MarkRunning(ProfileSample::getRunning());
-
-  // This command is part of a large OpenCL command. Register partial execution.
-  if (CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(&Cmd))
-    Ev.MarkSubRunning(ProfileSample::getSubRunning(MultiCmd->GetId()));
+  Cmd.notifyStart();
 
 #define DISPATCH(CmdType)                                           \
   case CPUCommand::CmdType:                                         \
@@ -356,7 +331,7 @@ void CPUThread::Execute(CPUExecCommand &Cmd) {
 
 #undef DISPATCH
 
-  NotifyDone(Cmd, ExitStatus);
+  Cmd.notifyCompletion(ExitStatus != CPUCommand::NoError);
 }
 
 int CPUThread::Execute(ReadBufferCPUCommand &Cmd) {

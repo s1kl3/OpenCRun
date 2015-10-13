@@ -613,8 +613,8 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   }
 
   // Holds data about kernel result.
-  llvm::IntrusiveRefCntPtr<CPUCommand::ResultRecorder> Result;
-  Result = new CPUCommand::ResultRecorder(Cmd.GetWorkGroupsCount());
+  llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext;
+  CmdContext = new CPUMultiExecContext(Cmd.GetWorkGroupsCount());
 
   size_t WGSize = DimInfo.GetLocalWorkItems();
 
@@ -623,8 +623,8 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
 
     // Submit command.
     if (!Thr.submit<NDRangeKernelBlockCPUCommand>(Cmd, Entry, GlobalArgs,
-                                                  I, I + WGSize, AutoLocalsSize,
-                                                  *Result))
+                                                  AutoLocalsSize, I, I + WGSize,
+                                                  CmdContext))
       return false;
   }
 

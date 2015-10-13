@@ -58,62 +58,8 @@ public:
     Unsupported       = CL_INVALID_OPERATION
   };
 
-public:
-  class ResultRecorder : public MTRefCountedBase<ResultRecorder> {
-  public:
-    typedef llvm::SmallVector<int, 32> StatusContainer;
-
-  public:
-    ResultRecorder(unsigned N = 1) : Started(false),
-                                     ToWait(N),
-                                     ExitStatus(N, CPUCommand::NoError) { }
-
-  public:
-    bool SetStarted() {
-      // Common case, command started -- skip atomic operations.
-      if(Started)
-        return false;
-
-      // Infrequent/contented case -- use CAS.
-      return !llvm::sys::CompareAndSwap(&Started, true, false);
-    }
-
-    bool SetExitStatus(unsigned ExitStatus) {
-      // Decrement the number of acknowledgment to wait.
-      unsigned I = llvm::sys::AtomicDecrement(&ToWait);
-
-      // The returned number is the caller Id inside the exit status array.
-      this->ExitStatus[I] = ExitStatus;
-
-      // Return true if this is the last acknowledgment.
-      return I == 0;
-    }
-
-    int GetExitStatus() {
-      int Status = CPUCommand::NoError;
-
-      for(StatusContainer::iterator I = ExitStatus.begin(),
-                                    E = ExitStatus.end();
-                                    I != E && Status == CPUCommand::NoError;
-                                    ++I)
-        Status = *I;
-
-      return Status;
-    }
-
-  private:
-    volatile llvm::sys::cas_flag Started;
-    volatile llvm::sys::cas_flag ToWait;
-    StatusContainer ExitStatus;
-  };
-
 protected:
-  CPUCommand(Type CommandTy) : CommandTy(CommandTy),
-                               Result(new CPUCommand::ResultRecorder()) { }
-
-  CPUCommand(Type CommandTy, CPUCommand::ResultRecorder &Result) :
-    CommandTy(CommandTy),
-    Result(&Result) { }
+  CPUCommand(Type CommandTy) : CommandTy(CommandTy) {}
 
 public:
   virtual ~CPUCommand() { }
@@ -121,20 +67,8 @@ public:
 public:
   Type GetType() const { return CommandTy; }
 
-  int GetExitStatus() { return Result->GetExitStatus(); }
-
-public:
-  bool RegisterStarted() {
-    return Result->SetStarted();
-  }
-
-  bool RegisterCompleted(int ExitStatus) {
-    return Result->SetExitStatus(ExitStatus);
-  }
-
 private:
   Type CommandTy;
-  llvm::IntrusiveRefCntPtr<ResultRecorder> Result;
 };
 
 class CPUServiceCommand : public CPUCommand {
@@ -159,21 +93,16 @@ public:
   }
 
 protected:
-  CPUExecCommand(CPUCommand::Type CommandTy, Command &Cmd) :
-    CPUCommand(CommandTy),
-    Cmd(Cmd) { }
-
-  CPUExecCommand(CPUCommand::Type CommandTy,
-                 Command &Cmd,
-                 CPUCommand::ResultRecorder &Result) :
-    CPUCommand(CommandTy, Result),
-    Cmd(Cmd) { }
+  CPUExecCommand(CPUCommand::Type CommandTy, Command &Cmd)
+   : CPUCommand(CommandTy), Cmd(Cmd) {}
 
 public:
   Command &GetQueueCommand() const { return Cmd; }
   template <typename Ty>
   Ty &GetQueueCommandAs() const { return llvm::cast<Ty>(Cmd); }
 
+  virtual void notifyStart() const = 0;
+  virtual void notifyCompletion(bool Error) const = 0;
 
 private:
   Command &Cmd;
@@ -188,7 +117,29 @@ public:
 
 protected:
   CPUSingleExecCommand(CPUCommand::Type CommandTy, Command &Cmd)
-    : CPUExecCommand(CommandTy, Cmd) { }
+    : CPUExecCommand(CommandTy, Cmd) {}
+
+public:
+  void notifyStart() const override final;
+  void notifyCompletion(bool Error) const override final;
+};
+
+class CPUMultiExecContext : public MTRefCountedBaseVPTR<CPUMultiExecContext> {
+public:
+  explicit CPUMultiExecContext(size_t N);
+
+private:
+  bool start();
+  bool finish(bool Error);
+
+  bool hasErrors() const;
+
+private:
+  std::atomic<size_t> StartedCount;
+  std::atomic<size_t> WaitCount;
+  std::atomic<bool> Errors;
+
+  friend class CPUMultiExecCommand;
 };
 
 class CPUMultiExecCommand : public CPUExecCommand {
@@ -199,18 +150,24 @@ public:
   }
 
 protected:
-  CPUMultiExecCommand(CPUCommand::Type CommandTy,
-                      Command &Cmd,
-                      CPUCommand::ResultRecorder &Result,
-                      unsigned Id) :
-    CPUExecCommand(CommandTy, Cmd, Result),
-    Id(Id) { }
+  CPUMultiExecCommand(CPUCommand::Type CommandTy, Command &Cmd, size_t Id,
+                      llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext)
+   : CPUExecCommand(CommandTy, Cmd), Id(Id),
+     CmdContext(std::move(CmdContext)) {}
+
+  CPUMultiExecContext &getCmdContext() const { return *CmdContext; }
+  template<typename CtxTy>
+  CtxTy &getCmdContextAs() const { return static_cast<CtxTy&>(*CmdContext); }
 
 public:
-  unsigned GetId() const { return Id; }
+  size_t GetId() const { return Id; }
+
+  void notifyStart() const override final;
+  void notifyCompletion(bool Error) const override final;
 
 private:
-  unsigned Id;
+  size_t Id;
+  llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext;
 };
 
 class StopDeviceCPUCommand : public CPUServiceCommand {
@@ -973,13 +930,11 @@ public:
   DimensionInfo::iterator index_end() { return End; }
 
 public:
-  NDRangeKernelBlockCPUCommand(EnqueueNDRangeKernel &Cmd,
-                               Signature Entry,
-                               ArgsMappings &GlobalArgs,
-                               DimensionInfo::iterator I,
-                               DimensionInfo::iterator E,
-                               size_t StaticLocalSize,
-                               CPUCommand::ResultRecorder &Result);
+  NDRangeKernelBlockCPUCommand(
+      EnqueueNDRangeKernel &Cmd, Signature Entry,
+      ArgsMappings &GlobalArgs, size_t StaticLocalSize,
+      DimensionInfo::iterator I, DimensionInfo::iterator E,
+      llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext);
 
   ~NDRangeKernelBlockCPUCommand();
 
