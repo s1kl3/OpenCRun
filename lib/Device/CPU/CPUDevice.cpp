@@ -602,16 +602,6 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   // Automatic locals size
   unsigned AutoLocalsSize = Cmplr.getAutomaticLocalsSize(Kern);
 
-  // Decide the work group size.
-  if (!Cmd.IsLocalWorkGroupSizeSpecified()) {
-    llvm::SmallVector<size_t, 4> Sizes;
-
-    for(unsigned I = 0; I < DimInfo.GetDimensions(); ++I)
-      Sizes.push_back(DimInfo.GetGlobalWorkItems(I));
-
-    DimInfo.SetLocalWorkItems(Sizes);
-  }
-
   // Holds data about kernel result.
   llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext;
   CmdContext = new CPUMultiExecContext(Cmd.GetWorkGroupsCount());
