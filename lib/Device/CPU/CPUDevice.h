@@ -33,18 +33,17 @@ protected:
   bool createSubDevices(const DevicePartition &Part,
       llvm::SmallVectorImpl<std::unique_ptr<Device>> &Devs) override;
 
-public:
-  virtual bool ComputeGlobalWorkPartition(const WorkSizes &GW,
-                                          WorkSizes &LW) const;
+  bool ComputeGlobalWorkPartition(const WorkSizes &GW,
+                                  WorkSizes &LW) const override;
 
-  virtual const Footprint &getKernelFootprint(const KernelDescriptor &Kern) const;
+  const Footprint &getKernelFootprint(const KernelDescriptor &K) const override;
 
   std::unique_ptr<MemoryDescriptor>
     createMemoryDescriptor(const MemoryObject &Obj) override;
 
-  virtual bool Submit(Command &Cmd);
+  bool Submit(Command &Cmd) override;
 
-  virtual void UnregisterKernel(const KernelDescriptor &Kern);
+  void UnregisterKernel(const KernelDescriptor &Kern) override;
 
 private:
   void InitDeviceInfo();
