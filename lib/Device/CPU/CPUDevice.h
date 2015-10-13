@@ -46,9 +46,6 @@ public:
 
   virtual void UnregisterKernel(const KernelDescriptor &Kern);
 
-  void NotifyDone(CPUServiceCommand *Cmd) { delete Cmd; }
-  void NotifyDone(CPUExecCommand *Cmd, int ExitStatus);
-
 private:
   void InitDeviceInfo();
   void InitSubDeviceInfo();

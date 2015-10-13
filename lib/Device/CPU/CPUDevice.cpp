@@ -177,26 +177,6 @@ void CPUDevice::UnregisterKernel(const KernelDescriptor &Kern) {
   getCompilerAs<CPUCompiler>().removeKernel(Kern.getFunction(this));
 }
 
-void CPUDevice::NotifyDone(CPUExecCommand *Cmd, int ExitStatus) {
-  // Get counters to profile.
-  Command &QueueCmd = Cmd->GetQueueCommand();
-  InternalEvent &Ev = QueueCmd.GetNotifyEvent();
-  CommandQueue &Queue = Ev.GetCommandQueue();
-
-  // This command does not directly translate to an OpenCL command. Register
-  // partial acknowledgment.
-  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd))
-    Ev.MarkSubCompleted(ProfileSample::getSubCompleted(MultiCmd->GetId()));
-
-  // All acknowledgment received.
-  if(Cmd->RegisterCompleted(ExitStatus)) {
-    Ev.MarkCompleted(Cmd->GetExitStatus(), ProfileSample::getCompleted());
-    Queue.CommandDone(QueueCmd);
-  }
-
-  delete Cmd;
-}
-
 void CPUDevice::InitDeviceInfo() {
   // Assuming symmetric systems.
   const sys::HardwareCache &L1Cache = Machine.socket_front().l1dc_front();
@@ -487,90 +467,90 @@ CPUThread &CPUDevice::pickLeastLoadedThread() {
 
 bool CPUDevice::Submit(EnqueueReadBuffer &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return pickThread().Submit(new ReadBufferCPUCommand(Cmd, SrcPtr));
+  return pickThread().submit<ReadBufferCPUCommand>(Cmd, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueWriteBuffer &Cmd) {
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new WriteBufferCPUCommand(Cmd, TgtPtr));
+  return pickThread().submit<WriteBufferCPUCommand>(Cmd, TgtPtr);
 }
 
 bool CPUDevice::Submit(EnqueueCopyBuffer &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new CopyBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().submit<CopyBufferCPUCommand>(Cmd, TgtPtr, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueReadImage &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return pickThread().Submit(new ReadImageCPUCommand(Cmd, SrcPtr));
+  return pickThread().submit<ReadImageCPUCommand>(Cmd, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueWriteImage &Cmd) {
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new WriteImageCPUCommand(Cmd, TgtPtr));
+  return pickThread().submit<WriteImageCPUCommand>(Cmd, TgtPtr);
 }
 
 bool CPUDevice::Submit(EnqueueCopyImage &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new CopyImageCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().submit<CopyImageCPUCommand>(Cmd, TgtPtr, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueCopyImageToBuffer &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new CopyImageToBufferCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().submit<CopyImageToBufferCPUCommand>(Cmd, TgtPtr, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferToImage &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new CopyBufferToImageCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().submit<CopyBufferToImageCPUCommand>(Cmd, TgtPtr, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueMapBuffer &Cmd) {
   // FIXME: Map operations are no-op!
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return pickThread().Submit(new MapBufferCPUCommand(Cmd, SrcPtr));
+  return pickThread().submit<MapBufferCPUCommand>(Cmd, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueMapImage &Cmd) {
   // FIXME: Map operations are no-op!
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return pickThread().Submit(new MapImageCPUCommand(Cmd, SrcPtr));
+  return pickThread().submit<MapImageCPUCommand>(Cmd, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueUnmapMemObject &Cmd) {
   // FIXME: Unmap operations are no-op!
   void *DataPtr = getMemoryDescriptor(Cmd.GetMemObj()).ptr();
-  return pickThread().Submit(new UnmapMemObjectCPUCommand(Cmd, DataPtr, Cmd.GetMappedPtr()));
+  return pickThread().submit<UnmapMemObjectCPUCommand>(Cmd, DataPtr, Cmd.GetMappedPtr());
 }
 
 bool CPUDevice::Submit(EnqueueReadBufferRect &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
-  return pickThread().Submit(new ReadBufferRectCPUCommand(Cmd, Cmd.GetTarget(), SrcPtr));
+  return pickThread().submit<ReadBufferRectCPUCommand>(Cmd, Cmd.GetTarget(), SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueWriteBufferRect &Cmd) {
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new WriteBufferRectCPUCommand(Cmd, TgtPtr, Cmd.GetSource()));
+  return pickThread().submit<WriteBufferRectCPUCommand>(Cmd, TgtPtr, Cmd.GetSource());
 }
 
 bool CPUDevice::Submit(EnqueueCopyBufferRect &Cmd) {
   void *SrcPtr = getMemoryDescriptor(Cmd.GetSource()).ptr();
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new CopyBufferRectCPUCommand(Cmd, TgtPtr, SrcPtr));
+  return pickThread().submit<CopyBufferRectCPUCommand>(Cmd, TgtPtr, SrcPtr);
 }
 
 bool CPUDevice::Submit(EnqueueFillBuffer &Cmd) {
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new FillBufferCPUCommand(Cmd, TgtPtr));
+  return pickThread().submit<FillBufferCPUCommand>(Cmd, TgtPtr);
 }
 
 bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
   void *TgtPtr = getMemoryDescriptor(Cmd.GetTarget()).ptr();
-  return pickThread().Submit(new FillImageCPUCommand(Cmd, TgtPtr));
+  return pickThread().submit<FillImageCPUCommand>(Cmd, TgtPtr);
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
@@ -591,15 +571,15 @@ bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
     *Addr = getMemoryDescriptor(*P.second).ptr();
   }
 
-  return pickThread().Submit(new NativeKernelCPUCommand(Cmd));
+  return pickThread().submit<NativeKernelCPUCommand>(Cmd);
 }
 
 bool CPUDevice::Submit(EnqueueMarker &Cmd) {
-  return pickThread().Submit(new NoOpCPUCommand(Cmd));
+  return pickThread().submit<NoOpCPUCommand>(Cmd);
 }
 
 bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
-  return pickThread().Submit(new NoOpCPUCommand(Cmd));
+  return pickThread().submit<NoOpCPUCommand>(Cmd);
 }
 
 bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
@@ -637,18 +617,18 @@ bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
   Result = new CPUCommand::ResultRecorder(Cmd.GetWorkGroupsCount());
 
   size_t WGSize = DimInfo.GetLocalWorkItems();
-  bool AllSent = true;
 
   for (auto I = DimInfo.begin(), E = DimInfo.end(); I != E; I += WGSize) {
-    auto *NDRangeCmd =
-        new NDRangeKernelBlockCPUCommand(Cmd, Entry, GlobalArgs, I, I + WGSize,
-                                         AutoLocalsSize, *Result);
+    auto &Thr = pickLeastLoadedThread();
 
     // Submit command.
-    AllSent = AllSent && pickLeastLoadedThread().Submit(NDRangeCmd);
+    if (!Thr.submit<NDRangeKernelBlockCPUCommand>(Cmd, Entry, GlobalArgs,
+                                                  I, I + WGSize, AutoLocalsSize,
+                                                  *Result))
+      return false;
   }
 
-  return AllSent;
+  return true;
 }
 
 const Footprint &

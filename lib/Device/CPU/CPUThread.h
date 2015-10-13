@@ -44,7 +44,7 @@ private:
 
 class CPUThread : public sys::Thread {
 public:
-  typedef std::deque<CPUCommand *> CPUCommands;
+  typedef std::deque<std::unique_ptr<CPUCommand>> CPUCommands;
   typedef llvm::SmallVector<void *, 8> StaticLocalPointers;
 
   enum WorkingMode {
@@ -60,11 +60,15 @@ public:
   virtual ~CPUThread();
 
 public:
-  bool Submit(CPUCommand *Cmd);
+  template<typename CmdTy, typename... Args>
+  bool submit(Args&&... args) {
+    static_assert(std::is_base_of<CPUCommand, CmdTy>::value,
+                  "Not a CPUCommand type.");
+    return Submit(llvm::make_unique<CmdTy>(std::forward<Args>(args)...));
+  }
 
   virtual void Run();
 
-public:
   float GetLoadIndicator();
 
   const DimensionInfo::iterator &GetCurrentIndex() { return Cur; }
@@ -72,7 +76,9 @@ public:
   void SwitchToNextWorkItem();
 
 private:
-  void Execute(CPUCommand *Cmd);
+  bool Submit(std::unique_ptr<CPUCommand> Cmd);
+
+  void Execute(std::unique_ptr<CPUCommand> Cmd);
 
   void Execute(CPUServiceCommand &Cmd);
   void Execute(StopDeviceCPUCommand &Cmd);

@@ -2,6 +2,7 @@
 #include "CPUThread.h"
 #include "CPUDevice.h"
 
+#include "opencrun/Core/CommandQueue.h"
 #include "opencrun/Core/Event.h"
 #include "opencrun/System/OS.h"
 
@@ -190,17 +191,16 @@ CPUThread::CPUThread(CPUDevice &Dev, const sys::HardwareCPU &CPU) :
 
 CPUThread::~CPUThread() {
   // Tell worker thread to stop activities.
-  CPUCommand *Cmd = new StopDeviceCPUCommand();
-  Submit(Cmd);
+  submit<StopDeviceCPUCommand>();
 
   // Use Thread::Join to suspend current thread until the joined thread exits.
   Join();
 }
 
-bool CPUThread::Submit(CPUCommand *Cmd) {
+bool CPUThread::Submit(std::unique_ptr<CPUCommand> Cmd) {
   sys::ScopedMonitor Mnt(ThisMnt);
 
-  if(Mode & NoNewJobs)
+  if (Mode & NoNewJobs)
     return false;
 
   switch (Cmd->GetType()) {
@@ -231,7 +231,7 @@ bool CPUThread::Submit(CPUCommand *Cmd) {
     break;
   }
 
-  Commands.push_back(Cmd);
+  Commands.push_back(std::move(Cmd));
   Mnt.Signal();
 
   return true;
@@ -246,12 +246,12 @@ void CPUThread::Run() {
     while(Commands.empty())
       ThisMnt.Wait();
 
-    CPUCommand *Cmd = Commands.front();
+    auto Cmd = std::move(Commands.front());
     Commands.pop_front();
 
     ThisMnt.Exit();
 
-    Execute(Cmd);
+    Execute(std::move(Cmd));
   }
 
   ResetCurrentThread();
@@ -270,11 +270,11 @@ void CPUThread::SwitchToNextWorkItem() {
   Stack.SwitchToNextWorkItem();
 }
 
-void CPUThread::Execute(CPUCommand *Cmd) {
-  if (auto *OnFly = llvm::dyn_cast<CPUExecCommand>(Cmd))
+void CPUThread::Execute(std::unique_ptr<CPUCommand> Cmd) {
+  if (auto *OnFly = llvm::dyn_cast<CPUExecCommand>(Cmd.get()))
     Execute(*OnFly);
 
-  if (auto *OnFly = llvm::dyn_cast<CPUServiceCommand>(Cmd))
+  if (auto *OnFly = llvm::dyn_cast<CPUServiceCommand>(Cmd.get()))
     Execute(*OnFly);
 }
 
@@ -290,12 +290,28 @@ void CPUThread::Execute(CPUServiceCommand &Cmd) {
   }
 
 #undef DISPATCH
-
-  Dev.NotifyDone(Cmd);
 }
 
 void CPUThread::Execute(StopDeviceCPUCommand &Cmd) {
   Mode = Stopped;
+}
+
+static void NotifyDone(CPUExecCommand &Cmd, int ExitStatus) {
+  // Get counters to profile.
+  Command &QueueCmd = Cmd.GetQueueCommand();
+  InternalEvent &Ev = QueueCmd.GetNotifyEvent();
+  CommandQueue &Queue = Ev.GetCommandQueue();
+
+  // This command does not directly translate to an OpenCL command. Register
+  // partial acknowledgment.
+  if (auto *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(&Cmd))
+    Ev.MarkSubCompleted(ProfileSample::getSubCompleted(MultiCmd->GetId()));
+
+  // All acknowledgment received.
+  if (Cmd.RegisterCompleted(ExitStatus)) {
+    Ev.MarkCompleted(Cmd.GetExitStatus(), ProfileSample::getCompleted());
+    Queue.CommandDone(QueueCmd);
+  }
 }
 
 void CPUThread::Execute(CPUExecCommand &Cmd) {
@@ -339,8 +355,8 @@ void CPUThread::Execute(CPUExecCommand &Cmd) {
   }
 
 #undef DISPATCH
-  
-  Dev.NotifyDone(Cmd, ExitStatus);
+
+  NotifyDone(Cmd, ExitStatus);
 }
 
 int CPUThread::Execute(ReadBufferCPUCommand &Cmd) {
