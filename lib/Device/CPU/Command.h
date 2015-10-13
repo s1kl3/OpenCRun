@@ -223,17 +223,17 @@ public:
   StopDeviceCPUCommand() : CPUServiceCommand(CPUCommand::StopDevice) { }
 };
 
-class NoOpCPUCommand : public CPUExecCommand {
+class NoOpCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::NoOp;
   }
 
 public:
-  NoOpCPUCommand(Command &Cmd) : CPUExecCommand(CPUCommand::NoOp, Cmd) {}
+  NoOpCPUCommand(Command &Cmd) : CPUSingleExecCommand(CPUCommand::NoOp, Cmd) {}
 };
 
-class ReadBufferCPUCommand : public CPUExecCommand {
+class ReadBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::ReadBuffer;
@@ -241,7 +241,7 @@ public:
 
 public:
   ReadBufferCPUCommand(EnqueueReadBuffer &Cmd, const void *Src)
-    : CPUExecCommand(CPUCommand::ReadBuffer, Cmd),
+    : CPUSingleExecCommand(CPUCommand::ReadBuffer, Cmd),
       Src(Src) { }
 
   void *GetTarget() {
@@ -263,7 +263,7 @@ private:
   const void *Src;
 };
 
-class WriteBufferCPUCommand : public CPUExecCommand {
+class WriteBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::WriteBuffer;
@@ -271,7 +271,7 @@ public:
 
 public:
   WriteBufferCPUCommand(EnqueueWriteBuffer &Cmd, void *Dst)
-    : CPUExecCommand(CPUCommand::WriteBuffer, Cmd),
+    : CPUSingleExecCommand(CPUCommand::WriteBuffer, Cmd),
       Dst(Dst) { }
 
 public:
@@ -294,7 +294,7 @@ private:
   void *Dst;
 };
 
-class CopyBufferCPUCommand : public CPUExecCommand {
+class CopyBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::CopyBuffer;
@@ -304,7 +304,7 @@ public:
   CopyBufferCPUCommand(EnqueueCopyBuffer &Cmd, 
                        void *Dst,
                        const void *Src)
-    :	CPUExecCommand(CPUCommand::CopyBuffer, Cmd),
+    :	CPUSingleExecCommand(CPUCommand::CopyBuffer, Cmd),
       Dst(Dst),
       Src(Src) { }
     
@@ -332,7 +332,7 @@ private:
   const void *Src;
 };
 
-class ReadImageCPUCommand : public CPUExecCommand {
+class ReadImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::ReadImage;
@@ -340,7 +340,7 @@ public:
 
 public:
   ReadImageCPUCommand(EnqueueReadImage &Cmd, const void *Src)
-    : CPUExecCommand(CPUCommand::ReadImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::ReadImage, Cmd),
       Src(Src) { }
 
   void *GetTarget() {
@@ -378,7 +378,7 @@ private:
   const void *Src;
 };
 
-class WriteImageCPUCommand : public CPUExecCommand {
+class WriteImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::WriteImage;
@@ -386,7 +386,7 @@ public:
 
 public:
   WriteImageCPUCommand(EnqueueWriteImage &Cmd, void *Dst)
-    : CPUExecCommand(CPUCommand::WriteImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::WriteImage, Cmd),
       Dst(Dst) { }
 
   void *GetTarget() {
@@ -424,7 +424,7 @@ private:
   void *Dst;
 };
 
-class CopyImageCPUCommand : public CPUExecCommand {
+class CopyImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::CopyImage;
@@ -432,7 +432,7 @@ public:
 
 public:
   CopyImageCPUCommand(EnqueueCopyImage &Cmd, void *Dst, const void *Src)
-    : CPUExecCommand(CPUCommand::CopyImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::CopyImage, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -475,7 +475,7 @@ private:
   const void *Src;
 };
 
-class CopyImageToBufferCPUCommand : public CPUExecCommand {
+class CopyImageToBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::CopyImageToBuffer;
@@ -485,7 +485,7 @@ public:
   CopyImageToBufferCPUCommand(EnqueueCopyImageToBuffer &Cmd, 
                               void *Dst,
                               const void *Src)
-    : CPUExecCommand(CPUCommand::CopyImageToBuffer, Cmd),
+    : CPUSingleExecCommand(CPUCommand::CopyImageToBuffer, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -522,7 +522,7 @@ private:
   const void *Src;
 };
 
-class CopyBufferToImageCPUCommand : public CPUExecCommand {
+class CopyBufferToImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::CopyBufferToImage;
@@ -532,7 +532,7 @@ public:
   CopyBufferToImageCPUCommand(EnqueueCopyBufferToImage &Cmd, 
                               void *Dst,
                               const void *Src)
-    : CPUExecCommand(CPUCommand::CopyBufferToImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::CopyBufferToImage, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -569,7 +569,7 @@ private:
   const void *Src;
 };
 
-class MapBufferCPUCommand : public CPUExecCommand {
+class MapBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::MapBuffer;
@@ -578,7 +578,7 @@ public:
 public:
   MapBufferCPUCommand(EnqueueMapBuffer &Cmd,
                       const void *Src)
-    : CPUExecCommand(CPUCommand::MapBuffer, Cmd),
+    : CPUSingleExecCommand(CPUCommand::MapBuffer, Cmd),
       Src(Src) { }
 
 public:
@@ -601,7 +601,7 @@ private:
   const void *Src;
 };
 
-class MapImageCPUCommand : public CPUExecCommand {
+class MapImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::MapImage;
@@ -610,7 +610,7 @@ public:
 public:
   MapImageCPUCommand(EnqueueMapImage &Cmd,
                      const void *Src)
-    : CPUExecCommand(CPUCommand::MapImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::MapImage, Cmd),
       Src(Src) { }
 
 public:
@@ -649,7 +649,7 @@ private:
   const void *Src;
 };
 
-class UnmapMemObjectCPUCommand : public CPUExecCommand {
+class UnmapMemObjectCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::UnmapMemObject;
@@ -659,7 +659,7 @@ public:
   UnmapMemObjectCPUCommand(EnqueueUnmapMemObject &Cmd,
                            void *MemObjAddr,
                            void *MappedPtr)
-    : CPUExecCommand(CPUCommand::UnmapMemObject, Cmd),
+    : CPUSingleExecCommand(CPUCommand::UnmapMemObject, Cmd),
       MemObjAddr(MemObjAddr),
       MappedPtr(MappedPtr) { }
     
@@ -673,7 +673,7 @@ private:
   void *MappedPtr;
 };
 
-class ReadBufferRectCPUCommand : public CPUExecCommand {
+class ReadBufferRectCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::ReadBufferRect;
@@ -683,7 +683,7 @@ public:
   ReadBufferRectCPUCommand(EnqueueReadBufferRect &Cmd,
                            void *Dst,
                            void *Src)
-    : CPUExecCommand(CPUCommand::ReadBufferRect, Cmd),
+    : CPUSingleExecCommand(CPUCommand::ReadBufferRect, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -726,7 +726,7 @@ private:
   void *Src;
 };
 
-class WriteBufferRectCPUCommand : public CPUExecCommand {
+class WriteBufferRectCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::WriteBufferRect;
@@ -736,7 +736,7 @@ public:
   WriteBufferRectCPUCommand(EnqueueWriteBufferRect &Cmd,
                             void *Dst,
                             const void *Src)
-    : CPUExecCommand(CPUCommand::WriteBufferRect, Cmd),
+    : CPUSingleExecCommand(CPUCommand::WriteBufferRect, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -779,7 +779,7 @@ private:
   const void *Src;
 };
 
-class CopyBufferRectCPUCommand : public CPUExecCommand {
+class CopyBufferRectCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::CopyBufferRect;
@@ -789,7 +789,7 @@ public:
   CopyBufferRectCPUCommand(EnqueueCopyBufferRect &Cmd,
                             void *Dst,
                             void *Src)
-    : CPUExecCommand(CPUCommand::CopyBufferRect, Cmd),
+    : CPUSingleExecCommand(CPUCommand::CopyBufferRect, Cmd),
       Dst(Dst),
       Src(Src) { }
 
@@ -832,7 +832,7 @@ private:
   void *Src;
 };
 
-class FillBufferCPUCommand : public CPUExecCommand {
+class FillBufferCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::FillBuffer;
@@ -841,7 +841,7 @@ public:
 public:
   FillBufferCPUCommand(EnqueueFillBuffer &Cmd,
                        void *Dst)
-    : CPUExecCommand(CPUCommand::FillBuffer, Cmd),
+    : CPUSingleExecCommand(CPUCommand::FillBuffer, Cmd),
       Dst(Dst) { }
       
   void *GetTarget() {
@@ -867,7 +867,7 @@ private:
   void *Dst;
 };
 
-class FillImageCPUCommand : public CPUExecCommand {
+class FillImageCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::FillImage;
@@ -876,7 +876,7 @@ public:
 public:
   FillImageCPUCommand(EnqueueFillImage &Cmd,
                       void *Dst)
-    : CPUExecCommand(CPUCommand::FillImage, Cmd),
+    : CPUSingleExecCommand(CPUCommand::FillImage, Cmd),
       Dst(Dst) { }
       
   void *GetTarget() {
@@ -1014,7 +1014,7 @@ private:
   DimensionInfo::iterator End;
 };
 
-class NativeKernelCPUCommand : public CPUExecCommand {
+class NativeKernelCPUCommand : public CPUSingleExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::NativeKernel;
@@ -1025,7 +1025,7 @@ public:
 
 public:
   NativeKernelCPUCommand(EnqueueNativeKernel &Cmd)
-    : CPUExecCommand(CPUCommand::NativeKernel, Cmd) { }
+    : CPUSingleExecCommand(CPUCommand::NativeKernel, Cmd) { }
 
 public:
   Signature GetFunction() const {
