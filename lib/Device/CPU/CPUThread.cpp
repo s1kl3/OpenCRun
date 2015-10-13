@@ -271,108 +271,74 @@ void CPUThread::SwitchToNextWorkItem() {
 }
 
 void CPUThread::Execute(CPUCommand *Cmd) {
-  if(CPUServiceCommand *OnFly = llvm::dyn_cast<CPUServiceCommand>(Cmd))
-    Execute(OnFly);
-  else if(CPUExecCommand *OnFly = llvm::dyn_cast<CPUExecCommand>(Cmd))
-    Execute(OnFly);
+  if (auto *OnFly = llvm::dyn_cast<CPUExecCommand>(Cmd))
+    Execute(*OnFly);
+
+  if (auto *OnFly = llvm::dyn_cast<CPUServiceCommand>(Cmd))
+    Execute(*OnFly);
 }
 
-void CPUThread::Execute(CPUServiceCommand *Cmd) {
-  if(StopDeviceCPUCommand *OnFly =
-            llvm::dyn_cast<StopDeviceCPUCommand>(Cmd))
-    Execute(OnFly);
+void CPUThread::Execute(CPUServiceCommand &Cmd) {
+#define DISPATCH(CmdType)                              \
+  case CPUCommand::CmdType:                            \
+    Execute(*llvm::cast<CmdType ## CPUCommand>(&Cmd)); \
+    break;
+
+  switch (Cmd.GetType()) {
+  default: llvm_unreachable("Unknown command type!");
+  DISPATCH(StopDevice)
+  }
+
+#undef DISPATCH
 
   Dev.NotifyDone(Cmd);
 }
 
-void CPUThread::Execute(CPUExecCommand *Cmd) {
-  InternalEvent &Ev = Cmd->GetQueueCommand().GetNotifyEvent();
+void CPUThread::Execute(StopDeviceCPUCommand &Cmd) {
+  Mode = Stopped;
+}
+
+void CPUThread::Execute(CPUExecCommand &Cmd) {
+  InternalEvent &Ev = Cmd.GetQueueCommand().GetNotifyEvent();
   int ExitStatus;
 
   // Command started.
-  if(Cmd->RegisterStarted())
+  if (Cmd.RegisterStarted())
     Ev.MarkRunning(ProfileSample::getRunning());
 
   // This command is part of a large OpenCL command. Register partial execution.
-  if(CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(Cmd))
+  if (CPUMultiExecCommand *MultiCmd = llvm::dyn_cast<CPUMultiExecCommand>(&Cmd))
     Ev.MarkSubRunning(ProfileSample::getSubRunning(MultiCmd->GetId()));
 
-  if(ReadBufferCPUCommand *OnFly = llvm::dyn_cast<ReadBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
+#define DISPATCH(CmdType)                                           \
+  case CPUCommand::CmdType:                                         \
+    ExitStatus = Execute(*llvm::cast<CmdType ## CPUCommand>(&Cmd)); \
+    break;
 
-  else if(WriteBufferCPUCommand *OnFly =
-            llvm::dyn_cast<WriteBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
+  switch (Cmd.GetType()) {
+  default: ExitStatus = CPUCommand::Unsupported; break;
+  DISPATCH(ReadBuffer)
+  DISPATCH(WriteBuffer)
+  DISPATCH(CopyBuffer)
+  DISPATCH(ReadImage)
+  DISPATCH(WriteImage)
+  DISPATCH(CopyImage)
+  DISPATCH(CopyImageToBuffer)
+  DISPATCH(CopyBufferToImage)
+  DISPATCH(MapBuffer)
+  DISPATCH(MapImage)
+  DISPATCH(UnmapMemObject)
+  DISPATCH(ReadBufferRect)
+  DISPATCH(WriteBufferRect)
+  DISPATCH(CopyBufferRect)
+  DISPATCH(FillBuffer)
+  DISPATCH(FillImage)
+  DISPATCH(NDRangeKernelBlock)
+  DISPATCH(NativeKernel)
+  DISPATCH(NoOp)
+  }
 
-  else if(CopyBufferCPUCommand *OnFly =
-            llvm::dyn_cast<CopyBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(ReadImageCPUCommand *OnFly = 
-            llvm::dyn_cast<ReadImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(WriteImageCPUCommand *OnFly = 
-            llvm::dyn_cast<WriteImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(CopyImageCPUCommand *OnFly = 
-            llvm::dyn_cast<CopyImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(CopyImageToBufferCPUCommand *OnFly = 
-            llvm::dyn_cast<CopyImageToBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(CopyBufferToImageCPUCommand *OnFly = 
-            llvm::dyn_cast<CopyBufferToImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(MapBufferCPUCommand *OnFly =
-            llvm::dyn_cast<MapBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(MapImageCPUCommand *OnFly =
-            llvm::dyn_cast<MapImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(UnmapMemObjectCPUCommand *OnFly =
-            llvm::dyn_cast<UnmapMemObjectCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(ReadBufferRectCPUCommand *OnFly =
-            llvm::dyn_cast<ReadBufferRectCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(WriteBufferRectCPUCommand *OnFly =
-            llvm::dyn_cast<WriteBufferRectCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(CopyBufferRectCPUCommand *OnFly =
-            llvm::dyn_cast<CopyBufferRectCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(FillBufferCPUCommand *OnFly =
-            llvm::dyn_cast<FillBufferCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(FillImageCPUCommand *OnFly =
-            llvm::dyn_cast<FillImageCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-  
-  else if(NDRangeKernelBlockCPUCommand *OnFly =
-            llvm::dyn_cast<NDRangeKernelBlockCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(NativeKernelCPUCommand *OnFly =
-            llvm::dyn_cast<NativeKernelCPUCommand>(Cmd))
-    ExitStatus = Execute(*OnFly);
-
-  else if(llvm::isa<NoOpCPUCommand>(Cmd))
-    ExitStatus = CPUCommand::NoError;
-  
-  else
-    ExitStatus = CPUCommand::Unsupported;
+#undef DISPATCH
   
   Dev.NotifyDone(Cmd, ExitStatus);
 }
@@ -736,6 +702,10 @@ int CPUThread::Execute(NativeKernelCPUCommand &Cmd) {
 
   Func(Args);
 
+  return CPUCommand::NoError;
+}
+
+int CPUThread::Execute(NoOpCPUCommand &Cmd) {
   return CPUCommand::NoError;
 }
 

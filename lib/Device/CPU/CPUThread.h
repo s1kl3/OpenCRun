@@ -74,10 +74,10 @@ public:
 private:
   void Execute(CPUCommand *Cmd);
 
-  void Execute(CPUServiceCommand *Cmd);
-  void Execute(StopDeviceCPUCommand *Cmd) { Mode = Stopped; }
+  void Execute(CPUServiceCommand &Cmd);
+  void Execute(StopDeviceCPUCommand &Cmd);
 
-  void Execute(CPUExecCommand *Cmd);
+  void Execute(CPUExecCommand &Cmd);
   
   int Execute(ReadBufferCPUCommand &Cmd);
   int Execute(WriteBufferCPUCommand &Cmd);
@@ -97,6 +97,7 @@ private:
   int Execute(FillImageCPUCommand &Cmd);
   int Execute(NDRangeKernelBlockCPUCommand &Cmd);
   int Execute(NativeKernelCPUCommand &Cmd);
+  int Execute(NoOpCPUCommand &Cmd);
 
 private:
   // Method used to copy data between rectangular regions.
