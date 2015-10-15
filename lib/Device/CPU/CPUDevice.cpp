@@ -3,6 +3,7 @@
 #include "CPUCompiler.h"
 #include "CPUPasses.h"
 #include "CPUThread.h"
+#include "ImageSupport.h"
 #include "InternalCalls.h"
 
 #include "opencrun/Core/CommandQueue.h"
@@ -91,6 +92,38 @@ void *CPUMemoryDescriptor::map() {
 void CPUMemoryDescriptor::unmap() {
 }
 
+CPUImageDescriptor::~CPUImageDescriptor() {
+  sys::Free(ImgHeader);
+}
+
+bool CPUImageDescriptor::allocate() {
+  Ptr = allocateStorage();
+  if (!Ptr)
+    return Allocated = false;
+
+  auto *Hdr = (cpu_image_t*)sys::Alloc(sizeof(cpu_image_t));
+  if (!Hdr)
+    return Allocated = false;
+
+  auto &Img = *llvm::cast<Image>(&Obj);
+  Hdr->image_channel_order = Img.getImageFormat().image_channel_order;
+  Hdr->image_channel_data_type = Img.getImageFormat().image_channel_data_type;
+  Hdr->num_channels = Img.getNumChannels();
+  Hdr->element_size = Img.getElementSize();
+  Hdr->width = Img.getWidth();
+  Hdr->height = Img.getHeight();
+  Hdr->depth = Img.getDepth();
+  Hdr->row_pitch = Img.getRowPitch();
+  Hdr->slice_pitch = Img.getSlicePitch();
+  Hdr->array_size = Img.getArraySize();
+  Hdr->num_mip_levels = 0;
+  Hdr->num_samples = 0;
+  Hdr->data = Ptr;
+  ImgHeader = Hdr;
+
+  return Allocated = true;
+}
+
 //
 // CPUDevice implementation.
 //
@@ -144,6 +177,8 @@ bool CPUDevice::ComputeGlobalWorkPartition(const WorkSizes &GW,
 
 std::unique_ptr<MemoryDescriptor>
 CPUDevice::createMemoryDescriptor(const MemoryObject &Obj) {
+  if (auto *Img = llvm::dyn_cast<Image>(&Obj))
+    return llvm::make_unique<CPUImageDescriptor>(*this, *Img);
   return llvm::make_unique<CPUMemoryDescriptor>(*this, Obj);
 }
 
@@ -468,6 +503,10 @@ CPUMemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {
   return static_cast<CPUMemoryDescriptor&>(Obj.getDescriptorFor(*this));
 }
 
+CPUImageDescriptor &CPUDevice::getMemoryDescriptor(const Image &Img) {
+  return static_cast<CPUImageDescriptor&>(Img.getDescriptorFor(*this));
+}
+
 CPUThread &CPUDevice::pickThread() {
   // FIXME: maybe this is a too much dumb policy.
   return *Threads.front();
@@ -694,7 +733,7 @@ void CPUDevice::LocateMemoryObjArgAddresses(
       break;
     case KernelArg::ImageArg:
       if (auto *Img = I->getImage())
-        Ptr = getMemoryDescriptor(*Img).ptr();
+        Ptr = getMemoryDescriptor(*Img).imageHeader();
       break;
     }
     GlobalArgs[I->getIndex()] = Ptr;

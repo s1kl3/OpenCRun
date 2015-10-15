@@ -34,6 +34,24 @@ protected:
   void *Ptr;
 };
 
+class CPUImageDescriptor : public CPUMemoryDescriptor {
+public:
+  CPUImageDescriptor(const Device &Dev, const Image &Img)
+   : CPUMemoryDescriptor(Dev, Img), ImgHeader(nullptr) {}
+  virtual ~CPUImageDescriptor();
+
+  bool allocate() override;
+
+  void *imageHeader() {
+    tryAllocate();
+
+    return ImgHeader;
+  }
+
+private:
+  void *ImgHeader;
+};
+
 class CPUDevice : public Device {
 public:
   static bool classof(const Device *Dev) { return true; }
@@ -104,6 +122,7 @@ private:
                                    GlobalArgMappingsContainer &GlobalArgs);
 
   CPUMemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
+  CPUImageDescriptor &getMemoryDescriptor(const Image &Obj);
 
 private:
   std::vector<std::unique_ptr<CPUThread>> Threads;

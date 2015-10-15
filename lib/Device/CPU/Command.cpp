@@ -81,18 +81,8 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
     switch (I->getKind()) {
     default: break;
     case KernelArg::BufferArg:
-      // A buffer can be allocated by the CPUDevice.
-      Args[J] = GlobalArgs[J];
-      break;
     case KernelArg::ImageArg:
-      // An image can be allocated by the CPUDevice.
-      if (auto *Img = I->getImage()) {
-        DeviceImage *DevImg = new DeviceImage(*Img, GlobalArgs[J]);
-        DevImgs.push_back(DevImg);
-
-        // Store image descriptor address.
-        Args[J] = DevImg;
-      }
+      Args[J] = GlobalArgs[J];
       break;
     case KernelArg::SamplerArg:
       if (auto *Smplr = I->getSampler()) {
@@ -111,8 +101,6 @@ NDRangeKernelBlockCPUCommand::NDRangeKernelBlockCPUCommand(
 }
 
 NDRangeKernelBlockCPUCommand::~NDRangeKernelBlockCPUCommand() {
-  // Image descriptors can be freed.
-  llvm::DeleteContainerPointers(DevImgs);
   // Sampler addresses can be freed.
   llvm::DeleteContainerPointers(DevSmplrs);
   sys::Free(Args);

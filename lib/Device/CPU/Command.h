@@ -873,43 +873,6 @@ private:
 
 class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {
 public:
-  class DeviceImage {
-  public:
-    DeviceImage(const Image &Img, void *ImgData)
-      : image_channel_order(Img.getImageFormat().image_channel_order),
-        image_channel_data_type(Img.getImageFormat().image_channel_data_type),
-        num_channels(Img.getNumChannels()),
-        element_size(Img.getElementSize()),
-        width(Img.getWidth()),
-        height(Img.getHeight()),
-        depth(Img.getDepth()),
-        row_pitch(Img.getRowPitch()),
-        slice_pitch(Img.getSlicePitch()),
-        array_size(Img.getArraySize()),
-        num_mip_levels(0),
-        num_samples(0),
-        data(ImgData) { }
-
-  private:
-    cl_channel_order image_channel_order;
-    cl_channel_type image_channel_data_type;
-    cl_uint num_channels;
-    cl_uint element_size;
-
-    cl_uint width;
-    cl_uint height;
-    cl_uint depth;
-
-    cl_uint row_pitch;
-    cl_uint slice_pitch;
-
-    cl_uint array_size;
-   
-    cl_uint num_mip_levels;
-    cl_uint num_samples;
-
-    void *data; // Pointer to actual image data in __global AS.
-  };
 
   typedef cl_uint DeviceSampler;
 
@@ -922,7 +885,6 @@ public:
   typedef void (*Signature) (void **);
 
   typedef llvm::DenseMap<unsigned, void *> ArgsMappings;
-  typedef llvm::SmallVector<DeviceImage *, 4> DeviceImagesContainer;
   typedef llvm::SmallVector<DeviceSampler *, 4> DeviceSamplersContainer;
 
 public:
@@ -962,7 +924,6 @@ private:
   void **Args;
   size_t StaticLocalSize;
 
-  DeviceImagesContainer DevImgs;
   DeviceSamplersContainer DevSmplrs;
 
   DimensionInfo::iterator Start;
