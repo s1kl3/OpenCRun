@@ -106,12 +106,8 @@ bool MemoryObject::initForDevices() {
   std::vector<std::unique_ptr<MemoryDescriptor>> Descs;
   Descs.reserve(Ctx->device_size());
 
-  if (getParentObject())
-    for (auto *Dev : Ctx->devices())
-      Descs.push_back(llvm::make_unique<SubObjectDescriptor>(*Dev, *this));
-  else
-    for (auto *Dev : Ctx->devices())
-      Descs.push_back(Dev->createMemoryDescriptor(*this));
+  for (auto *Dev : Ctx->devices())
+    Descs.push_back(Dev->createMemoryDescriptor(*this));
 
   for (const auto &Desc : Descs)
     if (Desc == nullptr)
@@ -264,52 +260,6 @@ void Image::computePixelFeatures() {
 }
 
 MemoryDescriptor::~MemoryDescriptor() {}
-
-static MemoryDescriptor &getParentDescriptor(const Device &Dev,
-                                             const MemoryObject &Obj) {
-  if (const auto *Img = llvm::dyn_cast<Image>(&Obj))
-    if (Img->getType() == Image::Image1D_Buffer)
-      return Img->getBuffer()->getDescriptorFor(Dev);
-
-  const auto *Buf = llvm::cast<Buffer>(&Obj);
-  return Buf->getParent()->getDescriptorFor(Dev);
-}
-
-SubObjectDescriptor::SubObjectDescriptor(const Device &Dev,
-                                         const MemoryObject &Obj)
- : MemoryDescriptor(Dev, Obj), Parent(getParentDescriptor(Dev, Obj)) {}
-
-bool SubObjectDescriptor::allocate() {
-  return Allocated = Parent.tryAllocate();
-}
-
-bool SubObjectDescriptor::aliasWithHostPtr() const {
-  return Parent.aliasWithHostPtr();
-}
-
-void *SubObjectDescriptor::map() {
-  void *Base = Parent.map();
-
-  size_t Offset = 0;
-  if (auto *Buf = llvm::dyn_cast<Buffer>(&getMemoryObject()))
-    Offset = Buf->getOrigin();
-
-  return reinterpret_cast<uint8_t*>(Base) + Offset;
-}
-
-void SubObjectDescriptor::unmap() {
-  Parent.unmap();
-}
-
-void *SubObjectDescriptor::ptr() {
-  void *Base = Parent.ptr();
-
-  size_t Offset = 0;
-  if (auto *Buf = llvm::dyn_cast<Buffer>(&getMemoryObject()))
-    Offset = Buf->getOrigin();
-
-  return reinterpret_cast<uint8_t*>(Base) + Offset;
-}
 
 MemoryCoherencyTracker::MemoryCoherencyTracker(const MemoryObject &Obj)
  : Obj(Obj) {}

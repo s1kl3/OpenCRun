@@ -12,6 +12,28 @@ namespace cpu {
 
 class CPUThread;
 
+class CPUMemoryDescriptor : public MemoryDescriptor {
+public:
+  CPUMemoryDescriptor(const Device &Dev, const MemoryObject &Obj)
+    : MemoryDescriptor(Dev, Obj), Ptr(nullptr) {}
+  virtual ~CPUMemoryDescriptor();
+
+  bool allocate() override;
+
+  bool aliasWithHostPtr() const override;
+
+  void *map() override;
+  void unmap() override;
+
+  void *ptr() override { return map(); }
+
+protected:
+  void *allocateStorage();
+
+protected:
+  void *Ptr;
+};
+
 class CPUDevice : public Device {
 public:
   static bool classof(const Device *Dev) { return true; }
@@ -81,7 +103,7 @@ private:
   void LocateMemoryObjArgAddresses(Kernel &Kern,
                                    GlobalArgMappingsContainer &GlobalArgs);
 
-  MemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
+  CPUMemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
 
 private:
   std::vector<std::unique_ptr<CPUThread>> Threads;
@@ -94,24 +116,6 @@ private:
   mutable FootprintsContainer KernelFootprints;
 };
 
-class CPUMemoryDescriptor : public MemoryDescriptor {
-public:
-  CPUMemoryDescriptor(const Device &Dev, const MemoryObject &Obj)
-    : MemoryDescriptor(Dev, Obj), Ptr(nullptr) {}
-  virtual ~CPUMemoryDescriptor();
-
-  bool allocate() override;
-
-  bool aliasWithHostPtr() const override;
-
-  void *map() override;
-  void unmap() override;
-
-  void *ptr() override { return map(); }
-
-private:
-  void *Ptr;
-};
 
 } // End namespace cpu.
 } // End namespace opencrun.

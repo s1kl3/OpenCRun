@@ -33,29 +33,53 @@ using namespace opencrun::cpu;
 //
 
 CPUMemoryDescriptor::~CPUMemoryDescriptor() {
+  if (Obj.getParentObject())
+    return;
+
   // If UseHostPtr is set, we do not own the storage.
-  if (getMemoryObject().getFlags() & MemoryObject::UseHostPtr)
+  if (Obj.getFlags() & MemoryObject::UseHostPtr)
     return;
 
   sys::Free(Ptr);
 }
 
-bool CPUMemoryDescriptor::allocate() {
+static MemoryDescriptor &getParentDescriptor(const Device &Dev,
+                                             const MemoryObject &Obj) {
+  if (const auto *Img = llvm::dyn_cast<Image>(&Obj))
+    if (Img->getType() == Image::Image1D_Buffer)
+      return Img->getBuffer()->getDescriptorFor(Dev);
+
+  const auto *Buf = llvm::cast<Buffer>(&Obj);
+  return Buf->getParent()->getDescriptorFor(Dev);
+}
+
+void *CPUMemoryDescriptor::allocateStorage() {
+  // Handle sub-objects.
+  if (auto *Parent = Obj.getParentObject()) {
+    auto &ParentDesc = getParentDescriptor(Dev, Obj);
+    auto &CPUParentDesc = static_cast<CPUMemoryDescriptor&>(ParentDesc);
+    if (void *Base = CPUParentDesc.allocateStorage())
+      return reinterpret_cast<uint8_t*>(Base) + Parent->getParentOffset();
+
+    return nullptr;
+  }
+
   assert(!isAllocated());
 
   // If UseHostPtr is set, do not duplicate the storage.
-  if (getMemoryObject().getFlags() & MemoryObject::UseHostPtr) {
-    Ptr = getMemoryObject().getHostPtr();
-    return Allocated = true;
-  }
+  if (Obj.getFlags() & MemoryObject::UseHostPtr)
+    return Obj.getHostPtr();
 
-  Ptr = sys::CacheAlignedAlloc(getMemoryObject().getSize());
+  return sys::CacheAlignedAlloc(Obj.getSize());
+}
+
+bool CPUMemoryDescriptor::allocate() {
+  Ptr = allocateStorage();
   return Allocated = Ptr != nullptr;
 }
 
 bool CPUMemoryDescriptor::aliasWithHostPtr() const {
-  return isAllocated() &&
-         getMemoryObject().getFlags() & MemoryObject::UseHostPtr;
+  return isAllocated() && (Obj.getFlags() & MemoryObject::UseHostPtr);
 }
 
 void *CPUMemoryDescriptor::map() {
@@ -440,8 +464,8 @@ void CPUDevice::InitCompiler() {
   #undef INTERNAL_CALL
 }
 
-MemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {
-  return Obj.getDescriptorFor(*this);
+CPUMemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {
+  return static_cast<CPUMemoryDescriptor&>(Obj.getDescriptorFor(*this));
 }
 
 CPUThread &CPUDevice::pickThread() {

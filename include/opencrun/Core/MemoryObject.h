@@ -110,19 +110,19 @@ public:
   void synchronizeRegionFor(const Device &D, unsigned SM,
                             size_t Offset, size_t Size) const;
 
+  size_t getParentOffset() const { return ParentOffset; }
+  MemoryObject *getParentObject() const { return Parent.get(); }
+
+  template<typename Ty> Ty *getParentObject() const {
+    return llvm::cast_or_null<Ty>(Parent.get());
+  }
+
 protected:
   MemoryObject(Context &Ctx, Kind K, size_t Size, void *HostPtr, unsigned Flags,
                MemoryObject *ParentObj, size_t ParentOffset)
    : MemObjKind(K), Size(Size), Ctx(&Ctx), HostPtr(HostPtr), Flags(Flags),
      Parent(ParentObj), ParentOffset(ParentOffset) {
     initializeMCT();
-  }
-
-  size_t getParentOffset() const { return ParentOffset; }
-  MemoryObject *getParentObject() const { return Parent.get(); }
-
-  template<typename Ty> Ty *getParentObject() const {
-    return llvm::cast_or_null<Ty>(Parent.get());
   }
 
 private:
@@ -324,28 +324,8 @@ public:
 
 protected:
   bool Allocated;
-
-private:
   const Device &Dev;
   const MemoryObject &Obj;
-};
-
-class SubObjectDescriptor final : public MemoryDescriptor {
-public:
-  explicit SubObjectDescriptor(const Device &Dev, const MemoryObject &Obj);
-  virtual ~SubObjectDescriptor() = default;
-
-  bool allocate() override;
-
-  bool aliasWithHostPtr() const override;
-
-  void *map() override;
-  void unmap() override;
-
-  void *ptr() override;
-
-private:
-  MemoryDescriptor &Parent;
 };
 
 class MemoryCoherencyTracker {
