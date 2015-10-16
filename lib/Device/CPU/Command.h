@@ -2,6 +2,8 @@
 #ifndef OPENCRUN_DEVICE_CPU_COMMAND_H
 #define OPENCRUN_DEVICE_CPU_COMMAND_H
 
+#include "CPUKernelArguments.h"
+
 #include "opencrun/Core/Command.h"
 #include "opencrun/Core/Context.h"
 
@@ -871,42 +873,38 @@ private:
   void *Dst;
 };
 
-class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {
+class NDRangeKernelBlockContext : public CPUMultiExecContext {
 public:
+  NDRangeKernelBlockContext(size_t N, CPUKernelArguments Args)
+   : CPUMultiExecContext(N), KernelArgs(std::move(Args)) {}
 
-  typedef cl_uint DeviceSampler;
+  const CPUKernelArguments &getKernelArguments() const { return KernelArgs; }
 
+private:
+  CPUKernelArguments KernelArgs;
+};
+
+class NDRangeKernelBlockCPUCommand : public CPUMultiExecCommand {
 public:
   static bool classof(const CPUCommand *Cmd) {
     return Cmd->GetType() == CPUCommand::NDRangeKernelBlock;
   }
 
 public:
-  typedef void (*Signature) (void **);
-
-  typedef llvm::DenseMap<unsigned, void *> ArgsMappings;
-  typedef llvm::SmallVector<DeviceSampler *, 4> DeviceSamplersContainer;
-
-public:
-  DimensionInfo::iterator index_begin() { return Start; }
-  DimensionInfo::iterator index_end() { return End; }
+  using Signature = void (*)(void**);
 
 public:
   NDRangeKernelBlockCPUCommand(
-      EnqueueNDRangeKernel &Cmd, Signature Entry,
-      ArgsMappings &GlobalArgs, size_t StaticLocalSize,
+      EnqueueNDRangeKernel &Cmd, void *Entry,
       DimensionInfo::iterator I, DimensionInfo::iterator E,
-      llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext);
+      llvm::IntrusiveRefCntPtr<NDRangeKernelBlockContext> CmdContext);
 
-  ~NDRangeKernelBlockCPUCommand();
+  Signature GetFunction() { return Entry; }
 
-public:
-  void SetLocalParams(LocalMemory &Local);
-
-public:
-  Signature &GetFunction() { return Entry; }
-  void **GetArgumentsPointer() { return Args; }
-  unsigned GetStaticLocalSize() const { return StaticLocalSize; }
+  std::unique_ptr<void*[]> prepareArgumentsBuffer(LocalMemory &LM) const {
+    auto &Ctx = getCmdContextAs<NDRangeKernelBlockContext>();
+    return Ctx.getKernelArguments().prepareArgumentsBuffer(LM);
+  }
 
   Kernel &GetKernel() {
     return GetQueueCommandAs<EnqueueNDRangeKernel>().GetKernel();
@@ -916,15 +914,11 @@ public:
     return GetQueueCommandAs<EnqueueNDRangeKernel>().GetDimensionInfo();
   }
 
-private:
-  cl_uint GetDeviceSampler(const Sampler &Smplr);
+  DimensionInfo::iterator index_begin() { return Start; }
+  DimensionInfo::iterator index_end() { return End; }
 
 private:
   Signature Entry;
-  void **Args;
-  size_t StaticLocalSize;
-
-  DeviceSamplersContainer DevSmplrs;
 
   DimensionInfo::iterator Start;
   DimensionInfo::iterator End;

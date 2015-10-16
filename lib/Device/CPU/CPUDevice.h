@@ -3,6 +3,7 @@
 #define OPENCRUN_DEVICE_CPU_CPUDEVICE_H
 
 #include "Command.h"
+#include "CPUKernelArguments.h"
 
 #include "opencrun/Core/Device.h"
 #include "opencrun/System/Hardware.h"
@@ -115,11 +116,9 @@ private:
   bool Submit(EnqueueMarker &Cmd);
   bool Submit(EnqueueBarrier &Cmd);
 
-  bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
-                           GlobalArgMappingsContainer &GlobalArgs);
+  bool BlockParallelSubmit(EnqueueNDRangeKernel &Cmd);
 
-  void LocateMemoryObjArgAddresses(Kernel &Kern,
-                                   GlobalArgMappingsContainer &GlobalArgs);
+  CPUKernelArguments createKernelArguments(Kernel &Kern, size_t ALS);
 
   CPUMemoryDescriptor &getMemoryDescriptor(const MemoryObject &Obj);
   CPUImageDescriptor &getMemoryDescriptor(const Image &Obj);

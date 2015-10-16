@@ -4,6 +4,9 @@
 #include "CL/cl.h"
 
 namespace opencrun {
+
+class Sampler;
+
 namespace cpu {
 
 //// WARNING: These definition must match the one in Library/Image.td.
@@ -28,6 +31,10 @@ struct cpu_image_t {
 
   void *data; // Pointer to actual image data in __global AS.
 };
+
+using cpu_sampler_t = cl_uint;
+
+cpu_sampler_t getCPUSampler(const Sampler *Smplr);
 
 }
 }

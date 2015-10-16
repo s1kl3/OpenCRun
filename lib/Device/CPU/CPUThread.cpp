@@ -657,14 +657,30 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
   return CPUCommand::NoError;
 }
 
+std::unique_ptr<void*[]>
+CPUKernelArguments::prepareArgumentsBuffer(LocalMemory &LM) const {
+  LM.Reset(AutoLocalsSize);
+
+  bool WithAutoLocals = AutoLocalsSize > 0;
+  auto ArgsBuffer = llvm::make_unique<void*[]>(Args.size() + WithAutoLocals);
+
+  memcpy(ArgsBuffer.get(), Args.data(), Args.size() * sizeof(void*));
+
+  for (const auto &P : LocalBuffers)
+    ArgsBuffer[P.first] = LM.Alloc(P.second);
+
+  if (WithAutoLocals)
+    ArgsBuffer[Args.size()] = LM.GetStaticPtr();
+
+  return ArgsBuffer;
+}
+
 int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
-  // Reserve space for local buffers.
-  Local.Reset(Cmd.GetStaticLocalSize());
-  Cmd.SetLocalParams(Local);
+  // Prepare arguments allocating local buffers.
+  auto Args = Cmd.prepareArgumentsBuffer(Local);
 
   // Get function and arguments.
   NDRangeKernelBlockCPUCommand::Signature Func = Cmd.GetFunction();
-  void **Args = Cmd.GetArgumentsPointer();
 
   // Entry point not available, error!
   if(!Func)
@@ -678,7 +694,7 @@ int CPUThread::Execute(NDRangeKernelBlockCPUCommand &Cmd) {
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
 
   // Reset the stack and set initial work-item.
-  Stack.Reset(Func, Args, DimInfo.GetLocalWorkItems());
+  Stack.Reset(Func, Args.get(), DimInfo.GetLocalWorkItems());
   Cur = Begin;
 
   // Start the first work-item.

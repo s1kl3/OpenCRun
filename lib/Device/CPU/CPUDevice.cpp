@@ -617,12 +617,8 @@ bool CPUDevice::Submit(EnqueueFillImage &Cmd) {
 }
 
 bool CPUDevice::Submit(EnqueueNDRangeKernel &Cmd) {
-  // Get global and constant buffer mappings.
-  GlobalArgMappingsContainer GlobalArgs;
-  LocateMemoryObjArgAddresses(Cmd.GetKernel(), GlobalArgs);
-
   // TODO: analyze kernel and decide the scheduling policy to use.
-  return BlockParallelSubmit(Cmd, GlobalArgs);
+  return BlockParallelSubmit(Cmd);
 }
 
 bool CPUDevice::Submit(EnqueueNativeKernel &Cmd) {
@@ -645,38 +641,70 @@ bool CPUDevice::Submit(EnqueueBarrier &Cmd) {
   return pickThread().submit<NoOpCPUCommand>(Cmd);
 }
 
-bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd,
-                                    GlobalArgMappingsContainer &GlobalArgs) {
-  const KernelDescriptor &KernDesc = Cmd.GetKernel().getDescriptor();
-  auto *Kern = KernDesc.getFunction(this);
+CPUKernelArguments CPUDevice::createKernelArguments(Kernel &Kern, size_t ALS) {
+  auto Args = std::vector<void*>{Kern.GetArgCount()};
+  auto LocalBuffers = std::vector<std::pair<size_t, size_t>>{};
+
+  auto Samplers = std::vector<cpu_sampler_t>{};
+  auto NumSamplers =
+    std::count_if(Kern.arg_begin(), Kern.arg_end(), [](const KernelArg &A) {
+      return A.getKind() == KernelArg::SamplerArg;
+    });
+  Samplers.resize(NumSamplers);
+
+  auto *CurSampler = &Samplers.front();
+  for (auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I) {
+    void *Ptr = nullptr;
+    switch (I->getKind()) {
+    default: break;
+    case KernelArg::LocalBufferArg:
+      Ptr = nullptr;
+      LocalBuffers.emplace_back(I->getIndex(), I->getLocalSize());
+      break;
+    case KernelArg::BufferArg:
+      if (auto *Buf = I->getBuffer())
+        Ptr = getMemoryDescriptor(*Buf).ptr();
+      break;
+    case KernelArg::ImageArg:
+      if (auto *Img = I->getImage())
+        Ptr = getMemoryDescriptor(*Img).imageHeader();
+      break;
+    case KernelArg::SamplerArg:
+      *CurSampler = getCPUSampler(I->getSampler());
+      Ptr = CurSampler++;
+      break;
+    case KernelArg::ByValueArg:
+      Ptr = I->getByValPtr();
+      break;
+    }
+    Args[I->getIndex()] = Ptr;
+  }
+
+  return {std::move(Args), ALS, std::move(LocalBuffers), std::move(Samplers)};
+}
+
+bool CPUDevice::BlockParallelSubmit(EnqueueNDRangeKernel &Cmd) {
+  auto &Kern = Cmd.GetKernel();
+  auto &KernDesc = Kern.getDescriptor();
+  auto *KernFn = KernDesc.getFunction(this);
   auto &Cmplr = getCompilerAs<CPUCompiler>();
 
-  // Add the kernel to the JIT-compiler.
-  Cmplr.addKernel(Kern);
+  Cmplr.addKernel(KernFn);
+  auto Entry = Cmplr.getEntryPoint(KernFn);
+  auto AutoLocalsSize = Cmplr.getAutomaticLocalsSize(KernFn);
+  auto KernArgs = createKernelArguments(Kern, AutoLocalsSize);
 
-  // Native launcher address.
-  using BlockParallelEntryPoint = NDRangeKernelBlockCPUCommand::Signature;
-  auto Entry =
-    reinterpret_cast<BlockParallelEntryPoint>(Cmplr.getEntryPoint(Kern));
+  llvm::IntrusiveRefCntPtr<NDRangeKernelBlockContext> CmdContext;
+  CmdContext = new NDRangeKernelBlockContext(Cmd.GetWorkGroupsCount(),
+                                             std::move(KernArgs));
 
-  // Index space.
   DimensionInfo &DimInfo = Cmd.GetDimensionInfo();
-
-  // Automatic locals size
-  unsigned AutoLocalsSize = Cmplr.getAutomaticLocalsSize(Kern);
-
-  // Holds data about kernel result.
-  llvm::IntrusiveRefCntPtr<CPUMultiExecContext> CmdContext;
-  CmdContext = new CPUMultiExecContext(Cmd.GetWorkGroupsCount());
-
   size_t WGSize = DimInfo.GetLocalWorkItems();
 
   for (auto I = DimInfo.begin(), E = DimInfo.end(); I != E; I += WGSize) {
     auto &Thr = pickLeastLoadedThread();
 
-    // Submit command.
-    if (!Thr.submit<NDRangeKernelBlockCPUCommand>(Cmd, Entry, GlobalArgs,
-                                                  AutoLocalsSize, I, I + WGSize,
+    if (!Thr.submit<NDRangeKernelBlockCPUCommand>(Cmd, Entry, I, I + WGSize,
                                                   CmdContext))
       return false;
   }
@@ -718,26 +746,6 @@ CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   KernelFootprints[&Kern] = *Pass;
 
   return KernelFootprints[&Kern];
-}
-
-void CPUDevice::LocateMemoryObjArgAddresses(
-                  Kernel &Kern,
-                  GlobalArgMappingsContainer &GlobalArgs) {
-  for(auto I = Kern.arg_begin(), E = Kern.arg_end(); I != E; ++I) {
-    void *Ptr = nullptr;
-    switch (I->getKind()) {
-    default: break;
-    case KernelArg::BufferArg:
-      if (auto *Buf = I->getBuffer())
-        Ptr = getMemoryDescriptor(*Buf).ptr();
-      break;
-    case KernelArg::ImageArg:
-      if (auto *Img = I->getImage())
-        Ptr = getMemoryDescriptor(*Img).imageHeader();
-      break;
-    }
-    GlobalArgs[I->getIndex()] = Ptr;
-  }
 }
 
 bool CPUDevice::isPartitionSupported(const DevicePartition &Part) const {
