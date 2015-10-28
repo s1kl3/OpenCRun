@@ -884,9 +884,9 @@ void MemoryObjectBuilder::setImage(const cl_image_format *Fmt,
 
     Img.Desc.Width = Desc->image_width;
     // FIXME: these values should be zero!
-    Img.Desc.Height = 1;
-    Img.Desc.Depth = 1;
-    Img.Desc.ArraySize = ArrayImage ? Desc->image_array_size : 1;
+    Img.Desc.Height = 0;
+    Img.Desc.Depth = 0;
+    Img.Desc.ArraySize = ArrayImage ? Desc->image_array_size : 0;
     break;
   }
   case CL_MEM_OBJECT_IMAGE2D:
@@ -919,8 +919,8 @@ void MemoryObjectBuilder::setImage(const cl_image_format *Fmt,
     Img.Desc.Width = Desc->image_width;
     Img.Desc.Height = Desc->image_height;
     // FIXME: these values should be zero!
-    Img.Desc.Depth = 1;
-    Img.Desc.ArraySize = ArrayImage ? Desc->image_array_size : 1;
+    Img.Desc.Depth = 0;
+    Img.Desc.ArraySize = ArrayImage ? Desc->image_array_size : 0;
     break;
   }
   case CL_MEM_OBJECT_IMAGE3D: {
@@ -949,7 +949,7 @@ void MemoryObjectBuilder::setImage(const cl_image_format *Fmt,
     Img.Desc.Height = Desc->image_height;
     Img.Desc.Depth = Desc->image_depth;
     // FIXME: these values should be zero!
-    Img.Desc.ArraySize = 1;
+    Img.Desc.ArraySize = 0;
     break;
   }
   default:
