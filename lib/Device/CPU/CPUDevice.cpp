@@ -105,17 +105,21 @@ bool CPUImageDescriptor::allocate() {
   if (!Hdr)
     return Allocated = false;
 
+  auto fixup = [](size_t X) {
+    return X == 0 ? 1 : X;
+  };
+
   auto &Img = *llvm::cast<Image>(&Obj);
   Hdr->image_channel_order = Img.getImageFormat().image_channel_order;
   Hdr->image_channel_data_type = Img.getImageFormat().image_channel_data_type;
   Hdr->num_channels = Img.getNumChannels();
   Hdr->element_size = Img.getElementSize();
-  Hdr->width = Img.getWidth();
-  Hdr->height = Img.getHeight();
-  Hdr->depth = Img.getDepth();
-  Hdr->row_pitch = Img.getRowPitch();
-  Hdr->slice_pitch = Img.getSlicePitch();
-  Hdr->array_size = Img.getArraySize();
+  Hdr->width = fixup(Img.getWidth());
+  Hdr->height = fixup(Img.getHeight());
+  Hdr->depth = fixup(Img.getDepth());
+  Hdr->row_pitch = fixup(Img.getRowPitch());
+  Hdr->slice_pitch = fixup(Img.getSlicePitch());
+  Hdr->array_size = fixup(Img.getArraySize());
   Hdr->num_mip_levels = 0;
   Hdr->num_samples = 0;
   Hdr->data = Ptr;
