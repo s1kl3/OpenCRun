@@ -189,7 +189,7 @@ static void regenerateFunction(Function *Fn, Type *HTy,
   // Create new function.
   auto *NewFn = Function::Create(NewFnTy, Fn->getLinkage());
   NewFn->takeName(Fn);
-  Fn->getParent()->getFunctionList().insert(Fn, NewFn);
+  Fn->getParent()->getFunctionList().insert(Fn->getIterator(), NewFn);
   F2FMap[Fn] = NewFn;
 
   // Move the function body from old to new.
@@ -203,7 +203,7 @@ static void regenerateFunction(Function *Fn, Type *HTy,
   auto NewArgI = NewFn->arg_begin();
   for (auto &Arg : Fn->args()) {
     NewArgI->setName(Arg.getName());
-    Arg.replaceAllUsesWith(NewArgI);
+    Arg.replaceAllUsesWith(&*NewArgI);
     ++NewArgI;
   }
   NewArgI->setName("automatic.locals.ptr");

@@ -130,7 +130,7 @@ static std::unique_ptr<llvm::Module> extractKernelModule(llvm::Function *F) {
       auto NewArgI = NewFn->arg_begin();
       for (auto ArgI = OldFn->arg_begin(); ArgI != OldFn->arg_end(); ++ArgI) {
         NewArgI->setName(ArgI->getName());
-        VMap[ArgI] = NewArgI++;
+        VMap[&*ArgI] = &*NewArgI++;
       }
 
       llvm::SmallVector<llvm::ReturnInst*, 8> Returns; // Ignore returns cloned.

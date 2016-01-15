@@ -122,7 +122,7 @@ bool GroupParallelStub::BuildStub(KernelInfo KI) {
   KI.updateCustomInfo(MDNode::get(Ctx, Info));
 
   // Set argument name.
-  Argument *Args = Stub->arg_begin();
+  Argument *Args = &*Stub->arg_begin();
   Args->setName("args");
 
   // Entry basic block.
