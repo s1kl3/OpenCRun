@@ -170,7 +170,7 @@ endif
 NO_MAYBE_UNINITIALIZED = -Wno-uninitialized
 
 BCCompile.CL = $(LLVMCC) $(CPP.Flags) $(C.Flags) $(CFLAGS) $(CPPFLAGS) \
-               $(TargetCommonOpts) $(CompileCommonOpts) -g0 \
+               $(TargetCommonOpts) $(CompileCommonOpts) -g0 -march=native \
                -I$(HeaderDir) -Wno-empty-translation-unit -Wgnu
 
 ObjectsBC := $(BaseNameSources:%=$(ObjDir)/%.bc)
