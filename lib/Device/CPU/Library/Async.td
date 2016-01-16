@@ -103,6 +103,7 @@ def : OCLTargetBuiltinImpl<blt_wait_group_events, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
+let Requirements = [generic_ptr] in
 def : OCLTargetBuiltinImpl<blt_prefetch, TemplateStrategy<[{
   const_gen_ptr_t chg_ptr;
   chg_ptr.g_ptr = param1;
