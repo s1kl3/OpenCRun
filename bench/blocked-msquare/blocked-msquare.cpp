@@ -60,8 +60,8 @@ BenchmarkResult *BlockedMSquare::Run(Benchmark::Class Cls) {
   cl::Kernel MSquareKern(Prog, "msquare");
   MSquareKern.setArg(0, DeviceSquareBuf);
   MSquareKern.setArg(1, MatrixBuf);
-  MSquareKern.setArg(2, cl::__local(BlockSz * BlockSz * sizeof(cl_float)));
-  MSquareKern.setArg(3, cl::__local(BlockSz * BlockSz * sizeof(cl_float)));
+  MSquareKern.setArg(2, cl::Local(BlockSz * BlockSz * sizeof(cl_float)));
+  MSquareKern.setArg(3, cl::Local(BlockSz * BlockSz * sizeof(cl_float)));
 
   // Move matrix on accelerator.
   Queue.enqueueWriteBuffer(MatrixBuf,

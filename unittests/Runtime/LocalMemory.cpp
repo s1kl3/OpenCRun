@@ -28,7 +28,7 @@ TYPED_TEST_P(LocalMemoryTest, ByAPI) {
   cl::Kernel Kern = this->BuildKernel("butterfly", Src);
 
   Kern.setArg(0, Out);
-  Kern.setArg(1, cl::__local(4 * sizeof(cl_uint)));
+  Kern.setArg(1, cl::Local(4 * sizeof(cl_uint)));
 
   cl::CommandQueue Queue = this->GetQueue();
 
