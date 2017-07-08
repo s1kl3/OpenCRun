@@ -66,13 +66,14 @@ public:
     const size_t *Region;
     cl_map_flags MapFlags;
 
-    bool CheckOverlap(const MappingInfo &MapInfo);
+    bool CheckOverlap(const MappingInfo &MapInfo) const;
   };
   
   typedef std::multimap<void *, MappingInfo> MappingsContainer;
   
 public:
   typedef MappingsContainer::iterator maps_iterator;
+  typedef MappingsContainer::const_iterator const_maps_iterator;
   
 protected:
   MemoryObj(Type MemTy,
@@ -119,7 +120,8 @@ public:
   
   MappingInfo *GetMappingInfo(void *MapBuf);
   
-  size_t GetMappedCount() const { return Maps.size(); }
+  size_t GetMappedCount() const;
+  size_t GetMappedCount(MappingInfo &MapInfo) const;
   
 private:
   Type MemTy;

@@ -15,7 +15,7 @@ MemoryObj::~MemoryObj() {
   Ctx->DestroyMemoryObj(*this);
 }
 
-bool MemoryObj::MappingInfo::CheckOverlap(const MappingInfo &MapInfo) {
+bool MemoryObj::MappingInfo::CheckOverlap(const MappingInfo &MapInfo) const {
   if(Origin && Region) {
     // Image mapping.
     const size_t MapInfo_Min[] = { MapInfo.Origin[0],
@@ -31,21 +31,15 @@ bool MemoryObj::MappingInfo::CheckOverlap(const MappingInfo &MapInfo) {
     const size_t Max[] = { Origin[0] + Region[0],
                            Origin[1] + Region[1],
                            Origin[2] + Region[2] };
-
-    bool Overlap = true;
-    for(unsigned I = 0; I < 3 && !Overlap; ++I) {
-      Overlap = Overlap && (MapInfo_Min[I] < Max[I])
-        && (MapInfo_Max[I] > Min[I]);
-    }
-
-    if(Overlap)
-      return true;
+    
+    return (((MapInfo_Min[0] < Max[0]) && (MapInfo_Max[0] > Min[0])) &&
+            ((MapInfo_Min[1] < Max[1]) && (MapInfo_Max[1] > Min[1])) &&
+            ((MapInfo_Min[2] < Max[2]) && (MapInfo_Max[2] > Min[2])));
 
   } else {
     // Buffer or 1D Image buffer mapping.
-    if((MapInfo.Offset <= (Offset + Size))
-        && ((MapInfo.Offset + MapInfo.Size) >=  Offset))
-      return true;
+    return ((MapInfo.Offset < (Offset + Size)) &&
+            ((MapInfo.Offset + MapInfo.Size) >  Offset));
   }
 
   return false;
@@ -64,11 +58,20 @@ bool MemoryObj::AddNewMapping(void *MapBuf, const MemoryObj::MappingInfo &MapInf
   
   llvm::sys::ScopedLock Lock(ThisLock);
 
-  if(llvm::isa<Buffer>(this)) {
+  if(Buffer *Buf = llvm::dyn_cast<Buffer>(this)) {
+
+    // For sub-buffers the request is forwarded to the
+    // parent buffer object.
+    if(Buf->IsSubBuffer()) {
+      MappingInfo ParentMapInfo = MapInfo;
+
+      Buffer *Parent = Buf->GetParent();
+      ParentMapInfo.Offset += Buf->GetOffset();
+      return Parent->AddNewMapping(MapBuf, ParentMapInfo);
+    }
 
     if(MapInfo.MapFlags & CL_MAP_READ)
       Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
-
     else if(MapInfo.MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
       if(Maps.count(MapBuf))
         return false;
@@ -81,35 +84,23 @@ bool MemoryObj::AddNewMapping(void *MapBuf, const MemoryObj::MappingInfo &MapInf
 
   } else if(Image *Img = llvm::dyn_cast<Image>(this)) {
 
-    if(MapInfo.MapFlags & CL_MAP_READ) {
-      if(Img->GetImageType() == Image::Image1D_Buffer) {
-        Buffer *Buf = Img->GetBuffer();
+    // For 1D image buffers the request is forwarded to the
+    // associated buffer object.
+    if(Img->GetImageType() == Image::Image1D_Buffer) {
+      Buffer *Buf = Img->GetBuffer();
+      return Buf->AddNewMapping(MapBuf, MapInfo);
+    }
 
-        // Mapping is added to the associated buffer, checking
-        // the image 1D buffer mapping doesn't overlap with
-        // any other mapping involving the buffer.
-        return Buf->AddNewMapping(MapBuf, MapInfo);
-      }
-      else 
-        Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
-    } else if(MapInfo.MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
-      if(Img->GetImageType() == Image::Image1D_Buffer) {
-        Buffer *Buf = Img->GetBuffer();
+    if(MapInfo.MapFlags & CL_MAP_READ)
+      Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
+    else if(MapInfo.MapFlags & (CL_MAP_WRITE | CL_MAP_WRITE_INVALIDATE_REGION)) {
+      if(Maps.count(MapBuf))
+        return false;
 
-        // Mapping is added to the associated buffer, checking
-        // the image 1D buffer mapping doesn't overlap with
-        // any other mapping involving the buffer.
-        return Buf->AddNewMapping(MapBuf, MapInfo);
-      }
-      else {
-        if(Maps.count(MapBuf))
-          return false;
+      for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
+        if(I->second.CheckOverlap(MapInfo)) return false;
 
-        for(maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
-          if(I->second.CheckOverlap(MapInfo)) return false;
-
-        Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
-      }
+      Maps.insert(std::pair<void *, MappingInfo>(MapBuf, MapInfo));
     }
 
   }
@@ -120,10 +111,16 @@ bool MemoryObj::AddNewMapping(void *MapBuf, const MemoryObj::MappingInfo &MapInf
 bool MemoryObj::RemoveMapping(void *MapBuf) {
   llvm::sys::ScopedLock Lock(ThisLock);
 
+  if(Buffer *Buf = llvm::dyn_cast<Buffer>(this)) {
+    if(Buf->IsSubBuffer()) {
+      Buffer *Parent = Buf->GetParent();
+      return Parent->RemoveMapping(MapBuf);
+    }
+  }
+
   if(Image *Img = llvm::dyn_cast<Image>(this)) {
     if(Img->GetImageType() == Image::Image1D_Buffer) {
       Buffer *Buf = Img->GetBuffer();
-
       return Buf->RemoveMapping(MapBuf);
     }
   }
@@ -154,6 +151,39 @@ MemoryObj::MappingInfo *MemoryObj::GetMappingInfo(void *MapBuf) {
     return NULL;
     
   return &(it->second);
+}
+
+size_t MemoryObj::GetMappedCount() const {
+  if(const Buffer *Buf = llvm::dyn_cast<Buffer>(this)) {
+
+    if(Buf->IsSubBuffer()) {
+      MappingInfo SubBufMapInfo;
+      SubBufMapInfo.Offset = Buf->GetOffset();
+      SubBufMapInfo.Size = Buf->GetSize();
+      SubBufMapInfo.Origin = NULL;
+      SubBufMapInfo.Region = NULL;
+      Buffer *Parent = Buf->GetParent();
+      return Parent->GetMappedCount(SubBufMapInfo);
+    }
+
+  } else if(const Image *Img = llvm::dyn_cast<Image>(this)) {
+
+    if(Img->GetImageType() == Image::Image1D_Buffer) {
+      Buffer *Buf = Img->GetBuffer();
+      return Buf->GetMappedCount();
+    }
+
+  }
+
+  return Maps.size();
+}
+
+size_t MemoryObj::GetMappedCount(MappingInfo &MapInfo) const {
+  size_t num_overlap = 0;
+  for(const_maps_iterator I = Maps.begin(), E = Maps.end(); I != E; ++I)
+    if(I->second.CheckOverlap(MapInfo)) num_overlap++;
+
+  return num_overlap;
 }
 
 //
