@@ -28,8 +28,8 @@ struct _event_t {
 typedef _event_t * event_t;
 
 // The same holds for some macro.
-#define CLK_LOCAL_MEM_FENCE  1 << 0
-#define CLK_GLOBAL_MEM_FENCE 1 << 1
+#define CLK_LOCAL_MEM_FENCE  0x0
+#define CLK_GLOBAL_MEM_FENCE 0x1
 
 #define CLK_NORMALIZED_COORDS_FALSE 0x0000
 #define CLK_NORMALIZED_COORDS_TRUE  0x0010
