@@ -351,7 +351,7 @@ def blt_atomic_xchg : AtomicBuiltin_nP1nn_UnP1UnUn_fP1ff_nP2nn_UnP2UnUn_fP2ff<"a
 def blt_atomic_inc : AtomicBuiltin_nP1n_UnP1Un_nP2n_UnP2Un<"atomic_inc">;
 def blt_atomic_dec : AtomicBuiltin_nP1n_UnP1Un_nP2n_UnP2Un<"atomic_dec">;
 
-def blt_atomic_cmpxchg : AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<"atomic_cmpgxchg">;
+def blt_atomic_cmpxchg : AtomicBuiltin_nP1nnn_UnP1UnUnUn_nP2nnn_UnP2UnUnUn<"atomic_cmpxchg">;
 
 def blt_atomic_min	: AtomicBuiltin_nP1nn_UnP1UnUn_nP2nn_UnP2UnUn<"atomic_min">;
 def blt_atomic_max	: AtomicBuiltin_nP1nn_UnP1UnUn_nP2nn_UnP2UnUn<"atomic_max">;

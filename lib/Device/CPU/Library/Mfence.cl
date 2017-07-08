@@ -1,6 +1,6 @@
 
 //
-// The Async library is auto-generated.
+// The Memory Fence library is auto-generated.
 //
 
 #define OPENCRUN_BUILTIN_MFENCE

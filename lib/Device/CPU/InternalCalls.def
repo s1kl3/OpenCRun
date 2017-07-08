@@ -16,6 +16,7 @@ INTERNAL_CALL(barrier, "vi", opencrun::cpu::Barrier)
 INTERNAL_CALL(async_work_group_copy, "ePcPczez", opencrun::cpu::AsyncWorkGroupCopy)
 INTERNAL_CALL(async_work_group_strided_copy, "ePcPczzezi", opencrun::cpu::AsyncWorkGroupStridedCopy)
 INTERNAL_CALL(wait_group_events, "viPe", opencrun::cpu::WaitGroupEvents)
+INTERNAL_CALL(prefetch, "vPczz", opencrun::cpu::Prefetch)
 
 // Explicit Memory Fence Functions.
 INTERNAL_CALL(mem_fence, "vi", opencrun::cpu::MemFence)

@@ -109,6 +109,10 @@ event_t AsyncWorkGroupStridedCopy(unsigned char *dst,
 
 void WaitGroupEvents(int num_events, event_t *event_list);
 
+void Prefetch(const unsigned char *p,
+              size_t num_gentypes,
+              size_t sz_gentype);
+
 // Explicit Memory Fence Functions.
 void MemFence(cl_mem_fence_flags flags);
 void ReadMemFence(cl_mem_fence_flags flags);

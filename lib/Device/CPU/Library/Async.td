@@ -19,10 +19,10 @@ typedef union {
 def async_internal : OCLCodeBlock<[{
 event_t __internal_async_work_group_copy(uchar *, const uchar*, size_t,
                                          event_t, size_t);
-
 event_t __internal_async_work_group_strided_copy(uchar *, const uchar*, size_t,
                                                  size_t, event_t, size_t, uint);
 void __internal_wait_group_events(int, event_t *);
+void __internal_prefetch(const uchar*, size_t, size_t);
 }]>;
 
 let Requirements = [generic_ptr, async_internal] in {
@@ -106,8 +106,6 @@ def : OCLTargetBuiltinImpl<blt_wait_group_events, TemplateStrategy<[{
 def : OCLTargetBuiltinImpl<blt_prefetch, TemplateStrategy<[{
   const_gen_ptr_t chg_ptr;
   chg_ptr.g_ptr = param1;
-  const GENTYPE *dest_ptr = (const GENTYPE *)chg_ptr.ptr;
-
-   for (uint i = 0; i < param2; i++)
-    __builtin_prefetch(dest_ptr + i);
+  
+  __internal_prefetch(chg_ptr.ptr, param2, sizeof(GENTYPE));
 }], [TypedefId<"GENTYPE", Pointee<1>>]>>;

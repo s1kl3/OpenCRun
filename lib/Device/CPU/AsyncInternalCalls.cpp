@@ -152,3 +152,20 @@ void opencrun::cpu::WaitGroupEvents(int num_events, event_t *event_list) {
 
   Barrier(CLK_LOCAL_MEM_FENCE);
 }
+
+void opencrun::cpu::Prefetch(const unsigned char *p,
+              size_t num_gentypes,
+              size_t sz_gentype) {
+
+  const sys::HardwareCPU *CPU = GetCurrentThread().GetPinnedToCPU();
+  const sys::HardwareCache *L1Cache = CPU->GetFirstLevelCache();
+  size_t L1LineSize = L1Cache->GetLineSize();
+  assert(L1LineSize > 0);
+
+  size_t DataSize = num_gentypes * sz_gentype;
+  const unsigned char *p_end = p + DataSize;
+
+  for (const unsigned char *p_cur = p; p_cur < p_end; p_cur += L1LineSize)
+    __builtin_prefetch(p_cur);
+    
+}
