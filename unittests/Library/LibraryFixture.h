@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 #include <tuple>
+#include <valarray>
 
 #define REGISTER_TYPED_TEST_CASE_P(CaseName, ...) \
   namespace GTEST_CASE_NAMESPACE_(CaseName) { \
@@ -62,6 +63,8 @@ public:
 
 public:
   static llvm::StringRef OCLCName;
+  static unsigned VecStep;
+  static bool DoesOutput;
 };
 
 //===----------------------------------------------------------------------===//
@@ -83,8 +86,27 @@ public:
 #define GENTYPE_DECLARE(V) \
   typename TypeParam::Type V
 
+#define GENTYPE_DECLARE_BUFFER(V) \
+  std::valarray<typename std::remove_pointer<typename TypeParam::Type>::type> V
+
+#define GENTYPE_DECLARE_OUT_BUFFER(S, V) \
+  OCLTypeTraits<std::valarray<typename std::remove_pointer<typename \
+    TypeParam::Type>::type>>::DoesOutput = true; \
+  std::valarray<typename std::remove_pointer<typename \
+    TypeParam::Type>::type> V(S)
+
 #define GENTYPE_DECLARE_TUPLE_ELEMENT(I, V) \
   typename std::tuple_element<I, typename TypeParam::Type>::type V
+
+#define GENTYPE_DECLARE_TUPLE_ELEMENT_BUFFER(I, V) \
+  std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
+    typename TypeParam::Type>::type>::type> V
+
+#define GENTYPE_DECLARE_TUPLE_ELEMENT_OUT_BUFFER(I, S, V) \
+  OCLTypeTraits<std::valarray<typename std::remove_pointer<typename \
+    std::tuple_element<I, typename TypeParam::Type>::type>::type>>::DoesOutput = true; \
+  std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
+    typename TypeParam::Type>::type>::type> V(S)
 
 //===----------------------------------------------------------------------===//
 /// GENTYPE_CREATE - Value creator for generic type-based tests.
@@ -96,15 +118,216 @@ public:
   (OCLTypeTraits<typename std::tuple_element<I, \
    typename TypeParam::Type>::type>::Create(V))
 
+#define GENTYPE_CREATE_BUFFER(V) \
+  (OCLTypeTraits<std::valarray<typename std::remove_pointer<typename \
+    TypeParam::Type>::type>>::Create(V))
+
+#define GENTYPE_CREATE_TUPLE_ELEMENT_BUFFER(I, V) \
+  (OCLTypeTraits<std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::type>>::Create(V))
+
+//===----------------------------------------------------------------------===//
+/// GENTYPE_GET - Get information for generic type-based tests.
+//===----------------------------------------------------------------------===//
+#define GENTYPE_GET_POINTEE_TYPE \
+  typename std::remove_pointer<typename TypeParam::Type>::type
+
+#define GENTYPE_GET_BUFFER_TYPE \
+  typename std::valarray<typename std::remove_pointer<typename TypeParam::Type>::type>
+
+#define GENTYPE_GET_TUPLE_ELEMENT_TYPE(I) \
+  typename std::tuple_element<I, typename TypeParam::Type>::type
+
+#define GENTYPE_GET_TUPLE_ELEMENT_POINTEE_TYPE(I) \
+  typename std::remove_pointer<typename std::tuple_element<I, \
+    typename TypeParam::Type>::type>::type
+
+#define GENTYPE_GET_TUPLE_ELEMENT_BUFFER_TYPE(I) \
+  typename std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
+    typename TypeParam::Type>::type>::type> 
+
+#define GENTYPE_GET_TUPLE_ELEMENT_VECSTEP(I)    \
+  (OCLTypeTraits<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::VecStep)
+
 //===----------------------------------------------------------------------===//
 /// GENTYPE_CHECK - Type checker for generic type-based tests.
 //===----------------------------------------------------------------------===//
 #define GENTYPE_CHECK(T) \
   (std::is_same<typename TypeParam::Type, T>::value)
 
-#define GENTYPE_CHECK_TUPLE_ELEMENT(I, T) \
-  (std::is_same<typename std::tuple_element<I, \
+#define GENTYPE_CHECK_POINTEE(T) \
+  (std::is_same<typename std::remove_pointer<typename TypeParam::Type>::type, T>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT(I, T)       \
+  (std::is_same<typename std::tuple_element<I,  \
    typename TypeParam::Type>::type, T>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE(I, T)                           \
+  (std::is_same<typename std::remove_pointer<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::type, T>::value)
+
+#define GENTYPE_CHECK_BASE_VECTOR(T, S) \
+  (std::is_same<typename TypeParam::Type, T ## S>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, S)    \
+  (std::is_same<typename std::tuple_element<I,              \
+   typename TypeParam::Type>::type, T ## S>::value)
+
+#define GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, S)         \
+  (std::is_same<typename std::remove_pointer<typename   \
+   TypeParam::Type>::type, T ## S>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, S)            \
+  (std::is_same<typename std::remove_pointer<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::type, T ## S>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_VECTOR(I) \
+  (GENTYPE_GET_TUPLE_ELEMENT_VECSTEP(I) > 1)
+
+#define GENTYPE_CHECK_BASE(T)           \
+  (GENTYPE_CHECK(T)                 ||  \
+   GENTYPE_CHECK_BASE_VECTOR(T, 2)  ||  \
+   GENTYPE_CHECK_BASE_VECTOR(T, 3)  ||  \
+   GENTYPE_CHECK_BASE_VECTOR(T, 4)  ||  \
+   GENTYPE_CHECK_BASE_VECTOR(T, 8)  ||  \
+   GENTYPE_CHECK_BASE_VECTOR(T, 16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_BASE(I, T)              \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, T)                    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, 2)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, 3)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, 4)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, 8)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_BASE_VECTOR(I, T, 16))
+
+#define GENTYPE_CHECK_POINTEE_BASE(T)           \
+  (GENTYPE_CHECK_POINTEE(T)                 ||  \
+   GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, 2)  ||  \
+   GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, 3)  ||  \
+   GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, 4)  ||  \
+   GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, 8)  ||  \
+   GENTYPE_CHECK_POINTEE_BASE_VECTOR(T, 16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE(I, T)              \
+  (GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE(I, T)                    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, 2)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, 3)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, 4)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, 8)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_POINTEE_BASE_VECTOR(I, T, 16))
+
+#define GENTYPE_CHECK_SIGNED_SCALAR \
+  (GENTYPE_CHECK(cl_char)   ||      \
+   GENTYPE_CHECK(cl_short)  ||      \
+   GENTYPE_CHECK(cl_int)    ||      \
+   GENTYPE_CHECK(cl_long))
+
+#define GENTYPE_CHECK_SIGNED_VECTOR(S)  \
+  (GENTYPE_CHECK(cl_char ## S)  ||      \
+   GENTYPE_CHECK(cl_short ## S) ||      \
+   GENTYPE_CHECK(cl_int ## S)   ||      \
+   GENTYPE_CHECK(cl_long ## S))
+
+#define GENTYPE_CHECK_SIGNED            \
+  (GENTYPE_CHECK_SIGNED_SCALAR      ||  \
+   GENTYPE_CHECK_SIGNED_VECTOR(2)   ||  \
+   GENTYPE_CHECK_SIGNED_VECTOR(3)   ||  \
+   GENTYPE_CHECK_SIGNED_VECTOR(4)   ||  \
+   GENTYPE_CHECK_SIGNED_VECTOR(8)   ||  \
+   GENTYPE_CHECK_SIGNED_VECTOR(16))
+
+#define GENTYPE_CHECK_UNSIGNED_SCALAR   \
+  (GENTYPE_CHECK(cl_uchar)  ||          \
+   GENTYPE_CHECK(cl_ushort) ||          \
+   GENTYPE_CHECK(cl_uint)   ||          \
+   GENTYPE_CHECK(cl_ulong))
+
+#define GENTYPE_CHECK_UNSIGNED_VECTOR(S)    \
+  (GENTYPE_CHECK(cl_uchar ## S)     ||      \
+   GENTYPE_CHECK(cl_ushort ## S)    ||      \
+   GENTYPE_CHECK(cl_uint ## S)      ||      \
+   GENTYPE_CHECK(cl_ulong ## S))
+
+#define GENTYPE_CHECK_UNSIGNED          \
+  (GENTYPE_CHECK_UNSIGNED_SCALAR    ||  \
+   GENTYPE_CHECK_UNSIGNED_VECTOR(2) ||  \
+   GENTYPE_CHECK_UNSIGNED_VECTOR(3) ||  \
+   GENTYPE_CHECK_UNSIGNED_VECTOR(4) ||  \
+   GENTYPE_CHECK_UNSIGNED_VECTOR(8) ||  \
+   GENTYPE_CHECK_UNSIGNED_VECTOR(16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_SCALAR(I)    \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_char)  ||          \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_short) ||          \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_int)   ||          \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_long))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, S) \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_char ## S)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_short ## S)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_int ## S)      ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_long ## S))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED(I)           \
+  (GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_SCALAR(I)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, 2)  ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, 3)  ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, 4)  ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, 8)  ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_SIGNED_VECTOR(I, 16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_SCALAR(I)  \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_uchar)     ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_ushort)    ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_uint)      ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_ulong))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, S)   \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_uchar ## S)    ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_ushort ## S)   ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_uint ## S)     ||      \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_ulong ## S))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED(I)             \
+  (GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_SCALAR(I)       ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, 2)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, 3)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, 4)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, 8)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED_VECTOR(I, 16))
+
+#define GENTYPE_CHECK_FLOAT         \
+  (GENTYPE_CHECK(cl_float)      ||  \
+   GENTYPE_CHECK(cl_float2)     ||  \
+   GENTYPE_CHECK(cl_float3)     ||  \
+   GENTYPE_CHECK(cl_float4)     ||  \
+   GENTYPE_CHECK(cl_float8)     ||  \
+   GENTYPE_CHECK(cl_float16))
+
+#define GENTYPE_CHECK_DOUBLE        \
+  (GENTYPE_CHECK(cl_double)      || \
+   GENTYPE_CHECK(cl_double2)     || \
+   GENTYPE_CHECK(cl_double3)     || \
+   GENTYPE_CHECK(cl_double4)     || \
+   GENTYPE_CHECK(cl_double8)     || \
+   GENTYPE_CHECK(cl_double16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_FLOAT(I)        \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float)     ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float2)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float3)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float4)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float8)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_float16))
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT_DOUBLE(I)       \
+  (GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double)    ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double2)   ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double3)   ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double4)   ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double8)   ||  \
+   GENTYPE_CHECK_TUPLE_ELEMENT(I, cl_double16))
 
 //===----------------------------------------------------------------------===//
 /// ASSERT_GENTYPE_EQ - Equality check for generic type-based tests.
@@ -112,12 +335,36 @@ public:
 #define ASSERT_GENTYPE_EQ(A, B) \
   (OCLTypeTraits<typename TypeParam::Type>::AssertEq(A, B))
 
-#define ASSERT_GENTYPE_TUPLE_EQ(I, A, B) \
+#define ASSERT_GENTYPE_BUFFER_EQ(A, B) \
+  (OCLTypeTraits<typename std::valarray<typename std::remove_pointer< \
+   typename TypeParam::Type>::type>>::AssertEq(A, B))
+
+#define ASSERT_GENTYPE_TUPLE_ELEMENT_EQ(I, A, B) \
   (OCLTypeTraits<typename std::tuple_element<I, \
    typename TypeParam::Type>::type>::AssertEq(A, B))
 
+#define ASSERT_GENTYPE_TUPLE_ELEMENT_BUFFER_EQ(I, A, B) \
+  (OCLTypeTraits<typename std::valarray<typename std::remove_pointer< \
+   typename std::tuple_element<I, typename TypeParam::Type>::type>::type>>::AssertEq(A, B))
+
 #define ASSERT_GENTYPE_IS_NAN(A) \
   (OCLTypeTraits<typename TypeParam::Type>::AssertIsNaN(A))
+
+#define ASSERT_GENTYPE_TUPLE_ELEMENT_IS_NAN(I, A) \
+  (OCLTypeTraits<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::AssertIsNaN(A))
+
+//===----------------------------------------------------------------------===//
+/// Helper macros.
+//===----------------------------------------------------------------------===//
+#define IS_PTR_TY(T) \
+  (OCLTypeTraits<T>::OCLCName.endswith(" *"))
+
+#define IS_OUTPUT_TY(T) \
+  (OCLTypeTraits<T>::DoesOutput)
+
+#define INIT_LIST(T, L) \
+  std::valarray<T> L
 
 //===----------------------------------------------------------------------===//
 /// RuntimeFailed - OpenCL callback to report runtime errors.
@@ -158,7 +405,7 @@ public:
         Dev = cl::Device(*I);
 
     ASSERT_TRUE(Dev());
-
+    
     // Get a queue for the device.
     cl_context_properties Props[] =
       { CL_CONTEXT_PLATFORM,
@@ -196,49 +443,56 @@ public:
               A1Ty A1,
               cl::NDRange Space = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<A1Ty>();
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty>(Fun);
     Kern.setArg(0, RetBuf);
     Kern.setArg(1, A1Buf);
 
-    Queue.enqueueWriteBuffer(A1Buf, true, 0, sizeof(A1Ty), &A1);
+    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
+
     Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
-    Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
+
+    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
+    ReadBuffer(RetBuf, R);
   }
 
   template <typename RetTy, typename A1Ty, typename A2Ty>
   void Invoke(llvm::StringRef Fun,
               RetTy &R,
-              A1Ty A1,
-              A2Ty A2,
+              A1Ty &A1,
+              A2Ty &A2,
               cl::NDRange Space = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<A1Ty>();
-    cl::Buffer A2Buf = AllocArgBuffer<A2Ty>();
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty>(Fun);
     Kern.setArg(0, RetBuf);
     Kern.setArg(1, A1Buf);
     Kern.setArg(2, A2Buf);
+   
+    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
+    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
 
-    Queue.enqueueWriteBuffer(A1Buf, true, 0, sizeof(A1Ty), &A1);
-    Queue.enqueueWriteBuffer(A2Buf, true, 0, sizeof(A2Ty), &A2);
     Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
-    Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
+
+    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
+    ReadBuffer(RetBuf, R);
   }
 
   template <typename RetTy, typename A1Ty, typename A2Ty, typename A3Ty>
   void Invoke(llvm::StringRef Fun,
               RetTy &R,
-              A1Ty A1,
-              A2Ty A2,
-              A3Ty A3,
+              A1Ty &A1,
+              A2Ty &A2,
+              A3Ty &A3,
               cl::NDRange Space = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<A1Ty>();
-    cl::Buffer A2Buf = AllocArgBuffer<A2Ty>();
-    cl::Buffer A3Buf = AllocArgBuffer<A3Ty>();
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
+    cl::Buffer A3Buf = AllocArgBuffer<>(A3, IS_OUTPUT_TY(A3Ty));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty, A3Ty>(Fun);
     Kern.setArg(0, RetBuf);
@@ -246,11 +500,42 @@ public:
     Kern.setArg(2, A2Buf);
     Kern.setArg(3, A3Buf);
 
-    Queue.enqueueWriteBuffer(A1Buf, true, 0, sizeof(A1Ty), &A1);
-    Queue.enqueueWriteBuffer(A2Buf, true, 0, sizeof(A2Ty), &A2);
-    Queue.enqueueWriteBuffer(A3Buf, true, 0, sizeof(A3Ty), &A3);
+    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
+    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
+    if (!IS_OUTPUT_TY(A3Ty)) WriteBuffer(A3Buf, A3);
+
     Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
-    Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
+
+    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
+    if (IS_OUTPUT_TY(A3Ty)) ReadBuffer(A3Buf, A3);
+    ReadBuffer(RetBuf, R);
+  }
+
+  template <typename A1Ty, typename A2Ty, typename A3Ty>
+  void VoidRetTyInvoke(llvm::StringRef Fun,
+              A1Ty &A1,
+              A2Ty &A2,
+              A3Ty &A3,
+              cl::NDRange Space = cl::NDRange(1)) {
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
+    cl::Buffer A3Buf = AllocArgBuffer<>(A3, IS_OUTPUT_TY(A3Ty));
+
+    cl::Kernel Kern = BuildVoidRetTyKernel<A1Ty, A2Ty, A3Ty>(Fun);
+    Kern.setArg(0, A1Buf);
+    Kern.setArg(1, A2Buf);
+    Kern.setArg(2, A3Buf);
+
+    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
+    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
+    if (!IS_OUTPUT_TY(A3Ty)) WriteBuffer(A3Buf, A3);
+
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+
+    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
+    if (IS_OUTPUT_TY(A3Ty)) ReadBuffer(A3Buf, A3);
   }
 
 protected:
@@ -259,8 +544,12 @@ protected:
     std::string KernName;
     BuildKernelName(Fun, KernName);
 
+    bool EnableFP64 = (OCLTypeTraits<RetTy>::OCLCName.startswith("double"));
+
     std::ostringstream SrcStream;
-    SrcStream << "kernel void " << KernName
+
+    SrcStream << (EnableFP64 ? "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n" : "") 
+              << "kernel void " << KernName
               << "(\n"
               << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r\n"
               << ")\n"
@@ -277,35 +566,53 @@ protected:
     std::string KernName;
     BuildKernelName(Fun, KernName);
 
+    bool EnableFP64 = (OCLTypeTraits<RetTy>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A1Ty>::OCLCName.startswith("double"));
+
     std::ostringstream SrcStream;
 
-    SrcStream << "kernel void " << KernName
+    SrcStream << (EnableFP64 ? "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n" : "") 
+              << "kernel void " << KernName
               << "(\n"
               << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r,\n"
-              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str() << " *a1\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str()
+                << (IS_PTR_TY(A1Ty) ? "a1" : "*a1") << "\n"
               << ")\n"
               << "{\n"
-              << "  *r = " << Fun.str() << "(*a1);\n"
+              << "  *r = " << Fun.str() << "("
+                << (IS_PTR_TY(A1Ty) ? "a1" : "*a1")
+                << ");\n"
               << "}\n";
     std::string Src = SrcStream.str();
 
     return GetKernel(KernName, Src);
   }
+
   template <typename RetTy, typename A1Ty, typename A2Ty>
   cl::Kernel BuildKernel(llvm::StringRef Fun) {
     std::string KernName;
     BuildKernelName(Fun, KernName);
 
+    bool EnableFP64 = (OCLTypeTraits<RetTy>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A1Ty>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A2Ty>::OCLCName.startswith("double"));
+
     std::ostringstream SrcStream;
 
-    SrcStream << "kernel void " << KernName
+    SrcStream << (EnableFP64 ? "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n" : "") 
+              << "kernel void " << KernName
               << "(\n"
               << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r,\n"
-              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str() << " *a1,\n"
-              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str() << " *a2\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str()
+                << (IS_PTR_TY(A1Ty) ? "a1" : " *a1") << ",\n"
+              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str()
+                << (IS_PTR_TY(A2Ty) ? "a2" : " *a2") << "\n"
               << ")\n"
               << "{\n"
-              << "  *r = " << Fun.str() << "(*a1, *a2);\n"
+              << "  *r = " << Fun.str() << "("
+                << (IS_PTR_TY(A1Ty) ? "a1" : "*a1") << ", "
+                << (IS_PTR_TY(A2Ty) ? "a2" : "*a2") 
+                << ");\n"
               << "}\n";
     std::string Src = SrcStream.str();
 
@@ -316,18 +623,64 @@ protected:
   cl::Kernel BuildKernel(llvm::StringRef Fun) {
     std::string KernName;
     BuildKernelName(Fun, KernName);
+     
+    bool EnableFP64 = (OCLTypeTraits<RetTy>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A1Ty>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A2Ty>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A3Ty>::OCLCName.startswith("double"));
 
     std::ostringstream SrcStream;
 
-    SrcStream << "kernel void " << KernName
+    SrcStream << (EnableFP64 ? "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n" : "") 
+              << "kernel void " << KernName
               << "(\n"
               << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r,\n"
-              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str() << " *a1,\n"
-              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str() << " *a2,\n"
-              << "  global " << OCLTypeTraits<A3Ty>::OCLCName.str() << " *a3\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str()
+                << (IS_PTR_TY(A1Ty) ? "a1" : " *a1") << ",\n"
+              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str()
+                << (IS_PTR_TY(A2Ty) ? "a2" : " *a2") << ",\n"
+              << "  global " << OCLTypeTraits<A3Ty>::OCLCName.str()
+                << (IS_PTR_TY(A3Ty) ? "a3" : " *a3") << "\n"
               << ")\n"
               << "{\n"
-              << "  *r = " << Fun.str() << "(*a1, *a2, *a3);\n"
+              << "  *r = " << Fun.str() << "("
+                << (IS_PTR_TY(A1Ty) ? "a1" : "*a1") << ", "
+                << (IS_PTR_TY(A2Ty) ? "a2" : "*a2") << ", "
+                << (IS_PTR_TY(A3Ty) ? "a3" : "*a3")
+                << ");\n"
+              << "}\n";
+    std::string Src = SrcStream.str();
+
+    return GetKernel(KernName, Src);
+  }
+
+  template <typename A1Ty, typename A2Ty, typename A3Ty>
+  cl::Kernel BuildVoidRetTyKernel(llvm::StringRef Fun) {
+    std::string KernName;
+    BuildKernelName(Fun, KernName);
+     
+    bool EnableFP64 = (OCLTypeTraits<A1Ty>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A2Ty>::OCLCName.startswith("double") ||
+                       OCLTypeTraits<A3Ty>::OCLCName.startswith("double"));
+
+    std::ostringstream SrcStream;
+
+    SrcStream << (EnableFP64 ? "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n\n" : "") 
+              << "kernel void " << KernName
+              << "(\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str()
+                << (IS_PTR_TY(A1Ty) ? "a1" : " *a1") << ",\n"
+              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str()
+                << (IS_PTR_TY(A2Ty) ? "a2" : " *a2") << ",\n"
+              << "  global " << OCLTypeTraits<A3Ty>::OCLCName.str()
+                << (IS_PTR_TY(A3Ty) ? "a3" : " *a3") << "\n"
+              << ")\n"
+              << "{\n"
+              << Fun.str() << "("
+                << (IS_PTR_TY(A1Ty) ? "a1" : "*a1") << ", "
+                << (IS_PTR_TY(A2Ty) ? "a2" : "*a2") << ", "
+                << (IS_PTR_TY(A3Ty) ? "a3" : "*a3")
+                << ");\n"
               << "}\n";
     std::string Src = SrcStream.str();
 
@@ -340,8 +693,35 @@ protected:
   }
 
   template <typename Ty>
-  cl::Buffer AllocArgBuffer() {
-    return cl::Buffer(Ctx, CL_MEM_READ_ONLY, sizeof(Ty));
+  cl::Buffer AllocArgBuffer(Ty T, bool WriteBuffer) {
+    return WriteBuffer ? cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, sizeof(Ty)) :
+                         cl::Buffer(Ctx, CL_MEM_READ_ONLY, sizeof(Ty));
+  }
+
+  template <typename Ty>
+  cl::Buffer AllocArgBuffer(std::valarray<Ty> &T, bool WriteBuffer) {
+    return WriteBuffer ? cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, T.size() * sizeof(Ty)) :
+                         cl::Buffer(Ctx, CL_MEM_READ_ONLY, T.size() * sizeof(Ty));
+  }
+
+  template <typename Ty>
+  cl_int WriteBuffer(cl::Buffer &Buffer, Ty T) {
+    return Queue.enqueueWriteBuffer(Buffer, true, 0, sizeof(Ty), &T);
+  }
+
+  template <typename Ty>
+  cl_int WriteBuffer(cl::Buffer &Buffer, std::valarray<Ty> &T) {
+    return Queue.enqueueWriteBuffer(Buffer, true, 0, T.size() * sizeof(Ty), &T[0]);
+  }
+
+  template <typename Ty>
+  cl_int ReadBuffer(cl::Buffer &Buffer, Ty &T) {
+    return Queue.enqueueReadBuffer(Buffer, true, 0, sizeof(Ty), &T);
+  }
+
+  template <typename Ty>
+  cl_int ReadBuffer(cl::Buffer &Buffer, std::valarray<Ty> &T) {
+    return Queue.enqueueReadBuffer(Buffer, true, 0, T.size() * sizeof(Ty), &T[0]);
   }
 
   void BuildKernelName(llvm::StringRef Fun, std::string &KernName) {
@@ -384,6 +764,7 @@ template <>
 class DeviceTraits<CPUDev> {
 public:
   #if defined(__x86_64__)
+  #define cl_khr_fp64
   typedef uint64_t SizeType;
   #elif defined(__i386__)
   typedef uint32_t SizeType;
