@@ -34,9 +34,6 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
   unsigned OCLTypeTraits<T>::VecStep = 1;           \
                                                     \
   template <>                                       \
-  bool OCLTypeTraits<T>::DoesOutput = false;        \
-                                                    \
-  template <>                                       \
   void OCLTypeTraits<T>::AssertEq(T A, T B) {       \
     AE(A, B);                                       \
   }
@@ -47,9 +44,6 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
                                                                 \
   template <>                                                   \
   unsigned OCLTypeTraits<T ## S>::VecStep = S;                  \
-                                                                \
-  template <>                                                   \
-  bool OCLTypeTraits<T ## S>::DoesOutput = false;               \
                                                                 \
   template <>                                                   \
   void OCLTypeTraits<T ## S>::AssertEq(T ## S A, T ## S B) {    \
@@ -82,9 +76,6 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
   unsigned OCLTypeTraits<std::valarray<T>>::VecStep = 1;                \
                                                                         \
   template <>                                                           \
-  bool OCLTypeTraits<std::valarray<T>>::DoesOutput = false;             \
-                                                                        \
-  template <>                                                           \
   void OCLTypeTraits<std::valarray<T>>::AssertEq(std::valarray<T> A,    \
                                                  std::valarray<T> B) {  \
     assert(A.size() == B.size());                                       \
@@ -98,9 +89,6 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
                                                                                         \
   template <>                                                                           \
   unsigned OCLTypeTraits<std::valarray<T ##S>>::VecStep = S;                            \
-                                                                                        \
-  template <>                                                                           \
-  bool OCLTypeTraits<std::valarray<T ## S>>::DoesOutput = false;                        \
                                                                                         \
   template <>                                                                           \
   void OCLTypeTraits<std::valarray<T ## S>>::AssertEq(std::valarray<T ## S> A,          \

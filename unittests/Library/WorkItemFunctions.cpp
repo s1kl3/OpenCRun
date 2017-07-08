@@ -24,7 +24,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_work_dim) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_global_size) {
   typename DeviceTraits<TypeParam>::SizeType GlobalSize;
 
-  this->Invoke("get_global_size", GlobalSize, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_global_size", GlobalSize, Input);
   EXPECT_EQ(1u, GlobalSize);
 
   cl::NDRange Cube(1, 1, 1);
@@ -37,7 +38,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_global_size) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_global_id) {
   typename DeviceTraits<TypeParam>::SizeType GlobalID;
 
-  this->Invoke("get_global_id", GlobalID, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_global_id", GlobalID, Input);
   EXPECT_EQ(0u, GlobalID);
 
   cl::NDRange Cube(1, 1, 1);
@@ -50,7 +52,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_global_id) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_local_size) {
   typename DeviceTraits<TypeParam>::SizeType LocalSize;
 
-  this->Invoke("get_local_size", LocalSize, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_local_size", LocalSize, Input);
   EXPECT_EQ(1u, LocalSize);
 
   cl::NDRange Cube(1, 1, 1);
@@ -63,7 +66,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_local_size) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_local_id) {
   typename DeviceTraits<TypeParam>::SizeType LocalID;
 
-  this->Invoke("get_local_id", LocalID, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_local_id", LocalID, Input);
   EXPECT_EQ(0u, LocalID);
 
   cl::NDRange Cube(1, 1, 1);
@@ -76,7 +80,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_local_id) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_num_groups) {
   typename DeviceTraits<TypeParam>::SizeType NumGroups;
 
-  this->Invoke("get_num_groups", NumGroups, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_num_groups", NumGroups, Input);
   EXPECT_EQ(1u, NumGroups);
 
   cl::NDRange Cube(1, 1, 1);
@@ -89,7 +94,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_num_groups) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_group_id) {
   typename DeviceTraits<TypeParam>::SizeType GroupID;
 
-  this->Invoke("get_group_id", GroupID, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_group_id", GroupID, Input);
   EXPECT_EQ(0u, GroupID);
 
   cl::NDRange Cube(1, 1, 1);
@@ -102,7 +108,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_group_id) {
 TYPED_TEST_P(WorkItemFunctionsTest, get_global_offset) {
   typename DeviceTraits<TypeParam>::SizeType GlobalOffset;
 
-  this->Invoke("get_global_offset", GlobalOffset, (cl_uint) 0);
+  cl_uint Input = 0;
+  this->Invoke("get_global_offset", GlobalOffset, Input);
   EXPECT_EQ(0u, GlobalOffset);
 
   cl::NDRange Cube(1, 1, 1);

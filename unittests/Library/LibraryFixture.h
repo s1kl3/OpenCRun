@@ -20,6 +20,7 @@
 
 #include "gtest/gtest.h"
 
+#include <map>
 #include <tuple>
 #include <valarray>
 
@@ -64,7 +65,6 @@ public:
 public:
   static llvm::StringRef OCLCName;
   static unsigned VecStep;
-  static bool DoesOutput;
 };
 
 //===----------------------------------------------------------------------===//
@@ -79,34 +79,60 @@ public:
   typedef DevTy Dev;
   typedef Ty Type;
 };
+ 
+//===----------------------------------------------------------------------===//
+/// KernelArgType - Enum class to capture the expected I/O behaviour for kernel
+/// arguments.
+//===----------------------------------------------------------------------===//
+enum class KernelArgType {
+    Default,
+    InputBuffer,
+    OutputBuffer,
+    InputOutputBuffer
+};
+
+using KernelArgAddr = void *;
 
 //===----------------------------------------------------------------------===//
 /// GENTTYPE_DECLARE - Declare a variable for generic type-based tests.
 //===----------------------------------------------------------------------===//
-#define GENTYPE_DECLARE(V) \
-  typename TypeParam::Type V
+#define GENTYPE_DECLARE(V)                          \
+  typename TypeParam::Type V;                       \
+  this->SetKernelArgType(&V, KernelArgType::Default)
 
-#define GENTYPE_DECLARE_BUFFER(V) \
-  std::valarray<typename std::remove_pointer<typename TypeParam::Type>::type> V
+#define GENTYPE_DECLARE_BUFFER(V)                           \
+  std::valarray<typename std::remove_pointer<typename       \
+    TypeParam::Type>::type> V;                              \
+  this->SetKernelArgType(&V, KernelArgType::InputBuffer)
 
-#define GENTYPE_DECLARE_OUT_BUFFER(S, V) \
-  OCLTypeTraits<std::valarray<typename std::remove_pointer<typename \
-    TypeParam::Type>::type>>::DoesOutput = true; \
-  std::valarray<typename std::remove_pointer<typename \
-    TypeParam::Type>::type> V(S)
+#define GENTYPE_DECLARE_OUT_BUFFER(S, V)                \
+  std::valarray<typename std::remove_pointer<typename   \
+    TypeParam::Type>::type> V(S);                       \
+  this->SetKernelArgType(&V, KernelArgType::OutputBuffer)
 
-#define GENTYPE_DECLARE_TUPLE_ELEMENT(I, V) \
-  typename std::tuple_element<I, typename TypeParam::Type>::type V
+#define GENTYPE_DECLARE_INOUT_BUFFER(V)                         \
+  std::valarray<typename std::remove_pointer<typename           \
+    TypeParam::Type>::type> V;                                  \
+  this->SetKernelArgType(&V, KernelArgType::InputOutputBuffer)
 
-#define GENTYPE_DECLARE_TUPLE_ELEMENT_BUFFER(I, V) \
+#define GENTYPE_DECLARE_TUPLE_ELEMENT(I, V)                         \
+  typename std::tuple_element<I, typename TypeParam::Type>::type V; \
+  this->SetKernelArgType(&V, KernelArgType::Default)
+
+#define GENTYPE_DECLARE_TUPLE_ELEMENT_BUFFER(I, V)                          \
   std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
-    typename TypeParam::Type>::type>::type> V
+    typename TypeParam::Type>::type>::type> V;                              \
+  this->SetKernelArgType(&V, KernelArgType::InputBuffer)
 
-#define GENTYPE_DECLARE_TUPLE_ELEMENT_OUT_BUFFER(I, S, V) \
-  OCLTypeTraits<std::valarray<typename std::remove_pointer<typename \
-    std::tuple_element<I, typename TypeParam::Type>::type>::type>>::DoesOutput = true; \
+#define GENTYPE_DECLARE_TUPLE_ELEMENT_OUT_BUFFER(I, S, V)                   \
   std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
-    typename TypeParam::Type>::type>::type> V(S)
+    typename TypeParam::Type>::type>::type> V(S);                           \
+  this->SetKernelArgType(&V, KernelArgType::OutputBuffer)
+
+#define GENTYPE_DECLARE_TUPLE_ELEMENT_INOUT_BUFFER(I, V)                    \
+  std::valarray<typename std::remove_pointer<typename std::tuple_element<I, \
+    typename TypeParam::Type>::type>::type> V;                              \
+  this->SetKernelArgType(&V, KernelArgType::InputOutputBuffer)
 
 //===----------------------------------------------------------------------===//
 /// GENTYPE_CREATE - Value creator for generic type-based tests.
@@ -360,8 +386,19 @@ public:
 #define IS_PTR_TY(T) \
   (OCLTypeTraits<T>::OCLCName.endswith(" *"))
 
-#define IS_OUTPUT_TY(T) \
-  (OCLTypeTraits<T>::DoesOutput)
+#define IS_INPUT_ARG(A)                                                         \
+  ( ArgTys.count(&A) ? ( ArgTys[&A] == KernelArgType::Default            ||     \
+                         ArgTys[&A] == KernelArgType::InputBuffer        ||     \
+                         ArgTys[&A] == KernelArgType::InputOutputBuffer )       \
+                       : true )
+  
+#define IS_OUTPUT_ARG(A)                                                        \
+  ( ArgTys.count(&A) ? ( ArgTys[&A] == KernelArgType::OutputBuffer       ||     \
+                         ArgTys[&A] == KernelArgType::InputOutputBuffer )       \
+                       : false )
+
+#define ARG_TYPE(A) \
+  (ArgTys.count(&A) ? ArgTys[&A] : KernelArgType::Default)
 
 #define INIT_LIST(T, L) \
   std::valarray<T> L
@@ -427,33 +464,35 @@ public:
   template <typename RetTy>
   void Invoke(llvm::StringRef Fun,
               RetTy &R,
-              cl::NDRange Space = cl::NDRange(1)) {
+              cl::NDRange GlobalSpace = cl::NDRange(1),
+              cl::NDRange LocalSpace = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
 
     cl::Kernel Kern = BuildKernel<RetTy>(Fun);
     Kern.setArg(0, RetBuf);
 
-    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, GlobalSpace, LocalSpace);
     Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
   }
 
   template <typename RetTy, typename A1Ty>
   void Invoke(llvm::StringRef Fun,
               RetTy &R,
-              A1Ty A1,
-              cl::NDRange Space = cl::NDRange(1)) {
+              A1Ty &A1,
+              cl::NDRange GlobalSpace = cl::NDRange(1),
+              cl::NDRange LocalSpace = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, ARG_TYPE(A1));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty>(Fun);
     Kern.setArg(0, RetBuf);
     Kern.setArg(1, A1Buf);
 
-    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
+    if (IS_INPUT_ARG(A1)) WriteBuffer(A1Buf, A1);
 
-    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, GlobalSpace, LocalSpace);
 
-    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_ARG(A1)) ReadBuffer(A1Buf, A1);
     ReadBuffer(RetBuf, R);
   }
 
@@ -462,23 +501,24 @@ public:
               RetTy &R,
               A1Ty &A1,
               A2Ty &A2,
-              cl::NDRange Space = cl::NDRange(1)) {
+              cl::NDRange GlobalSpace = cl::NDRange(1),
+              cl::NDRange LocalSpace = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
-    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, ARG_TYPE(A1));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, ARG_TYPE(A2));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty>(Fun);
     Kern.setArg(0, RetBuf);
     Kern.setArg(1, A1Buf);
     Kern.setArg(2, A2Buf);
    
-    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
-    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
+    if (IS_INPUT_ARG(A1)) WriteBuffer(A1Buf, A1);
+    if (IS_INPUT_ARG(A2)) WriteBuffer(A2Buf, A2);
 
-    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, GlobalSpace, LocalSpace);
 
-    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
-    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
+    if (IS_OUTPUT_ARG(A1)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_ARG(A2)) ReadBuffer(A2Buf, A2);
     ReadBuffer(RetBuf, R);
   }
 
@@ -488,11 +528,12 @@ public:
               A1Ty &A1,
               A2Ty &A2,
               A3Ty &A3,
-              cl::NDRange Space = cl::NDRange(1)) {
+              cl::NDRange GlobalSpace = cl::NDRange(1),
+              cl::NDRange LocalSpace = cl::NDRange(1)) {
     cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
-    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
-    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
-    cl::Buffer A3Buf = AllocArgBuffer<>(A3, IS_OUTPUT_TY(A3Ty));
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, ARG_TYPE(A1));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, ARG_TYPE(A2));
+    cl::Buffer A3Buf = AllocArgBuffer<>(A3, ARG_TYPE(A3));
 
     cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty, A3Ty>(Fun);
     Kern.setArg(0, RetBuf);
@@ -500,15 +541,15 @@ public:
     Kern.setArg(2, A2Buf);
     Kern.setArg(3, A3Buf);
 
-    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
-    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
-    if (!IS_OUTPUT_TY(A3Ty)) WriteBuffer(A3Buf, A3);
+    if (IS_INPUT_ARG(A1)) WriteBuffer(A1Buf, A1);
+    if (IS_INPUT_ARG(A2)) WriteBuffer(A2Buf, A2);
+    if (IS_INPUT_ARG(A3)) WriteBuffer(A3Buf, A3);
 
-    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, GlobalSpace, LocalSpace);
 
-    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
-    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
-    if (IS_OUTPUT_TY(A3Ty)) ReadBuffer(A3Buf, A3);
+    if (IS_OUTPUT_ARG(A1)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_ARG(A2)) ReadBuffer(A2Buf, A2);
+    if (IS_OUTPUT_ARG(A3)) ReadBuffer(A3Buf, A3);
     ReadBuffer(RetBuf, R);
   }
 
@@ -517,25 +558,26 @@ public:
               A1Ty &A1,
               A2Ty &A2,
               A3Ty &A3,
-              cl::NDRange Space = cl::NDRange(1)) {
-    cl::Buffer A1Buf = AllocArgBuffer<>(A1, IS_OUTPUT_TY(A1Ty));
-    cl::Buffer A2Buf = AllocArgBuffer<>(A2, IS_OUTPUT_TY(A2Ty));
-    cl::Buffer A3Buf = AllocArgBuffer<>(A3, IS_OUTPUT_TY(A3Ty));
+              cl::NDRange GlobalSpace = cl::NDRange(1),
+              cl::NDRange LocalSpace = cl::NDRange(1)) {
+    cl::Buffer A1Buf = AllocArgBuffer<>(A1, ARG_TYPE(A1));
+    cl::Buffer A2Buf = AllocArgBuffer<>(A2, ARG_TYPE(A2));
+    cl::Buffer A3Buf = AllocArgBuffer<>(A3, ARG_TYPE(A3));
 
     cl::Kernel Kern = BuildVoidRetTyKernel<A1Ty, A2Ty, A3Ty>(Fun);
     Kern.setArg(0, A1Buf);
     Kern.setArg(1, A2Buf);
     Kern.setArg(2, A3Buf);
 
-    if (!IS_OUTPUT_TY(A1Ty)) WriteBuffer(A1Buf, A1);
-    if (!IS_OUTPUT_TY(A2Ty)) WriteBuffer(A2Buf, A2);
-    if (!IS_OUTPUT_TY(A3Ty)) WriteBuffer(A3Buf, A3);
+    if (IS_INPUT_ARG(A1)) WriteBuffer(A1Buf, A1);
+    if (IS_INPUT_ARG(A2)) WriteBuffer(A2Buf, A2);
+    if (IS_INPUT_ARG(A3)) WriteBuffer(A3Buf, A3);
 
-    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, GlobalSpace, LocalSpace);
 
-    if (IS_OUTPUT_TY(A1Ty)) ReadBuffer(A1Buf, A1);
-    if (IS_OUTPUT_TY(A2Ty)) ReadBuffer(A2Buf, A2);
-    if (IS_OUTPUT_TY(A3Ty)) ReadBuffer(A3Buf, A3);
+    if (IS_OUTPUT_ARG(A1)) ReadBuffer(A1Buf, A1);
+    if (IS_OUTPUT_ARG(A2)) ReadBuffer(A2Buf, A2);
+    if (IS_OUTPUT_ARG(A3)) ReadBuffer(A3Buf, A3);
   }
 
 protected:
@@ -693,15 +735,36 @@ protected:
   }
 
   template <typename Ty>
-  cl::Buffer AllocArgBuffer(Ty T, bool WriteBuffer) {
-    return WriteBuffer ? cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, sizeof(Ty)) :
-                         cl::Buffer(Ctx, CL_MEM_READ_ONLY, sizeof(Ty));
+  cl::Buffer AllocReturnBuffer(std::valarray<Ty> &T) {
+    return cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, T.size() * sizeof(Ty));
   }
 
   template <typename Ty>
-  cl::Buffer AllocArgBuffer(std::valarray<Ty> &T, bool WriteBuffer) {
-    return WriteBuffer ? cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, T.size() * sizeof(Ty)) :
-                         cl::Buffer(Ctx, CL_MEM_READ_ONLY, T.size() * sizeof(Ty));
+  cl::Buffer AllocArgBuffer(Ty T, KernelArgType ArgTy = KernelArgType::Default) {
+    switch (ArgTy) {
+    case KernelArgType::OutputBuffer:
+      return cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, sizeof(Ty));
+    case KernelArgType::InputOutputBuffer:
+      return cl::Buffer(Ctx, CL_MEM_READ_WRITE, sizeof(Ty));
+    case KernelArgType::InputBuffer:
+    case KernelArgType::Default:
+    default:
+      return cl::Buffer(Ctx, CL_MEM_READ_ONLY, sizeof(Ty));
+    }
+  }
+
+  template <typename Ty>
+  cl::Buffer AllocArgBuffer(std::valarray<Ty> &T, KernelArgType ArgTy = KernelArgType::Default) {
+    switch (ArgTy) {
+    case KernelArgType::OutputBuffer:
+      return cl::Buffer(Ctx, CL_MEM_WRITE_ONLY, T.size() * sizeof(Ty));
+    case KernelArgType::InputOutputBuffer:
+      return cl::Buffer(Ctx, CL_MEM_READ_WRITE, T.size() * sizeof(Ty));
+    case KernelArgType::InputBuffer:
+    case KernelArgType::Default:
+    default:
+      return cl::Buffer(Ctx, CL_MEM_READ_ONLY, T.size() * sizeof(Ty));
+    }
   }
 
   template <typename Ty>
@@ -728,7 +791,7 @@ protected:
     KernName = Fun.str() + "_test";
   }
 
-  cl::Kernel GetKernel(std::string &Name, std::string &Src) {
+  cl::Kernel GetKernel(const std::string &Name, const std::string &Src) {
     cl::Program::Sources Srcs;
     Srcs.push_back(std::make_pair(Src.c_str(), 0));
 
@@ -738,10 +801,19 @@ protected:
     return cl::Kernel(Prog, Name.c_str());
   }
 
+  void SetKernelArgType(KernelArgAddr ArgAddr, KernelArgType ArgTy) { ArgTys[ArgAddr] = ArgTy; }
+
+  cl::Platform GetPlatform() { return Plat; }
+  cl::Device GetDevice() { return Dev; }
+  cl::Context GetContext() { return Ctx; }
+  cl::CommandQueue GetQueue() { return Queue; }
+
 private:
   void RuntimeFailed(llvm::StringRef Err) {
     FAIL() << Err.str() << "\n";
   }
+
+  std::map<KernelArgAddr, KernelArgType> ArgTys;
 
 protected:
   cl::Platform Plat;
@@ -765,6 +837,8 @@ class DeviceTraits<CPUDev> {
 public:
   #if defined(__x86_64__)
   #define cl_khr_fp64
+  #define cl_khr_int64_base_atomics
+  #define cl_khr_int64_extended_atomics
   typedef uint64_t SizeType;
   #elif defined(__i386__)
   typedef uint32_t SizeType;
