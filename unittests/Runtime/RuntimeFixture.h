@@ -22,6 +22,14 @@
 
 #include "gtest/gtest.h"
 
+#define REGISTER_TYPED_TEST_CASE_P(CaseName, ...) \
+  namespace GTEST_CASE_NAMESPACE_(CaseName) { \
+  typedef ::testing::internal::Templates<__VA_ARGS__>::type gtest_AllTests_; \
+  } \
+  static const char* const GTEST_REGISTERED_TEST_NAMES_(CaseName) = \
+      GTEST_TYPED_TEST_CASE_P_STATE_(CaseName).VerifyRegisteredTestNames(\
+          __FILE__, __LINE__, #__VA_ARGS__)
+
 //===----------------------------------------------------------------------===//
 /// DeviceTraits - Traits of OpenCL devices. We do not need much power here.
 ///  Knowing the name of the device is enough.
