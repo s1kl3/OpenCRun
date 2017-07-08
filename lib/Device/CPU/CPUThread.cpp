@@ -670,10 +670,6 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
   cl_image_format ImgFmt = Cmd.GetTargetImageFormat();
   const size_t *Region = Cmd.GetTargetRegion(); 
 
-  // Region's first element is stored in bytes inside
-  // EnqueueFillImage class.
-  size_t RowEls = Region[0] / Cmd.GetTargetElementSize();
-
   std::memset(fill_data, 0, 16 * sizeof(cl_uchar));
 
   float r, g, b;
@@ -772,43 +768,38 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
   switch(Cmd.GetTargetElementSize()) {
   case 1:
     MemRectFill<cl_uchar>(Cmd.GetTarget(),
-                          Cmd.GetSource(),
+                          fill_data,
                           Region,
                           Cmd.GetTargetRowPitch(),
-                          Cmd.GetTargetSlicePitch(),
-                          RowEls);
+                          Cmd.GetTargetSlicePitch());
     break;
   case 2:
      MemRectFill<cl_ushort>(Cmd.GetTarget(),
-                            Cmd.GetSource(),
+                            fill_data,
                             Region,
                             Cmd.GetTargetRowPitch(),
-                            Cmd.GetTargetSlicePitch(),
-                            RowEls);
+                            Cmd.GetTargetSlicePitch());
      break;
   case 4:
      MemRectFill<cl_uint>(Cmd.GetTarget(),
-                          Cmd.GetSource(),
+                          fill_data,
                           Region,
                           Cmd.GetTargetRowPitch(),
-                          Cmd.GetTargetSlicePitch(),
-                          RowEls);
+                          Cmd.GetTargetSlicePitch());
      break;
   case 8:
      MemRectFill<cl_ulong>(Cmd.GetTarget(),
-                           Cmd.GetSource(),
+                           fill_data,
                            Region,
                            Cmd.GetTargetRowPitch(),
-                           Cmd.GetTargetSlicePitch(),
-                           RowEls);
+                           Cmd.GetTargetSlicePitch());
      break;
   case 16:
      MemRectFill<cl_uint4>(Cmd.GetTarget(),
-                           Cmd.GetSource(),
+                           fill_data,
                            Region,
                            Cmd.GetTargetRowPitch(),
-                           Cmd.GetTargetSlicePitch(),
-                           RowEls);
+                           Cmd.GetTargetSlicePitch());
      break;
   }
 

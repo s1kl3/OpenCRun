@@ -411,7 +411,14 @@ EnqueueFillImage ::EnqueueFillImage(Image &Target,
   : Command(Command::FillImage, WaitList),
     Target(&Target),
     Source(Source),
-    TargetOffset(0) { 
+    TargetOffset(0) {
+  // Source is expected to be a four component RGBA floating-point
+  // or integer color value (see section 5.3.4 of the OpenCL 1.2
+  // specifications). Thus, its size will be that of a 16 bytes
+  // (i.e. sizeof(cl_uint4) or sizeof(cl_float4)).
+  this->Source = std::malloc(sizeof(cl_uint4));
+  std::memcpy(const_cast<void *>(this->Source), Source, sizeof(cl_uint4));
+
   std::memcpy(this->TargetOrigin, TargetOrigin, 3 * sizeof(size_t));
 
   // Convert the region width in bytes.
@@ -423,6 +430,10 @@ EnqueueFillImage ::EnqueueFillImage(Image &Target,
                  TargetOrigin[1] * Target.GetRowPitch() +
                  TargetOrigin[2] * Target.GetSlicePitch();
 }                                     
+
+EnqueueFillImage::~EnqueueFillImage() {
+  std::free(const_cast<void *>(Source));
+}
 
 //
 // EnqueueNDRangeKernel implementation.

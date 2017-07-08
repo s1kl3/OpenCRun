@@ -157,15 +157,17 @@ private:
   }
 
   // Template method used to fill a rectangular region of a
-  // target buffer with RowEls elements of type T for each Region
-  // row.
+  // target buffer with elements of type T.
   template<typename T>
   void MemRectFill(void *Target,
                    const void *Source,
                    const size_t *Region,
                    size_t TargetRowPitch,
-                   size_t TargetSlicePitch,
-                   size_t RowEls) {
+                   size_t TargetSlicePitch) {
+  // Region's first element is stored in bytes inside
+  // EnqueueFillImage class.
+  size_t RowEls = Region[0] / sizeof(T);
+
     for(size_t Z = 0; Z < Region[2]; ++Z)
       for(size_t Y = 0; Y < Region[1]; ++Y)
         MemFill<T>(reinterpret_cast<void *>(

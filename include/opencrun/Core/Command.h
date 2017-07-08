@@ -679,6 +679,9 @@ private:
                    EventsContainer &WaitList);
 
 public:
+  ~EnqueueFillImage();
+
+public:
   Image &GetTarget() { return *Target; }
   const void *GetSource() { return Source; }
   size_t *GetTargetOrigin() { return TargetOrigin; }
