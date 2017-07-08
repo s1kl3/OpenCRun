@@ -12,6 +12,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include <iterator>
+#include <algorithm>
 
 using namespace opencrun;
 
@@ -201,9 +202,10 @@ private:
                               llvm::GlobalVariable *V,
                               llvm::Value *Ptr,
                               unsigned KernelLocalsIdx,
-                              unsigned FieldOffset) const;
+                              unsigned FieldIndex) const;
   void updateCallInst(llvm::CallInst *CInst);
   void prepareFunctionForLocals(llvm::Function &F);
+  void prepareFunctionSignature(llvm::Function &F, bool isKernel = false);
   void replaceFunction(llvm::Function *Old, llvm::Function *New);
 
 private:
@@ -256,6 +258,10 @@ KernelLocals *KernelLocals::getKernelLocals(llvm::Function &Kern) {
        E = M.global_end(); I != E; ++I)
     if (isAutomaticLocal(KernelName, *I)) {
       GVs.push_back(&*I);
+
+      // The type of an llvm::GlobalValue (i.e. functions or global variable)
+      // is always a pointer to its content. This pointer must be dereferenced
+      // to get the effective type of the global variable.
       Fields.push_back(I->getType()->getPointerElementType());
     }
 
@@ -358,7 +364,7 @@ AutomaticLocalVariables::replaceKernelLocalUses(llvm::Function &F,
                                                 llvm::GlobalVariable *V,
                                                 llvm::Value *Ptr,
                                                 unsigned KernelLocalsIdx,
-                                                unsigned FieldOffset) const {
+                                                unsigned FieldIndex) const {
   using namespace llvm;
 
   KernelToLocalsMapping::const_iterator It = K2LocalsMap.find(&F);
@@ -391,10 +397,10 @@ AutomaticLocalVariables::replaceKernelLocalUses(llvm::Function &F,
     // %tmp_2 = bitcast i8* %tmp_1 to %struct.F_KLs*
     Value *BitCast = B.CreateBitCast(Load_1, PtrTy);
     
-    // %field.addr = getelementptr inbounds %struct.F_KLs* %tmp_2, i320 0, i32 ->FieldOffset<- 
+    // %field.addr = getelementptr inbounds %struct.F_KLs* %tmp_2, i320 0, i32 ->FieldIndex<- 
     Value *IdxList_2[2] = {
       ConstantInt::get(I32Ty, 0),
-      ConstantInt::get(I32Ty, FieldOffset)
+      ConstantInt::get(I32Ty, FieldIndex)
     };
     Value *New = B.CreateInBoundsGEP(BitCast, IdxList_2);
 
@@ -419,7 +425,7 @@ void AutomaticLocalVariables::updateCallInst(llvm::CallInst *CInst) {
   FunctionToFunctionMapping::const_iterator CalleeIt =
     ModifiedFunctions.find(CInst->getCalledFunction());
   
-  // Check if the called function hasn't been modified adding and
+  // Check if the called function hasn't been modified adding an
   // (i8**) argument.
   if (CalleeIt == ModifiedFunctions.end())
     return;
@@ -487,6 +493,9 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
     // !<n+2> = metadata !{i32 <array_idx_K_i>, i64 <offset_K_i>}
     // ...
     //
+    // where <KLs_num> is the number of kernel local structures (see KernelLocals)
+    // within the LLVM module, while <sz> is the total size (in bytes) for the
+    // structure belonging to the call-chain having F as its root.
     const DataLayout &DL = *M.getDataLayout();
     KernelInfo KI = ModuleInfo(M).getKernelInfo(F.getName());
     llvm::MDNode *InfoMD = KI.getCustomInfo();
@@ -538,26 +547,44 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
     }
 
     KernelMD->replaceOperandWith(NumOp, MDNode::get(Ctx, Info));
+
+    // All kernel functions that reach this point will have __local
+    // automatic variables and their signature needs updated.
+    prepareFunctionSignature(F, true);
   } else {
     // The current function F is not a kernel and it doesn't reach any
     // kernel.
     if(RKSet.empty())
       return;
+ 
+    // A non-kernel functions gets its signature updated only if its
+    // reachable kernels have __local automatic variables.
+    if (std::any_of(RKSet.begin(), RKSet.end(),
+        [this](llvm::Function *K) { return K2LocalsMap.count(K); }))  
+      prepareFunctionSignature(F);
   }
+  
+}
 
+void AutomaticLocalVariables::prepareFunctionSignature(llvm::Function &F,
+                                                       bool isKernel) {
+
+  using namespace llvm;
+
+  LLVMContext &Ctx = F.getContext();
   FunctionType *FTy = F.getFunctionType();
 
   // Compute the new function signature.
   SmallVector<Type *, 8> ArgsTypes;
   ArgsTypes.reserve(FTy->getNumParams() + 1);
   for (FunctionType::param_iterator I = FTy->param_begin(),
-       E = FTy->param_end(); I != E; ++I)
+      E = FTy->param_end(); I != E; ++I)
     ArgsTypes.push_back(*I);
   // Add an i8** argument to the function signature.
   ArgsTypes.push_back(Type::getInt8Ty(Ctx)->getPointerTo()->getPointerTo());
 
   FunctionType *NewFTy = FunctionType::get(FTy->getReturnType(), ArgsTypes,
-                                           FTy->isVarArg());
+      FTy->isVarArg());
 
   // Create the new function and move the code from the original one.
   Function *NF = Function::Create(NewFTy, F.getLinkage(), F.getName());
@@ -567,7 +594,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
   Function::arg_iterator DestI = NF->arg_begin();
   AttributeSet OldAttrs = F.getAttributes();
   for (Function::arg_iterator I = F.arg_begin(), E = F.arg_end();
-       I != E; ++I, ++DestI) {
+      I != E; ++I, ++DestI) {
     DestI->setName(I->getName());
     AttributeSet attrs = OldAttrs.getParamAttributes(I->getArgNo());
     if (attrs.getNumSlots() > 0)
@@ -576,11 +603,11 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
   }
   DestI->setName(F.getName() + ".locals");
   NF->setAttributes(NF->getAttributes()
-                      .addAttributes(Ctx, AttributeSet::ReturnIndex,
-                                     OldAttrs.getRetAttributes()));
+      .addAttributes(Ctx, AttributeSet::ReturnIndex,
+        OldAttrs.getRetAttributes()));
   NF->setAttributes(NF->getAttributes()
-                      .addAttributes(Ctx, AttributeSet::FunctionIndex,
-                                     OldAttrs.getFnAttributes()));
+      .addAttributes(Ctx, AttributeSet::FunctionIndex,
+        OldAttrs.getFnAttributes()));
 
   if (isKernel && K2LocalsMap.count(&F)) {
     Value *PtrLocals = &*DestI;
@@ -589,7 +616,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
 
     // Update kernel mappings.
     K2LocalsMap[NF] = KL;
-    K2IdxMap[NF] = K2IdxMap[&F];
+    K2IdxMap[NF] = KLStructIdx;
 
     // Replace uses of globals with a GEP to the correspondent field in the
     // locals structure.
@@ -599,6 +626,7 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
   }
 
   ModifiedFunctions[&F] = NF;
+
 }
 
 void AutomaticLocalVariables::replaceFunction(llvm::Function *Old,
