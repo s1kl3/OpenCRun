@@ -197,7 +197,8 @@ private:
   bool collectKernelLocals(llvm::Function &F);
   bool getReachableKernels(llvm::Function &F,
                            FunctionSet &RKSet,
-                           CallInstSet &CInstSet);
+                           CallInstSet &CInstSet,
+                           FunctionSet &Visited);
   void replaceKernelLocalUses(llvm::Function &F,
                               llvm::GlobalVariable *V,
                               llvm::Value *Ptr,
@@ -307,7 +308,8 @@ bool AutomaticLocalVariables::collectKernelLocals(llvm::Function &F) {
 bool
 AutomaticLocalVariables::getReachableKernels(llvm::Function &F,
                                              FunctionSet &RKSet,
-                                             CallInstSet &CInstSet) {
+                                             CallInstSet &CInstSet,
+                                             FunctionSet &Visited) {
   using namespace llvm;
 
   // True if the current function F reaches one or more kernels.
@@ -325,6 +327,7 @@ AutomaticLocalVariables::getReachableKernels(llvm::Function &F,
     return isKR; 
   }
 
+  Visited.insert(&F);
   Module &M = *F.getParent();
   FunctionSet Tmp_RKSet;
   CallInstSet Tmp_CInstSet;
@@ -332,6 +335,11 @@ AutomaticLocalVariables::getReachableKernels(llvm::Function &F,
   for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
     if (CallInst *CInst = dyn_cast<CallInst>(&*I)) {
       Function *Callee = CInst->getCalledFunction();
+
+      // Recursive call
+      if (Visited.count(Callee))
+        continue;
+
       // Previously modified functions are still present as declarations.
       if (Callee->isDeclaration() && 
           ModifiedFunctions.find(Callee) == ModifiedFunctions.end())
@@ -341,9 +349,9 @@ AutomaticLocalVariables::getReachableKernels(llvm::Function &F,
         isKR = true;
         Tmp_RKSet.insert(Callee);
         Tmp_CInstSet.insert(CInst);
-        getReachableKernels(*Callee, Tmp_RKSet, Tmp_CInstSet);
+        getReachableKernels(*Callee, Tmp_RKSet, Tmp_CInstSet, Visited);
       } else {
-        if (getReachableKernels(*Callee, Tmp_RKSet, Tmp_CInstSet)) {
+        if (getReachableKernels(*Callee, Tmp_RKSet, Tmp_CInstSet, Visited)) {
           isKR = true;
           Tmp_CInstSet.insert(CInst);
         }
@@ -457,8 +465,8 @@ void AutomaticLocalVariables::prepareFunctionForLocals(llvm::Function &F) {
   LLVMContext &Ctx = F.getContext();
   bool isKernel = ModuleInfo(M).hasKernel(F.getName());
 
-  FunctionSet RKSet;
-  getReachableKernels(F, RKSet, CInstSet);
+  FunctionSet RKSet, Visited;
+  getReachableKernels(F, RKSet, CInstSet, Visited);
 
   if (isKernel) {
     // The current kernel F hasn't any automatic local variables and it
