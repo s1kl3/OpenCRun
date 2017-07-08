@@ -77,7 +77,7 @@ getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const {
 Kernel::Kernel(const Kernel &K) : Desc(K.Desc) {
   Arguments.reserve(K.Arguments.size());
   for (unsigned I = 0, E = K.Arguments.size(); I != E; ++I) {
-    llvm::KernelArg *Arg = K.Arguments[I];
+    KernelArg *Arg = K.Arguments[I];
     switch (Arg->GetType()) {
     default: llvm_unreachable(0);
     case KernelArg::BufferArg:
