@@ -292,7 +292,7 @@ public:
   const OCLType &getOperand(unsigned i) const { return *Operands[i]; }
   size_t size() const { return Operands.size(); }
   const ConstraintsContainer &getConstraints() const { return Constraints; }
-  std::string getVariantName() const { return VariantName; }
+  llvm::StringRef getVariantName() const { return VariantName; }
   const PredicateSet &getPredicates() const { return Predicates; }
   void setPredicates(const PredicateSet &preds) { Predicates = preds; }
 
@@ -312,7 +312,7 @@ public:
   };
 
 public:
-  typedef std::map<llvm::StringRef, const OCLBuiltinVariant*> VariantsMap;
+  typedef std::map<std::string, const OCLBuiltinVariant*> VariantsMap;
   typedef VariantsMap::const_iterator var_iterator;
 
 protected:
@@ -325,8 +325,8 @@ public:
 
 public:
   BuiltinKind getKind() const { return Kind; }
-  std::string getName() const { return Name; }
-  std::string getGroup() const { return Group; }
+  llvm::StringRef getName() const { return Name; }
+  llvm::StringRef getGroup() const { return Group; }
   var_iterator begin() const { return Variants.begin(); }
   var_iterator end() const { return Variants.end(); }
   var_iterator find(llvm::StringRef V) const { return Variants.find(V); }
@@ -375,7 +375,7 @@ public:
    : Name(name), DefaultFor(rmd) {}
 
 public:
-  std::string getName() const { return Name; }
+  llvm::StringRef getName() const { return Name; }
   bool isDefaultFor(const OCLBasicType &Ty) const;
 
 private:
@@ -455,7 +455,7 @@ protected:
    : OCLDecl(K), Name(name), Param(p) {}
 
 public:
-  std::string getName() const { return Name; }
+  llvm::StringRef getName() const { return Name; }
   const OCLParam &getParam() const { return Param; }
 
 private:
@@ -500,7 +500,7 @@ protected:
    : OCLDecl(K), ID(id), Param(p) {}
 
 public:
-  std::string getID() const { return ID; }
+  llvm::StringRef getID() const { return ID; }
   const OCLParam &getParam() const { return Param; }
 
 private:
@@ -541,7 +541,7 @@ public:
    : OCLDecl(DK_BuiltinName), Name(name), Builtin(b) {}
 
 public:
-  std::string getName() const { return Name; }
+  llvm::StringRef getName() const { return Name; }
   const OCLBuiltin &getBuiltin() const { return Builtin; }
 
 private:
@@ -590,7 +590,7 @@ public:
   OCLInfixBinAssocReduction(llvm::StringRef op)
    : OCLReduction(RK_InfixBinAssoc), Operator(op) {}
 
-  std::string getOperator() const { return Operator; }
+  llvm::StringRef getOperator() const { return Operator; }
 
 private:
   std::string Operator;
@@ -638,7 +638,7 @@ public:
    : OCLStrategy(SK_RecursiveSplit, decls), ScalarImpl(scalarimpl), 
      Reduction(red) {}
 
-  std::string getScalarImpl() const { return ScalarImpl; }
+  llvm::StringRef getScalarImpl() const { return ScalarImpl; }
   const OCLReduction *getReduction() const { return Reduction; }
 
 private:
@@ -656,7 +656,7 @@ public:
   OCLDirectSplit(llvm::StringRef scalarimpl, DeclsContainer &decls)
    : OCLStrategy(SK_DirectSplit, decls), ScalarImpl(scalarimpl) {}
 
-  std::string getScalarImpl() const { return ScalarImpl; }
+  llvm::StringRef getScalarImpl() const { return ScalarImpl; }
 
 private:
   std::string ScalarImpl;
@@ -672,7 +672,7 @@ public:
   OCLTemplateStrategy(llvm::StringRef impl, DeclsContainer &decls)
    : OCLStrategy(SK_TemplateStrategy, decls), TemplateImpl(impl) {}
 
-  std::string getTemplateImpl() const { return TemplateImpl; }
+  llvm::StringRef getTemplateImpl() const { return TemplateImpl; }
 
 private:
   std::string TemplateImpl;
@@ -706,7 +706,7 @@ public:
    : OCLRequirement(RK_Include), FileName(filename) {}
 
 public:
-  std::string getFileName() const { return FileName; }
+  llvm::StringRef getFileName() const { return FileName; }
 
 private:
   std::string FileName;
@@ -723,7 +723,7 @@ public:
    : OCLRequirement(RK_CodeBlock), CodeBlock(codeblock) {}
 
 public:
-  std::string getCodeBlock() const { return CodeBlock; }
+  llvm::StringRef getCodeBlock() const { return CodeBlock; }
 
 private:
   std::string CodeBlock;
@@ -736,14 +736,14 @@ public:
 
 public:
   OCLBuiltinImpl(const OCLBuiltin &builtin, const OCLStrategy &strategy,
-                 const std::string varname, bool target) 
+                 const llvm::StringRef varname, bool target) 
     : BuiltIn(builtin), Strategy(strategy), VariantName(varname), 
       IsTarget(target) {}
 
 public:
   const OCLBuiltin &getBuiltin() const { return BuiltIn; }
   const OCLStrategy &getStrategy() const { return Strategy; }
-  const std::string getVariantName() const { return VariantName; }
+  llvm::StringRef getVariantName() const { return VariantName; }
   bool isTarget() const { return IsTarget; }
 
   void addRequirement(const OCLRequirement *R) {

@@ -32,14 +32,14 @@ std::string OCLScalarType::BuildName(llvm::StringRef Name) {
 
 std::string OCLVectorType::BuildName(const OCLScalarType &Base, 
                                      unsigned Width) {
-  return Base.getName() + llvm::Twine(Width).str();
+  return (Base.getName() + llvm::Twine(Width)).str();
 }
 
 std::string OCLPointerType::BuildName(const OCLType &Base, 
                                       AddressSpaceKind AS,
                                       unsigned Modifiers) {
-  return "@ptr<as:" + llvm::Twine(AS).str() +", m:" + 
-         llvm::Twine(Modifiers).str() + ">{ " + Base.getName() + " }";
+  return ("@ptr<as:" + llvm::Twine(AS) +", m:" + 
+         llvm::Twine(Modifiers) + ">{ " + Base.getName() + " }").str();
 }
 
 bool OCLIntegerType::compareLess(const OCLType *T) const {
@@ -186,7 +186,8 @@ private:
     OCLType *Type = 0;
 
     if (R.isSubClassOf("OCLOpaqueType")) {
-      Type = new OCLOpaqueType(R.getValueAsString("Name"));    
+      auto Name = R.getValueAsString("Name");
+      Type = new OCLOpaqueType(Name);
     }
     else if (R.isSubClassOf("OCLIntegerType")) {
       unsigned BitWidth = R.getValueAsInt("BitWidth");
@@ -221,7 +222,7 @@ private:
 		R.getValueAsListOfDefs("Modifiers");
 	  unsigned mods = 0;
 	  for (unsigned i = 0, e = Modifiers.size(); i != e; ++i) {
-		const std::string &ModName = Modifiers[i]->getName();
+		    llvm::StringRef ModName = Modifiers[i]->getName();
         mods |= 
           llvm::StringSwitch<unsigned>(ModName)
             .Case("ocl_mod_const", OCLPointerType::M_Const)
@@ -301,7 +302,7 @@ private:
     if (R.isSubClassOf("OCLOpaqueTypeDef")) {
       const OCLType *T = &get(*R.getValueAsDef("Type"));
 
-      llvm::StringRef Def = R.getValueAsString("Define");
+      auto Def = R.getValueAsString("Define");
       bool IsTarget = R.getValueAsBit("isTarget");
 
       D = new OCLOpaqueTypeDef(*llvm::cast<OCLOpaqueType>(T), Def, IsTarget);

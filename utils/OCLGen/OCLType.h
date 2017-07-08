@@ -36,7 +36,7 @@ public:
   virtual ~OCLType();
 
   TypeKind getKind() const { return Kind; }
-  std::string getName() const { return Name; }
+  llvm::StringRef getName() const { return Name; }
 
   virtual bool compareLess(const OCLType *T) const = 0;
 
@@ -232,7 +232,7 @@ public:
   OCLOpaqueTypeDef(const OCLOpaqueType &Ty, llvm::StringRef def, bool isTarget)
    : Type(Ty), Def(def), IsTarget(isTarget) {}
 
-  std::string getDef() const { return Def; }
+  llvm::StringRef getDef() const { return Def; }
   const OCLOpaqueType &getType() const { return Type; }
   bool isTarget() const { return IsTarget; }
   const PredicateSet &getPredicates() const { return Predicates; }

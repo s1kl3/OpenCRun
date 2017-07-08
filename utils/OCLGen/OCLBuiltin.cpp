@@ -347,8 +347,8 @@ private:
 
     assert(R.isSubClassOf("OCLBuiltin") && "Not a builtin!");
 
-    std::string Name = R.getValueAsString("Name");
-    std::string Group = R.getValueAsString("Group");
+    auto Name = R.getValueAsString("Name");
+    auto Group = R.getValueAsString("Group");
 
     OCLBuiltin::VariantsMap Variants;
     std::vector<llvm::Record *> Vars = R.getValueAsListOfDefs("Variants");
@@ -389,7 +389,7 @@ private:
     for (unsigned i = 0, e = Constrs.size(); i != e; ++i)
       ConstrVec.push_back(&getTypeConstr(*Constrs[i]));
 
-    llvm::StringRef VarName = R.getValueAsString("VariantName");
+    auto VarName = R.getValueAsString("VariantName");
 
     PredicateSet Preds = FetchPredicates(R);
     Preds.insert(BuiltinPreds.begin(), BuiltinPreds.end());
@@ -460,7 +460,7 @@ private:
 
     assert(R.isSubClassOf("OCLRoundingMode") && "Not a rounding mode!");
 
-    llvm::StringRef Name = R.getValueAsString("Name");
+    auto Name = R.getValueAsString("Name");
     unsigned DefaultFor = OCLRoundingMode::RMD_None;
     if (R.getValueAsBit("DefaultForInteger"))
       DefaultFor |= OCLRoundingMode::RMD_Integer;
@@ -479,7 +479,7 @@ private:
 
     const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("BuiltIn"));
     const OCLStrategy &Strategy = getStrategy(*R.getValueAsDef("Strategy"));
-    llvm::StringRef VarName = R.getValueAsString("VariantName");
+    auto VarName = R.getValueAsString("VariantName");
     bool IsTarget = R.getValueAsBit("isTarget");
 
     BuiltinImpl = new OCLBuiltinImpl(Builtin, Strategy, VarName, IsTarget);
@@ -495,7 +495,7 @@ private:
     OCLDecl *Decl = 0;
 
     if (R.isSubClassOf("OCLTypedef")) {
-      llvm::StringRef Name = R.getValueAsString("Name");
+      auto Name = R.getValueAsString("Name");
       const OCLParam &Param = getParam(*R.getValueAsDef("Param"));
       if (R.isSubClassOf("TypedefId"))
         Decl = new OCLTypedefIdDecl(Name, Param);
@@ -505,7 +505,7 @@ private:
         llvm::PrintFatalError("Invalid OCLTypedef: " + R.getName());
     }
     else if (R.isSubClassOf("OCLTypeValue")) {
-      llvm::StringRef ID = R.getValueAsString("ID");
+      auto ID = R.getValueAsString("ID");
       const OCLParam &Param = getParam(*R.getValueAsDef("Param"));
       if (R.isSubClassOf("MinValue"))
         Decl = new OCLMinValueDecl(ID, Param);
@@ -515,7 +515,7 @@ private:
         llvm::PrintFatalError("Invalid OCLTypeValue: " + R.getName());
     }
     else if (R.isSubClassOf("BuiltinName")) {
-      llvm::StringRef Name = R.getValueAsString("Name");
+      auto Name = R.getValueAsString("Name");
       const OCLBuiltin &Builtin = getBuiltin(*R.getValueAsDef("Builtin"));
       Decl = new OCLBuiltinNameDecl(Name, Builtin);
     }
@@ -533,7 +533,8 @@ private:
     OCLReduction *Red = 0;
     
     if (R.isSubClassOf("InfixBinAssocReduction")) {
-      Red = new OCLInfixBinAssocReduction(R.getValueAsString("Operator"));
+      auto Operator = R.getValueAsString("Operator");
+      Red = new OCLInfixBinAssocReduction(Operator);
     } else if (R.getName() == "OCLDefaultReduction") {
       Red = 0;
     } else
@@ -546,10 +547,10 @@ private:
     OCLRequirement *Req = 0;
 
     if (R.isSubClassOf("OCLInclude")) {
-      llvm::StringRef FileName = R.getValueAsString("FileName");
+      auto FileName = R.getValueAsString("FileName");
       Req = new OCLIncludeRequirement(FileName);
     } else if (R.isSubClassOf("OCLCodeBlock")) {
-      llvm::StringRef CodeBlock = R.getValueAsString("CodeBlock");
+      auto CodeBlock = R.getValueAsString("CodeBlock");
       Req = new OCLCodeBlockRequirement(CodeBlock);
     } else
       llvm::PrintFatalError("Invalid OCLRequirement: " + R.getName());
@@ -568,14 +569,14 @@ private:
       Decls.push_back(&getDecl(*Declarations[I]));
 
     if (R.isSubClassOf("RecursiveSplit")) {
-      llvm::StringRef ScalarImpl = R.getValueAsString("ScalarImpl");
+      auto ScalarImpl = R.getValueAsString("ScalarImpl");
       const OCLReduction *Red = &getReduction(*R.getValueAsDef("Reduction"));
       Strategy = new OCLRecursiveSplit(ScalarImpl, Decls, Red); 
     } else if (R.isSubClassOf("DirectSplit")) {
-      llvm::StringRef ScalarImpl = R.getValueAsString("ScalarImpl");
+      auto ScalarImpl = R.getValueAsString("ScalarImpl");
       Strategy = new OCLDirectSplit(ScalarImpl, Decls);
     } else if (R.isSubClassOf("TemplateStrategy")) {
-      llvm::StringRef TemplateImpl = R.getValueAsString("TemplateImpl");
+      auto TemplateImpl = R.getValueAsString("TemplateImpl");
       Strategy = new OCLTemplateStrategy(TemplateImpl, Decls);
     } else
       llvm::PrintFatalError("Invalid OCLStrategy: " + R.getName());

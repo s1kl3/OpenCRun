@@ -31,9 +31,9 @@ private:
     OCLConstant *C = 0;
 
     if (R.isSubClassOf("OCLConstant")) {
-      llvm::StringRef Name = R.getValueAsString("Name");
-      llvm::StringRef Group = R.getValueAsString("Group");
-      llvm::StringRef Value = R.getValueAsString("Value");
+      auto Name = R.getValueAsString("Name");
+      auto Group = R.getValueAsString("Group");
+      auto Value = R.getValueAsString("Value");
       bool IsTarget = R.getValueAsBit("isTarget");
       C = new OCLConstant(Name, Group, Value, IsTarget);
     }

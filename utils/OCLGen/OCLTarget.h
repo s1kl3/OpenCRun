@@ -19,18 +19,19 @@ public:
 
 protected:
   OCLPredicate(PredicateKind K, llvm::StringRef P, llvm::StringRef N)
-   : Kind(K), Prefix(P), Name(N) {}
+   : Kind(K), Prefix(P), Name(N), FullName(Prefix + Name) {}
 
 public:
   PredicateKind getKind() const { return Kind; }
-  std::string getPrefix() const { return Prefix; }
-  std::string getName() const { return Name; }
-  std::string getFullName() const { return Prefix + Name; }
+  llvm::StringRef getPrefix() const { return Prefix; }
+  llvm::StringRef getName() const { return Name; }
+  llvm::StringRef getFullName() const { return FullName; }
 
 private:
   PredicateKind Kind;
   std::string Prefix;
   std::string Name;
+  std::string FullName;
 };
 
 class OCLExtension : public OCLPredicate {

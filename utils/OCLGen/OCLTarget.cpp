@@ -36,8 +36,8 @@ private:
     OCLPredicate *P = 0;
 
     if (R.isSubClassOf("OCLPredicate")) {
-      llvm::StringRef Prefix = R.getValueAsString("Prefix");
-      llvm::StringRef Name = R.getValueAsString("Name");
+      auto Prefix = R.getValueAsString("Prefix");
+      auto Name = R.getValueAsString("Name");
 
       if (R.isSubClassOf("OCLExtension")) {
         P = new OCLExtension(Prefix, Name);

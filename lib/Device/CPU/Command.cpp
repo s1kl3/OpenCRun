@@ -118,14 +118,10 @@ void NDRangeKernelBlockCPUCommand::SetLocalParams(
 cl_uint NDRangeKernelBlockCPUCommand::GetDeviceSampler(const Sampler &Smplr) {
   cl_uint flags = 0;
 
-  switch(Smplr.GetNormalizedCoords()) {
-    case true:
-      flags |= CLK_NORMALIZED_COORDS_TRUE;
-      break;
-    case false:
-      flags |= CLK_NORMALIZED_COORDS_FALSE;
-      break;
-  }
+  if(Smplr.GetNormalizedCoords() == true)
+    flags |= CLK_NORMALIZED_COORDS_TRUE;
+  else if(Smplr.GetNormalizedCoords() == false)
+    flags |= CLK_NORMALIZED_COORDS_FALSE;
 
   switch(Smplr.GetAddressingMode()) {
     case Sampler::AddressNone:

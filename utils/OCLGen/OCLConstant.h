@@ -17,9 +17,9 @@ public:
               llvm::StringRef value, bool isTarget)
    : Name(name), Group(group), Value(value), IsTarget(isTarget) {}
 
-  std::string getName() const { return Name; }
-  std::string getGroup() const { return Group; }
-  std::string getValue() const { return Value; }
+  llvm::StringRef getName() const { return Name; }
+  llvm::StringRef getGroup() const { return Group; }
+  llvm::StringRef getValue() const { return Value; }
   bool isTarget() const { return IsTarget; }
 private:
   std::string Name;
