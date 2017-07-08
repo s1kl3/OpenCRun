@@ -29,17 +29,34 @@ KernelDescriptor::~KernelDescriptor() {
     V.first->UnregisterKernel(*this);
 }
 
-bool KernelDescriptor::hasRequireWorkGroupSizes(const Device *Dev) const {
-  // TODO: check kernel metadata.
-  return false;
+bool KernelDescriptor::hasRequiredWorkGroupSizes(const Device *Dev) const {
+  // Retrive kernel metadata and check if the "reqd_work_group_size"
+  // node is present.
+  ModuleInfo Info(*getFunction(Dev)->getParent());
+  return Info.getKernelInfo(Name).hasRequiredWorkGroupSizes() ?
+    true : false;
 }
 
 bool KernelDescriptor::
 getRequiredWorkGroupSizes(llvm::SmallVectorImpl<size_t> &Sizes,
                           const Device *Dev) const {
-  // TODO: check kernel metadata.
+  if (!hasRequiredWorkGroupSizes(Dev))
+    return false;
+
+  // Retrive kernel metadata and extract values from the "reqd_work_group_size"
+  // node.
+  ModuleInfo Info(*getFunction(Dev)->getParent());
+  KernelArgInfo WGSzInfo = Info.getKernelInfo(Name).getRequiredWorkGroupSizes();
+  unsigned NumWGSz = WGSzInfo.getNumArguments();
+
   Sizes.clear();
-  Sizes.append(3, size_t(0));
+  Sizes.resize(NumWGSz);
+
+  for (unsigned I = 0, E = NumWGSz; I != E; ++I) {
+    size_t Sz = WGSzInfo.getArgumentAs<llvm::ConstantInt>(I)->getZExtValue();
+    Sizes[I] = Sz;
+  }
+
   return true;
 }
 

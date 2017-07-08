@@ -2771,7 +2771,7 @@ EnqueueNDRangeKernelBuilder &
 EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
   const KernelDescriptor &Desc = Kern->getDescriptor();
   if(!LocalWorkSizes) {
-    if(Desc.hasRequireWorkGroupSizes(&Dev))
+    if(Desc.hasRequiredWorkGroupSizes(&Dev))
       NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                   "kernel requires fixed local work size");
 
@@ -2797,7 +2797,7 @@ EnqueueNDRangeKernelBuilder::SetLocalWorkSize(const size_t *LocalWorkSizes) {
                          "work group size does not divide "
                          "number of work items");
 
-    if(Desc.hasRequireWorkGroupSizes(&Dev) &&
+    if(Desc.hasRequiredWorkGroupSizes(&Dev) &&
        (I >= 3 || ReqWorkGroupSizes[I] != LocalWorkSizes[I]))
       return NotifyError(CL_INVALID_WORK_GROUP_SIZE,
                          "work group size does not match "

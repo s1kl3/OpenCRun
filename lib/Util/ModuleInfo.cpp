@@ -5,7 +5,8 @@ using namespace opencrun;
 
 bool KernelArgInfo::checkValidity() const {
   if (llvm::MDString *S = llvm::dyn_cast<llvm::MDString>(MD->getOperand(0)))
-    return S->getString().startswith("kernel_arg_");
+    return S->getString().startswith("kernel_arg_") ||
+      S->getString().equals("reqd_work_group_size");
   return false;
 }
 
@@ -55,7 +56,7 @@ llvm::MDNode *KernelInfo::getCustomInfo(llvm::StringRef Name) const {
 
 llvm::MDNode *KernelInfo::getKernelArgInfo(llvm::StringRef Name) const {
   assert(MD);
-  if (Name.startswith("kernel_arg_"))
+  if (Name.startswith("kernel_arg_") || Name.equals("reqd_work_group_size"))
     for (unsigned I = 1, E = MD->getNumOperands(); I != E; ++I) {
       llvm::MDNode *N = llvm::cast<llvm::MDNode>(MD->getOperand(I));
       llvm::MDString *S = llvm::cast<llvm::MDString>(N->getOperand(0));

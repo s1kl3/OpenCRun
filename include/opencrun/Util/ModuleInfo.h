@@ -89,8 +89,19 @@ public:
     return getFunction()->getName();
   }
 
+  bool hasRequiredWorkGroupSizes() const {
+    // This metadata is added to the module only if its corresponding
+    // __attribute_ has been specified for the kernel.
+    return getKernelArgInfo("reqd_work_group_size") ? true : false;
+  }
+
   KernelSignature getSignature() const {
     return getCustomInfo("signature");
+  }
+
+  KernelArgInfo getRequiredWorkGroupSizes() const {
+    assert(hasRequiredWorkGroupSizes());
+    return getKernelArgInfo("reqd_work_group_size");
   }
 
   KernelArgInfo getArgsAddrSpace() const {

@@ -187,7 +187,7 @@ public:
     return Infos.begin()->second;
   }
 
-  bool hasRequireWorkGroupSizes(const Device *Dev) const;
+  bool hasRequiredWorkGroupSizes(const Device *Dev) const;
   bool getRequiredWorkGroupSizes(llvm::SmallVectorImpl<size_t> &Sizes,
                                  const Device *Dev) const;
 
