@@ -195,6 +195,12 @@ def ocl_sgentype_real : OCLGroupType<[
   ocl_float, ocl_double
 ]>;
 
+// All scalar gentype
+
+def ocl_sgentype : OCLGroupType<[
+  ocl_sgentype_integer, ocl_sgentype_real
+]>;
+
 // Integer vectorial gentype
 
 def ocl_vgentype_s_integer : OCLGroupType<[
@@ -210,6 +216,7 @@ def ocl_vgentype_integer : OCLGroupType<[
 ]>;
 
 // Real vectorial gentype
+
 def ocl_vgentype_float : OCLGroupType<[
   ocl_vec_float
 ]>;
@@ -220,6 +227,12 @@ def ocl_vgentype_double : OCLGroupType<[
 
 def ocl_vgentype_real : OCLGroupType<[
   ocl_vgentype_float, ocl_vgentype_double
+]>;
+
+// All vectorial gentype
+
+def ocl_vgentype : OCLGroupType<[
+  ocl_vgentype_integer, ocl_vgentype_real
 ]>;
 
 // Integer gentype

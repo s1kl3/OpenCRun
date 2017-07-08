@@ -10,10 +10,22 @@ class GeometricBuiltin_ff<string name> : OCLGenericBuiltinSimple<
   [isSameAs<Id<0>, Id<1>>]
 >;
 
+class GeometricBuiltin_rr<string name> : OCLGenericBuiltinSimple<
+  name, 
+  [ocl_gentype_real_geom, ocl_gentype_real_geom], 
+  [isSameAs<Id<0>, Id<1>>]
+>;
+
 class GeometricBuiltin_Cff<string name> : OCLGenericBuiltinSimple<
   name, 
   [ocl_float, ocl_gentype_float_geom], 
   []
+>;
+
+class GeometricBuiltin_Crr<string name> : OCLGenericBuiltinSimple<
+  name,
+  [ocl_sgentype_real, ocl_gentype_real_geom],
+  [isSameBaseAs<Id<0>,Id<1>>]
 >;
 
 class GeometricBuiltin_Cfff<string name> : OCLGenericBuiltinSimple<
@@ -27,53 +39,6 @@ class GeometricBuiltin_Crrr<string name> : OCLGenericBuiltinSimple<
   [ocl_sgentype_real, ocl_gentype_real_geom, ocl_gentype_real_geom],
   [isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>,Id<1>>]
 >;
-
-class GeometricBuiltin_ff_dd<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_float_geom,
-    ocl_gentype_float_geom
-  ],
-  [isSameAs<Id<0>, Id<1>>],
-  "ff">,
-  OCLBuiltinVariant<[
-   ocl_gentype_double_geom,
-   ocl_gentype_double_geom
-  ],
-  [isSameAs<Id<0>, Id<1>>],
-  "dd">
-]>;
-
-class GeometricBuiltin_Cff_Cdd<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_float,
-    ocl_gentype_float_geom
-  ],
-  [],
-  "Cff">,
-  OCLBuiltinVariant<[
-   ocl_double,
-   ocl_gentype_double_geom
-  ],
-  [],
-  "Cdd">
-]>;
-
-class GeometricBuiltin_Cfff_Cddd<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_float,
-    ocl_gentype_float_geom,
-    ocl_gentype_float_geom
-  ],
-  [isSameAs<Id<1>, Id<2>>],
-  "Cfff">,
-  OCLBuiltinVariant<[
-   ocl_double,
-   ocl_gentype_double_geom,
-   ocl_gentype_double_geom
-  ],
-  [isSameAs<Id<1>, Id<2>>],
-  "Cddd">
-]>;
 
 class GeometricBuiltin_V3fV3fV3f_V4fV4fV4f_V3dV3dV3d_V4dV4dV4d<string name> : 
 OCLGenericBuiltin<name, [
@@ -113,14 +78,14 @@ OCLGenericBuiltin<name, [
 // Geometric builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_cross : GeometricBuiltin_V3fV3fV3f_V4fV4fV4f_V3dV3dV3d_V4dV4dV4d<"cross">;
+def blt_cross           : GeometricBuiltin_V3fV3fV3f_V4fV4fV4f_V3dV3dV3d_V4dV4dV4d<"cross">;
 
 def blt_dot             : GeometricBuiltin_Crrr<"dot">;
-def blt_distance        : GeometricBuiltin_Cfff_Cddd<"distance">;
+def blt_distance        : GeometricBuiltin_Crrr<"distance">;
 
-def blt_length          : GeometricBuiltin_Cff_Cdd<"length">;
+def blt_length          : GeometricBuiltin_Crr<"length">;
 
-def blt_normalize       : GeometricBuiltin_ff_dd<"normalize">;
+def blt_normalize       : GeometricBuiltin_rr<"normalize">;
 
 def blt_fast_distance   : GeometricBuiltin_Cfff<"fast_distance">;
 
@@ -173,12 +138,8 @@ def : OCLBuiltinImpl<blt_distance, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_length, TemplateStrategy<[{
-  return __builtin_sqrtf(__builtin_ocl_dot(param1, param1));
-}]>, "Cff">;
-
-def : OCLBuiltinImpl<blt_length, TemplateStrategy<[{
-  return __builtin_sqrt(__builtin_ocl_dot(param1, param1));
-}]>, "Cdd">;
+  return __builtin_ocl_sqrt(__builtin_ocl_dot(param1, param1));
+}]>>;
 
 //----------------------------------------------------------------------------//
 
@@ -201,5 +162,5 @@ def : OCLBuiltinImpl<blt_fast_length, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_fast_normalize, TemplateStrategy<[{
-  return param1 * __builtin_ocl_half_rsqrt(__builtin_ocl_dot(param1, param1));
+  return param1 / __builtin_ocl_fast_length(param1);
 }]>>;

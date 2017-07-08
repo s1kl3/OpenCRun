@@ -72,34 +72,6 @@ class MathBuiltin_ffSn_ddSn<string name> : OCLGenericBuiltin<name, [
   [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ddSn">
 ]>;
 
-class MathBuiltin_ff_dd<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_float,
-    ocl_gentype_float
-  ], 
-  [isSameAs<Id<0>, Id<1>>], "ff">,
-  OCLBuiltinVariant<[
-    ocl_gentype_double,
-    ocl_gentype_double
-  ], 
-  [isSameAs<Id<0>, Id<1>>], "dd">
-]>;
-
-class MathBuiltin_fff_ddd<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_float,
-    ocl_gentype_float,
-    ocl_gentype_float
-  ], 
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "fff">,
-  OCLBuiltinVariant<[
-    ocl_gentype_double,
-    ocl_gentype_double,
-    ocl_gentype_double
-  ], 
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>], "ddd">
-]>;
-
 class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real,

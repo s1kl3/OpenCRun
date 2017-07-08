@@ -257,7 +257,7 @@ def : OCLBuiltinImpl<blt_abs, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_clz, RecursiveSplit<[{
   TYPE shamt = sizeof(TYPE)*8/2;
-  TYPE mask = (~0x0 << shamt);
+  TYPE mask = ((TYPE)~0x0 << shamt);
   TYPE n = 0;
 
   if (param1 == 0)
@@ -314,7 +314,7 @@ def : OCLBuiltinImpl<blt_rhadd, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_mul_hi, RecursiveSplit<[{
   TYPE shamt = sizeof(TYPE)*8/2;
-  TYPE lo_mask = (1 << shamt) - 1;
+  TYPE lo_mask = ((TYPE)1 << shamt) - 1;
 
   TYPE xl = param1 & lo_mask;
   TYPE xh = param1 >> shamt;
@@ -337,24 +337,24 @@ def : OCLBuiltinImpl<blt_mul_hi, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_rotate, RecursiveSplit<[{
-  return (param1 << param2) | (param1 >> ((sizeof(param1) * 8) - param2));
-}]>>;
+  return (param1 << param2) | ((UTYPE)param1 >> ((sizeof(param1) * 8) - param2));
+}], [TypedefUnsigned<"UTYPE", Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_mul24, RecursiveSplit<[{
+def : OCLBuiltinImpl<blt_mul24, TemplateStrategy<[{
   return param1 * param2;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_mad_hi, RecursiveSplit<[{
+def : OCLBuiltinImpl<blt_mad_hi, TemplateStrategy<[{
   return __builtin_ocl_mul_hi(param1, param2) + param3;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_mad24, RecursiveSplit<[{
+def : OCLBuiltinImpl<blt_mad24, TemplateStrategy<[{
   return __builtin_ocl_mul24(param1, param2) + param3;
 }]>>;
 
@@ -368,7 +368,7 @@ def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_add_sat, RecursiveSplit<[{
   UTYPE max_val = (UTYPE)~0 >> 1; 
-  UTYPE min_val = 1 << (sizeof(TYPE)*8 - 1);
+  UTYPE min_val = (UTYPE)1 << (sizeof(TYPE)*8 - 1);
   
   if ((param2 > 0) && (param1 > (TYPE)max_val - param2))
     return max_val;
@@ -388,7 +388,7 @@ def : OCLBuiltinImpl<blt_sub_sat, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_sub_sat, RecursiveSplit<[{
   UTYPE max_val = (UTYPE)~0 >> 1;
-  UTYPE min_val = 1 << (sizeof(TYPE)*8 - 1);
+  UTYPE min_val = (UTYPE)1 << (sizeof(TYPE)*8 - 1);
 
   if ((param2 > 0) && (param1 < (TYPE)min_val + param2))
     return min_val;
@@ -417,7 +417,7 @@ def : OCLBuiltinImpl<blt_mad_sat, RecursiveSplit<[{
     return param3;
 
   UTYPE max_val = (UTYPE)~0 >> 1;
-  UTYPE min_val = 1 << (sizeof(TYPE)*8 - 1);
+  UTYPE min_val = (UTYPE)1 << (sizeof(TYPE)*8 - 1);
 
   if ((param3 > 0) && (param1 > ((TYPE)max_val - param3)/param2))
     return max_val;

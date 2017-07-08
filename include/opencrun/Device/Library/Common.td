@@ -78,25 +78,6 @@ class CommonBuiltin_rrrr_VrVrVrCr<string name> : OCLGenericBuiltin<name, [
   "VrVrVrCr">
 ]>;
 
-class CommonBuiltin_rrrr_VrCrCrVr<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_real, 
-    ocl_gentype_real, 
-    ocl_gentype_real, 
-    ocl_gentype_real
-  ],
-  [isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, isSameAs<Id<2>, Id<3>>],
-  "rrrr">,
-  OCLBuiltinVariant<[
-    ocl_vgentype_real,
-    ocl_sgentype_real,
-    ocl_sgentype_real,
-    ocl_vgentype_real
-  ],
-  [isSameAs<Id<0>, Id<3>>, isSameAs<Id<1>, Id<2>>, isSameBaseAs<Id<0>, Id<1>>],
-  "VrCrCrVr">
-]>;
-
 class CommonBuiltin_rrrr_VrVrCrCr<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real, 

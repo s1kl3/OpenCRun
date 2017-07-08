@@ -75,34 +75,54 @@ class RelationalBuiltin_iiii_ffff_dddd<string name> : OCLGenericBuiltin<name, [
   ], "dddd">
 ]>;
 
-class RelationalBuiltin_gggSi_gggUi<string name> : OCLGenericBuiltin<name, [
+class RelationalBuiltin_CgCgCgCSi_CgCgCgCUi_VgVgVgVSi_VgVgVgVUi<string name> :
+OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
-    ocl_gentype, 
-    ocl_gentype,
-    ocl_gentype,
-    ocl_gentype_s_integer
+    ocl_sgentype,
+    ocl_sgentype,
+    ocl_sgentype,
+    ocl_sgentype_s_integer
   ],
   [
     isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
-    isSameDimAs<Id<2>, Id<3>>, 
-    isSameBaseSizeAs<Id<2>, Id<3>>
-  ], "gggSi">,
+    isSameDimAs<Id<2>, Id<3>> 
+  ], "CgCgCgCSi">,
   OCLBuiltinVariant<[
-    ocl_gentype,
-    ocl_gentype,
-    ocl_gentype,
-    ocl_gentype_u_integer
+    ocl_sgentype,
+    ocl_sgentype,
+    ocl_sgentype,
+    ocl_sgentype_u_integer
   ],
   [
     isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
-    isSameDimAs<Id<2>, Id<3>>,
-    isSameBaseSizeAs<Id<2>, Id<3>>], "gggUi">
+    isSameDimAs<Id<2>, Id<3>>
+  ], "CgCgCgCUi">,
+  OCLBuiltinVariant<[
+    ocl_vgentype,
+    ocl_vgentype,
+    ocl_vgentype,
+    ocl_vgentype_s_integer
+  ],
+  [
+    isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
+    isSameDimAs<Id<2>, Id<3>>
+  ], "VgVgVgVSi">,
+  OCLBuiltinVariant<[
+    ocl_vgentype,
+    ocl_vgentype,
+    ocl_vgentype,
+    ocl_vgentype_u_integer
+  ],
+  [
+    isSameAs<Id<0>, Id<1>>, isSameAs<Id<1>, Id<2>>, 
+    isSameDimAs<Id<2>, Id<3>>
+  ], "VgVgVgVUi">
 ]>;
 
 }
 
 //===----------------------------------------------------------------------===//
-// Common builtin declarations
+// Relational builtin declarations
 //===----------------------------------------------------------------------===//
 
 def blt_isequal         : RelationalBuiltin_Snff_Sidd<"isequal">;
@@ -126,7 +146,7 @@ def blt_all             : RelationalBuiltin_CnSi<"all">;
 
 def blt_bitselect       : RelationalBuiltin_iiii_ffff_dddd<"bitselect">;
 
-def blt_select          : RelationalBuiltin_gggSi_gggUi<"select">;
+def blt_select          : RelationalBuiltin_CgCgCgCSi_CgCgCgCUi_VgVgVgVSi_VgVgVgVUi<"select">;
 
 //===----------------------------------------------------------------------===//
 // Common builtin implementations
@@ -217,13 +237,13 @@ def : OCLBuiltinImpl<blt_isnan, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_isnormal, TemplateStrategy<[{
-  return (param1 == param1) 
+  return (param1 != 0.0f) && (param1 == param1) 
       && (__builtin_ocl_fabs(param1) < HUGE_VALF)
       && (__builtin_ocl_fabs(param1) >= FLT_MIN);
 }]>, "Snf">;
 
 def : OCLBuiltinImpl<blt_isnormal, TemplateStrategy<[{
-  return (param1 == param1) 
+  return (param1 != 0.0) && (param1 == param1) 
       && (__builtin_ocl_fabs(param1) < HUGE_VAL)
       && (__builtin_ocl_fabs(param1) >= DBL_MIN);
 }]>, "Sid">;
@@ -302,6 +322,27 @@ def : OCLBuiltinImpl<blt_bitselect, RecursiveSplit<[{
 
 def : OCLBuiltinImpl<blt_select, TemplateStrategy<[{
   return param3 ? param2 : param1;
-}]>>;
+}]>, "CgCgCgCSi">;
 
+def : OCLBuiltinImpl<blt_select, TemplateStrategy<[{
+  return param3 ? param2 : param1;
+}]>, "CgCgCgCUi">;
+
+def : OCLBuiltinImpl<blt_select, TemplateStrategy<[{
+  GENTYPE_N RetValue;
+
+  for (uint i = 0; i < vec_step(param3); i++)
+    RetValue[i] = ((param3[i] >> (sizeof(param3[i]) * 8 - 1)) & 0x1U) ? param2[i] : param1[i];
+
+  return RetValue;
+}], [TypedefId<"GENTYPE_N", Id<0>>]>, "VgVgVgVSi">;
+
+def : OCLBuiltinImpl<blt_select, TemplateStrategy<[{
+  GENTYPE_N RetValue;
+
+  for (uint i = 0; i < vec_step(param3); i++)
+    RetValue[i] = ((param3[i] >> (sizeof(param3[i]) * 8 - 1)) & 0x1U) ? param2[i] : param1[i];
+
+  return RetValue;
+}], [TypedefId<"GENTYPE_N", Id<0>>]>, "VgVgVgVUi">;
 
