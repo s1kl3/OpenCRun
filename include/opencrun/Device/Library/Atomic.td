@@ -527,6 +527,24 @@ def : OCLBuiltinImpl<blt_atom_cmpxchg_32_local, TemplateStrategy<[{
 
 //----------------------------------------------------------------------------//
 
+def : OCLBuiltinImpl<blt_atom_and_32_local, TemplateStrategy<[{
+  return __atomic_fetch_and(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_or_32_local, TemplateStrategy<[{
+  return __atomic_fetch_or(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_xor_32_local, TemplateStrategy<[{
+  return __atomic_fetch_xor(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
 def : OCLBuiltinImpl<blt_atom_add_32_global, TemplateStrategy<[{
   return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
@@ -567,6 +585,25 @@ def : OCLBuiltinImpl<blt_atom_cmpxchg_32_global, TemplateStrategy<[{
 }]>>;
 
 //----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_and_32_global, TemplateStrategy<[{
+  return __atomic_fetch_and(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_or_32_global, TemplateStrategy<[{
+  return __atomic_fetch_or(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
+def : OCLBuiltinImpl<blt_atom_xor_32_global, TemplateStrategy<[{
+  return __atomic_fetch_xor(param1, param2, __ATOMIC_RELAXED);
+}]>>;
+
+//----------------------------------------------------------------------------//
+
 def : OCLBuiltinImpl<blt_atom_add_64, TemplateStrategy<[{
   return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
