@@ -779,6 +779,12 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   llvm::Module &Mod = *KernDesc.getFunction(this)->getParent();
   llvm::StringRef KernName = KernDesc.getFunction(this)->getName();
 
+  // Link opencrunCPULib.bc with kernel module.
+  llvm::Linker::LinkModules(&Mod,
+                            &(*BitCodeLibrary),
+                            llvm::Linker::PreserveSource,
+                            NULL);
+
   // The aggressive inliner cache info about call graph shape.
   AggressiveInliner *Inliner = CreateAggressiveInlinerPass(KernName);
 
@@ -796,11 +802,6 @@ CPUDevice::GetBlockParallelEntryPoint(const KernelDescriptor &KernDesc) {
   std::string EntryName = MangleBlockParallelKernelName(KernName);
   llvm::Function *EntryFn = Mod.getFunction(EntryName);
 
-  // Link opencrunCPULib.bc with kernel module.
-  llvm::Linker::LinkModules(&Mod,
-                            &(*BitCodeLibrary),
-                            llvm::Linker::PreserveSource,
-                            NULL);
 
   // Force translation to native code.
   SignalJITCallStart(*this);
