@@ -45,7 +45,7 @@ TYPED_TEST_P(CallGraphLoopTest, Fact) {
   cl_int exitStatus = Ev.getInfo<CL_EVENT_COMMAND_EXECUTION_STATUS>();
 
   // Do the check here over the signed variable.
-  EXPECT_TRUE(exitStatus < 0);
+  EXPECT_FALSE(exitStatus < 0);
 }
 
 REGISTER_TYPED_TEST_CASE_P(CallGraphLoopTest, Fact);
