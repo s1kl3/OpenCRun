@@ -25,7 +25,7 @@ void AsyncCopyThread::Run() {
     // In this case the thread performs a strided copy
     // from a local memory location to a global one.
     for (size_t I = 0; I < num_gentypes; ++I) {
-      for (size_t J = 1; J < sz_gentype; ++J, ++dst) {
+      for (size_t J = 0; J < sz_gentype; ++J, ++dst) {
         *dst = src[I * sz_gentype + J];
         if ((J == (sz_gentype - 1)) && (I < (num_gentypes - 1)))
           dst += dst_stride * sz_gentype;

@@ -165,7 +165,7 @@ void opencrun::cpu::Prefetch(const unsigned char *p,
   size_t DataSize = num_gentypes * sz_gentype;
   const unsigned char *p_end = p + DataSize;
 
-  for (const unsigned char *p_cur = p; p_cur < p_end; p_cur += L1LineSize)
+  for (const unsigned char *p_cur = p_end - L1LineSize; p_cur >= p; p_cur -= L1LineSize)
     __builtin_prefetch(p_cur);
     
 }
