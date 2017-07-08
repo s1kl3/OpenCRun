@@ -377,7 +377,7 @@ AutomaticLocalVariables::replaceKernelLocalUses(llvm::Function &F,
 
     Constant *Old = V;
 
-    // %arrayidx = getelementptr inbounds inbounds i8** %locals_array, i32 ->KernelLocalsIdx<-
+    // %arrayidx = getelementptr inbounds i8** %locals_array, i32 ->KernelLocalsIdx<-
     Value *IdxList_1[1] = {
       ConstantInt::get(I32Ty, KernelLocalsIdx)
     };

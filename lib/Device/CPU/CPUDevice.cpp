@@ -851,13 +851,16 @@ CPUDevice::GetBlockParallelStaticLocalVector(const KernelDescriptor &KernDesc,
     BlockParallelStaticLocalVectorsCache.find(&KernDesc);
   if (I != BlockParallelStaticLocalVectorsCache.end())
     SLVec = I->second;
+  else {
+    // Cache miss.
+    CPUKernelInfo Info(KernDesc.getKernelInfo());
 
-  // Cache miss.
-  CPUKernelInfo Info(KernDesc.getKernelInfo());
+    for (unsigned i = 0; i < Info.getNumStaticLocalAreas(); ++i) {
+      SLVec.push_back(std::make_pair(Info.getStaticLocalIndex(i),
+                                     Info.getStaticLocalOffset(i)));
+    }
 
-  for (unsigned i = 0; i < Info.getNumStaticLocalAreas(); ++i) {
-    SLVec.push_back(std::make_pair(Info.getStaticLocalIndex(i),
-                                   Info.getStaticLocalOffset(i)));
+    BlockParallelStaticLocalVectorsCache[&KernDesc] = SLVec;
   }
 }
 
