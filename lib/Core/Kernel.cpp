@@ -350,9 +350,17 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
   // has been already performed by the SetArg function.
   llvm::Function *Kern = Desc->getKernelInfo().getFunction();
   llvm::FunctionType *FTy = Kern->getFunctionType();
-  llvm::Module *M = Kern->getParent();
-  const llvm::DataLayout *DL = M->getDataLayout();
-  uint64_t ArgSz = DL->getTypeStoreSize(FTy->getParamType(I));
+  const llvm::DataLayout *DL = Kern->getParent()->getDataLayout();
+  
+  uint64_t ArgSz;
+  llvm::Type *ParamTy = FTy->getParamType(I);
+  // For 3-component vector data types, the size of the data type is
+  // 4 * sizeof(component). This means that a 3-component vector data
+  // type will be aligned to a 4 * sizeof(component) boundary.
+  if (ParamTy->isVectorTy() && (ParamTy->getVectorNumElements() == 3))
+    ArgSz = DL->getTypeStoreSize(ParamTy->getVectorElementType()) * 4;
+  else
+    ArgSz = DL->getTypeStoreSize(FTy->getParamType(I));
 
   if (Size != ArgSz)
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
