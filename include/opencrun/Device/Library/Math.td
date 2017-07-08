@@ -57,21 +57,6 @@ class MathBuiltin_fUn_dUl<string name> : OCLGenericBuiltin<name, [
   [isSameDimAs<Id<0>, Id<1>>, isSameBaseSizeAs<Id<0>, Id<1>>], "dUl">
 ]>;
 
-class MathBuiltin_ffSn_ddSn<string name> : OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-    ocl_gentype_float, 
-    ocl_gentype_float, 
-    ocl_s_int
-  ], 
-  [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ffSn">,
-  OCLBuiltinVariant<[
-    ocl_gentype_double, 
-    ocl_gentype_double, 
-    ocl_s_int
-  ], 
-  [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Id<2>>], "ddSn">
-]>;
-
 class MathBuiltin_rrr_VfVfCf_VdVdCd<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_gentype_real,
@@ -109,40 +94,6 @@ class MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<string name> : OCLGenericBuiltin<name, [
      ocl_gentype_real, 
      OCLPointerType<ocl_s_int, ocl_as_private, []>
   ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "rrP4Sn">
-]>;
-
-class MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<string name> : 
-OCLGenericBuiltin<name, [
-  OCLBuiltinVariant<[
-     ocl_gentype_float, 
-     ocl_gentype_float, 
-     OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP1Sn">,
-  OCLBuiltinVariant<[
-     ocl_gentype_float, 
-     ocl_gentype_float, 
-     OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP2Sn">,
-  OCLBuiltinVariant<[
-     ocl_gentype_float, 
-     ocl_gentype_float, 
-     OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ffP4Sn">,
-  OCLBuiltinVariant<[
-     ocl_gentype_double, 
-     ocl_gentype_double, 
-     OCLPointerType<ocl_s_int, ocl_as_global, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP1Sn">,
-  OCLBuiltinVariant<[
-     ocl_gentype_double, 
-     ocl_gentype_double, 
-     OCLPointerType<ocl_s_int, ocl_as_local, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP2Sn">,
-  OCLBuiltinVariant<[
-     ocl_gentype_double, 
-     ocl_gentype_double, 
-     OCLPointerType<ocl_s_int, ocl_as_private, []>
-  ], [isSameAs<Id<0>, Id<1>>, isSameDimAs<Id<1>, Pointee<2>>], "ddP4Sn">
 ]>;
 
 class MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<string name> : OCLGenericBuiltin<name, [
@@ -303,7 +254,7 @@ def blt_fma         : MathBuiltin_rrrr<"fma">;
 def blt_mad         : MathBuiltin_rrrr<"mad">;
 
 def blt_pown        : MathBuiltin_rrSn<"pown">;
-def blt_rootn       : MathBuiltin_ffSn_ddSn<"rootn">;
+def blt_rootn       : MathBuiltin_rrSn<"rootn">;
 
 def blt_ldexp       : MathBuiltin_VrVrCn_rrSn<"ldexp">;
 
@@ -314,13 +265,11 @@ def blt_ilogb       : MathBuiltin_Snr<"ilogb">;
 def blt_fract       : MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<"fract">;
 
 def blt_frexp       : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"frexp">;
-
-def blt_lgamma_r    : MathBuiltin_ffP1Sn_ffP2Sn_ffP4Sn_ddP1Sn_ddP2Sn_ddP4Sn<"lgamma_r">;
+def blt_lgamma_r    : MathBuiltin_rrP1Sn_rrP2Sn_rrP4Sn<"lgamma_r">;
 
 def blt_remquo      : MathBuiltin_rrrP1Sn_rrrP2Sn_rrrP4Sn<"remquo">;
 
-def blt_modf        : MathBuiltin_ffP1f_ffP2f_ffP4f_ddP1d_ddP2d_ddP4d<"modf">;
-
+def blt_modf        : MathBuiltin_rrP1r_rrP2r_rrP4r<"modf">;
 def blt_sincos      : MathBuiltin_rrP1r_rrP2r_rrP4r<"sincos">;
 
 // half_* versions - to be overridden in case of fast FPU
