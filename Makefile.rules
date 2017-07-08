@@ -116,7 +116,7 @@ ifdef TABLEGEN_INC_FILES_COMMON
 ifdef OPENCRUN_TARGET
 
 $(ObjDir)/oclconst.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
-	$(Echo) Generating OCL target library definition for '$(OPENCRUN_TARGET)' with oclgen
+	$(Echo) Generating OCL target constants definition for '$(OPENCRUN_TARGET)' with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-constants-target -target $(OPENCRUN_TARGET) -o $(call SYSPATH, $@) $<
 
 $(ObjDir)/ocltype.$(OPENCRUN_TARGET).h.inc.tmp: $(OPENCRUN_TARGET).td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir

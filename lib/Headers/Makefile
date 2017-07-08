@@ -16,7 +16,7 @@ HEADERS := oclconst.h ocltype.h oclbuiltin.h
 include $(LEVEL)/Makefile.common
 
 $(ObjDir)/oclconst.h.inc.tmp: $(CommonLibraryDir)/OpenCL.td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
-	$(Echo) Generating OCL builtins library definition with oclgen
+	$(Echo) Generating OCL constants definition with oclgen
 	$(Verb) $(OCLGen) -gen-ocl-constants -o $(call SYSPATH, $@) $<
 
 $(ObjDir)/oclbuiltin.h.inc.tmp: $(CommonLibraryDir)/OpenCL.td $(OCLGEN) $(OCLGenLibrary) $(ObjDir)/.dir
