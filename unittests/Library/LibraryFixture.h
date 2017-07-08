@@ -20,6 +20,8 @@
 
 #include "gtest/gtest.h"
 
+#include <tuple>
+
 #define REGISTER_TYPED_TEST_CASE_P(CaseName, ...) \
   namespace GTEST_CASE_NAMESPACE_(CaseName) { \
   typedef ::testing::internal::Templates<__VA_ARGS__>::type gtest_AllTests_; \
@@ -81,17 +83,38 @@ public:
 #define GENTYPE_DECLARE(V) \
   typename TypeParam::Type V
 
+#define GENTYPE_DECLARE_TUPLE_ELEMENT(I, V) \
+  typename std::tuple_element<I, typename TypeParam::Type>::type V
+
 //===----------------------------------------------------------------------===//
 /// GENTYPE_CREATE - Value creator for generic type-based tests.
 //===----------------------------------------------------------------------===//
 #define GENTYPE_CREATE(V) \
   (OCLTypeTraits<typename TypeParam::Type>::Create(V))
 
+#define GENTYPE_CREATE_TUPLE_ELEMENT(I, V) \
+  (OCLTypeTraits<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::Create(V))
+
+//===----------------------------------------------------------------------===//
+/// GENTYPE_CHECK - Type checker for generic type-based tests.
+//===----------------------------------------------------------------------===//
+#define GENTYPE_CHECK(T) \
+  (std::is_same<typename TypeParam::Type, T>::value)
+
+#define GENTYPE_CHECK_TUPLE_ELEMENT(I, T) \
+  (std::is_same<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type, T>::value)
+
 //===----------------------------------------------------------------------===//
 /// ASSERT_GENTYPE_EQ - Equality check for generic type-based tests.
 //===----------------------------------------------------------------------===//
 #define ASSERT_GENTYPE_EQ(A, B) \
   (OCLTypeTraits<typename TypeParam::Type>::AssertEq(A, B))
+
+#define ASSERT_GENTYPE_TUPLE_EQ(I, A, B) \
+  (OCLTypeTraits<typename std::tuple_element<I, \
+   typename TypeParam::Type>::type>::AssertEq(A, B))
 
 #define ASSERT_GENTYPE_IS_NAN(A) \
   (OCLTypeTraits<typename TypeParam::Type>::AssertIsNaN(A))
@@ -184,6 +207,52 @@ public:
     Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
   }
 
+  template <typename RetTy, typename A1Ty, typename A2Ty>
+  void Invoke(llvm::StringRef Fun,
+              RetTy &R,
+              A1Ty A1,
+              A2Ty A2,
+              cl::NDRange Space = cl::NDRange(1)) {
+    cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
+    cl::Buffer A1Buf = AllocArgBuffer<A1Ty>();
+    cl::Buffer A2Buf = AllocArgBuffer<A2Ty>();
+
+    cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty>(Fun);
+    Kern.setArg(0, RetBuf);
+    Kern.setArg(1, A1Buf);
+    Kern.setArg(2, A2Buf);
+
+    Queue.enqueueWriteBuffer(A1Buf, true, 0, sizeof(A1Ty), &A1);
+    Queue.enqueueWriteBuffer(A2Buf, true, 0, sizeof(A2Ty), &A2);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
+  }
+
+  template <typename RetTy, typename A1Ty, typename A2Ty, typename A3Ty>
+  void Invoke(llvm::StringRef Fun,
+              RetTy &R,
+              A1Ty A1,
+              A2Ty A2,
+              A3Ty A3,
+              cl::NDRange Space = cl::NDRange(1)) {
+    cl::Buffer RetBuf = AllocReturnBuffer<RetTy>();
+    cl::Buffer A1Buf = AllocArgBuffer<A1Ty>();
+    cl::Buffer A2Buf = AllocArgBuffer<A2Ty>();
+    cl::Buffer A3Buf = AllocArgBuffer<A3Ty>();
+
+    cl::Kernel Kern = BuildKernel<RetTy, A1Ty, A2Ty, A3Ty>(Fun);
+    Kern.setArg(0, RetBuf);
+    Kern.setArg(1, A1Buf);
+    Kern.setArg(2, A2Buf);
+    Kern.setArg(3, A3Buf);
+
+    Queue.enqueueWriteBuffer(A1Buf, true, 0, sizeof(A1Ty), &A1);
+    Queue.enqueueWriteBuffer(A2Buf, true, 0, sizeof(A2Ty), &A2);
+    Queue.enqueueWriteBuffer(A3Buf, true, 0, sizeof(A3Ty), &A3);
+    Queue.enqueueNDRangeKernel(Kern, cl::NullRange, Space, Space);
+    Queue.enqueueReadBuffer(RetBuf, true, 0, sizeof(RetTy), &R);
+  }
+
 protected:
   template <typename RetTy>
   cl::Kernel BuildKernel(llvm::StringRef Fun) {
@@ -217,6 +286,48 @@ protected:
               << ")\n"
               << "{\n"
               << "  *r = " << Fun.str() << "(*a1);\n"
+              << "}\n";
+    std::string Src = SrcStream.str();
+
+    return GetKernel(KernName, Src);
+  }
+  template <typename RetTy, typename A1Ty, typename A2Ty>
+  cl::Kernel BuildKernel(llvm::StringRef Fun) {
+    std::string KernName;
+    BuildKernelName(Fun, KernName);
+
+    std::ostringstream SrcStream;
+
+    SrcStream << "kernel void " << KernName
+              << "(\n"
+              << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r,\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str() << " *a1,\n"
+              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str() << " *a2\n"
+              << ")\n"
+              << "{\n"
+              << "  *r = " << Fun.str() << "(*a1, *a2);\n"
+              << "}\n";
+    std::string Src = SrcStream.str();
+
+    return GetKernel(KernName, Src);
+  }
+
+  template <typename RetTy, typename A1Ty, typename A2Ty, typename A3Ty>
+  cl::Kernel BuildKernel(llvm::StringRef Fun) {
+    std::string KernName;
+    BuildKernelName(Fun, KernName);
+
+    std::ostringstream SrcStream;
+
+    SrcStream << "kernel void " << KernName
+              << "(\n"
+              << "  global " << OCLTypeTraits<RetTy>::OCLCName.str() << " *r,\n"
+              << "  global " << OCLTypeTraits<A1Ty>::OCLCName.str() << " *a1,\n"
+              << "  global " << OCLTypeTraits<A2Ty>::OCLCName.str() << " *a2,\n"
+              << "  global " << OCLTypeTraits<A3Ty>::OCLCName.str() << " *a3\n"
+              << ")\n"
+              << "{\n"
+              << "  *r = " << Fun.str() << "(*a1, *a2, *a3);\n"
               << "}\n";
     std::string Src = SrcStream.str();
 
