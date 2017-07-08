@@ -880,6 +880,21 @@ CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   PM.add(Pass);
   PM.run(*Fun->getParent());
 
+  // Local memory usage updated thanks to "static_local_infos" additional
+  // metadata from the AutomaticLocalVariables pass.
+  if (Fun->arg_size() > 1) {
+    const llvm::Argument &Arg = *(--Fun->arg_end());
+    std::string ArgName = Fun->getName().str() + ".locals";
+    if (Arg.getName() == ArgName) {
+      CPUKernelInfo Info(Kern.getKernelInfo());
+      Pass->AddLocalMemoryUsage(Info.getStaticLocalSize());
+    }
+  }
+
+  // Local memory allocated for kernel __local pointer arguments by
+  // creating VirtualBuffer objects.
+  Pass->AddLocalMemoryUsage(Kern.getLocalArgsSize());
+  
   KernelFootprints[&Kern] = *Pass;
 
   return KernelFootprints[&Kern];

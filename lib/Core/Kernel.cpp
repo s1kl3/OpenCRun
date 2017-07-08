@@ -18,7 +18,7 @@ using namespace opencrun;
 
 KernelDescriptor::KernelDescriptor(llvm::StringRef N, Program &P,
                                    KernelInfoContainer &&I)
- : Name(N), Infos(std::move(I)), Prog(&P) {
+ : Name(N), Infos(std::move(I)), Prog(&P), LocalArgsSz(0) {
   for (const auto &V : Infos)
     V.first->RegisterKernel(*this);
 }
@@ -243,6 +243,8 @@ cl_int Kernel::SetBufferArg(unsigned I, size_t Size, const void *Arg) {
                                   MemoryObj::ReadWrite, 
                                   MemoryObj::HostNoProtection);
 
+    // Update the amount of __local memory allocated for kernel arguments.
+    Desc->addLocalArgsSize(Size);
     break;
 
   default:

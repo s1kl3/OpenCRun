@@ -49,6 +49,10 @@ public:
     return Accuracy;
   }
 
+  void AddLocalMemoryUsage(size_t Usage) {
+    LocalMemoryUsage += Usage;
+  }
+
 protected:
   void AddPrivateMemoryUsage(size_t Usage) {
     PrivateMemoryUsage += Usage;
