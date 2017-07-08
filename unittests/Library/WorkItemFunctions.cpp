@@ -17,7 +17,8 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_work_dim) {
   this->Invoke("get_work_dim", WorkDim);
   EXPECT_EQ(1u, WorkDim);
 
-  this->Invoke("get_work_dim", WorkDim, cl::NDRange(1, 1, 1));
+  cl::NDRange Cube(1, 1, 1);
+  this->Invoke("get_work_dim", WorkDim, Cube, Cube);
   EXPECT_EQ(3u, WorkDim);
 }
 
@@ -30,7 +31,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_global_size) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_global_size", GlobalSize, I, Cube);
+    this->Invoke("get_global_size", GlobalSize, I, Cube, Cube);
     EXPECT_EQ(1u, GlobalSize);
   }
 }
@@ -44,7 +45,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_global_id) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_global_id", GlobalID, I, Cube);
+    this->Invoke("get_global_id", GlobalID, I, Cube, Cube);
     EXPECT_EQ(0u, GlobalID);
   }
 }
@@ -58,7 +59,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_local_size) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_local_size", LocalSize, I, Cube);
+    this->Invoke("get_local_size", LocalSize, I, Cube, Cube);
     EXPECT_EQ(1u, LocalSize);
   }
 }
@@ -72,7 +73,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_local_id) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_local_id", LocalID, I, Cube);
+    this->Invoke("get_local_id", LocalID, I, Cube, Cube);
     EXPECT_EQ(0u, LocalID);
   }
 }
@@ -86,7 +87,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_num_groups) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_num_groups", NumGroups, I, Cube);
+    this->Invoke("get_num_groups", NumGroups, I, Cube, Cube);
     EXPECT_EQ(1u, NumGroups);
   }
 }
@@ -100,7 +101,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_group_id) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_group_id", GroupID, I, Cube);
+    this->Invoke("get_group_id", GroupID, I, Cube, Cube);
     EXPECT_EQ(0u, GroupID);
   }
 }
@@ -114,7 +115,7 @@ TYPED_TEST_P(WorkItemFunctionsTest, get_global_offset) {
 
   cl::NDRange Cube(1, 1, 1);
   for(cl_uint I = 0; I < 3; ++I) {
-    this->Invoke("get_global_offset", GlobalOffset, I, Cube);
+    this->Invoke("get_global_offset", GlobalOffset, I, Cube, Cube);
     EXPECT_EQ(0u, GlobalOffset);
   }
 }

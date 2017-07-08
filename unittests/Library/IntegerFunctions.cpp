@@ -182,45 +182,45 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, add_sat) {
 
     // Saturation
     Input_x = GENTYPE_CREATE(MinVal);
-    Input_y = GENTYPE_CREATE(-1L);
+    Input_y = GENTYPE_CREATE((uint64_t) -1);
     Expected = GENTYPE_CREATE(MinVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // Saturation
     Input_x = GENTYPE_CREATE(MaxVal);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MinVal + 1);
-    Input_y = GENTYPE_CREATE(-1L);
+    Input_y = GENTYPE_CREATE((uint64_t) -1);
     Expected = GENTYPE_CREATE(MinVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MaxVal - 1);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
   } else if (GENTYPE_CHECK_UNSIGNED) { 
     // All bits set to 1.
-    uint64_t MaxVal = ~0UL;
+    uint64_t MaxVal = ~0ULL;
 
     // Saturation
     Input_x = GENTYPE_CREATE(MaxVal);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MaxVal - 1);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("add_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
@@ -251,45 +251,45 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, sub_sat) {
 
     // Saturation
     Input_x = GENTYPE_CREATE(MinVal);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MinVal);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // Saturation
     Input_x = GENTYPE_CREATE(MaxVal);
-    Input_y = GENTYPE_CREATE(-1L);
+    Input_y = GENTYPE_CREATE((uint64_t) -1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MinVal + 1);
-    Input_y = GENTYPE_CREATE(1L);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MinVal);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MaxVal - 1);
-    Input_y = GENTYPE_CREATE(-1L);
+    Input_y = GENTYPE_CREATE((uint64_t) -1);
     Expected = GENTYPE_CREATE(MaxVal);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
   } else if (GENTYPE_CHECK_UNSIGNED) { 
     // All bits set to 1.
-    uint64_t MaxVal = ~0UL;
+    uint64_t MaxVal = ~0ULL;
 
     // Saturation
-    Input_x = GENTYPE_CREATE(1);
+    Input_x = GENTYPE_CREATE((uint64_t) 1);
     Input_y = GENTYPE_CREATE(MaxVal);
-    Expected = GENTYPE_CREATE(0);
+    Expected = GENTYPE_CREATE((uint64_t) 0);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // No Saturation
     Input_x = GENTYPE_CREATE(MaxVal);
-    Input_y = GENTYPE_CREATE(1);
+    Input_y = GENTYPE_CREATE((uint64_t) 1);
     Expected = GENTYPE_CREATE(MaxVal - 1);
     this->Invoke("sub_sat", Output, Input_x, Input_y);
     ASSERT_GENTYPE_EQ(Expected, Output);
@@ -349,7 +349,7 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, mad_sat) {
     ASSERT_GENTYPE_EQ(Expected, Output);
 
     // Saturation
-    Input_a = GENTYPE_CREATE(-1L);
+    Input_a = GENTYPE_CREATE(-1);
     Input_b = GENTYPE_CREATE(1);
     Input_c = GENTYPE_CREATE(MinVal);
     Expected = GENTYPE_CREATE(MinVal);
@@ -357,7 +357,7 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, mad_sat) {
     ASSERT_GENTYPE_EQ(Expected, Output);
   } else if (GENTYPE_CHECK_UNSIGNED) { 
     // All bits set to 1.
-    uint64_t MaxVal = ~0UL;
+    uint64_t MaxVal = ~0ULL;
 
     Input_a = GENTYPE_CREATE(0);
     Input_b = GENTYPE_CREATE(MaxVal);
@@ -428,9 +428,9 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, mul_hi) {
       Input_y = GENTYPE_CREATE(0x2FFFFFFFU);
       Expected = GENTYPE_CREATE(0x5FFFFFFU);
     } else if (GENTYPE_CHECK_BASE(cl_ulong)) {
-      Input_x = GENTYPE_CREATE(0x1FFFFFFFFFFFFFFFUL);
-      Input_y = GENTYPE_CREATE(0x2FFFFFFFFFFFFFFFUL);
-      Expected = GENTYPE_CREATE(0x5FFFFFFFFFFFFFFUL);
+      Input_x = GENTYPE_CREATE(0x1FFFFFFFFFFFFFFFU);
+      Input_y = GENTYPE_CREATE(0x2FFFFFFFFFFFFFFFU);
+      Expected = GENTYPE_CREATE(0x5FFFFFFFFFFFFFFU);
     }
   }
   this->Invoke("mul_hi", Output, Input_x, Input_y);
@@ -483,10 +483,10 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, mad_hi) {
       Input_c = GENTYPE_CREATE(1);
       Expected = GENTYPE_CREATE(0x6000000U);
     } else if (GENTYPE_CHECK_BASE(cl_ulong)) {
-      Input_a = GENTYPE_CREATE(0x1FFFFFFFFFFFFFFFUL);
-      Input_b = GENTYPE_CREATE(0x2FFFFFFFFFFFFFFFUL);
+      Input_a = GENTYPE_CREATE(0x1FFFFFFFFFFFFFFFU);
+      Input_b = GENTYPE_CREATE(0x2FFFFFFFFFFFFFFFU);
       Input_c = GENTYPE_CREATE(1);
-      Expected = GENTYPE_CREATE(0x600000000000000UL);
+      Expected = GENTYPE_CREATE(0x600000000000000U);
     }
   }
 
@@ -670,7 +670,7 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, clz) {
   GENTYPE_DECLARE(Output);
 
   if (GENTYPE_CHECK_SIGNED) {
-    Input_x = GENTYPE_CREATE(1L);
+    Input_x = GENTYPE_CREATE(1);
     if (GENTYPE_CHECK_BASE(cl_char))
       Expected = GENTYPE_CREATE(7);
     else if (GENTYPE_CHECK_BASE(cl_short)) 
@@ -680,7 +680,7 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, clz) {
     else if (GENTYPE_CHECK_BASE(cl_long)) 
       Expected = GENTYPE_CREATE(63);
   } else if (GENTYPE_CHECK_UNSIGNED) {
-    Input_x = GENTYPE_CREATE(-1L);
+    Input_x = GENTYPE_CREATE(-1);
     Expected = GENTYPE_CREATE(0);
   }
   this->Invoke("clz", Output, Input_x);
@@ -693,16 +693,16 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, popcount) {
   GENTYPE_DECLARE(Output);
 
   if (GENTYPE_CHECK_BASE(cl_char) || GENTYPE_CHECK_BASE(cl_uchar)) {
-    Input_x = GENTYPE_CREATE((uint8_t)0x55UL);
+    Input_x = GENTYPE_CREATE((uint8_t) 0x55U);
     Expected = GENTYPE_CREATE(4);
   } else if (GENTYPE_CHECK_BASE(cl_short) || GENTYPE_CHECK_BASE(cl_ushort)) {
-    Input_x = GENTYPE_CREATE((uint16_t)0x5555UL);
+    Input_x = GENTYPE_CREATE((uint16_t) 0x5555U);
     Expected = GENTYPE_CREATE(8);
   } else if (GENTYPE_CHECK_BASE(cl_int) || GENTYPE_CHECK_BASE(cl_uint)) {
-    Input_x = GENTYPE_CREATE((uint32_t)0x55555555UL);
+    Input_x = GENTYPE_CREATE((uint32_t) 0x55555555U);
     Expected = GENTYPE_CREATE(16);
   } else if (GENTYPE_CHECK_BASE(cl_long) || GENTYPE_CHECK_BASE(cl_ulong)) {
-    Input_x = GENTYPE_CREATE((uint64_t)0x5555555555555555UL);
+    Input_x = GENTYPE_CREATE((uint64_t) 0x5555555555555555U);
     Expected = GENTYPE_CREATE(32);
   }
   this->Invoke("popcount", Output, Input_x);
@@ -729,9 +729,9 @@ TYPED_TEST_P(IntegerFunctions_TestCase_2, rotate) {
       Input_i = GENTYPE_CREATE(6);
       Expected = GENTYPE_CREATE(0x44444444U);
     } else if (GENTYPE_CHECK_BASE(cl_ulong)) {
-      Input_v = GENTYPE_CREATE(0x1111111111111111UL);
+      Input_v = GENTYPE_CREATE(0x1111111111111111U);
       Input_i = GENTYPE_CREATE(6);
-      Expected = GENTYPE_CREATE(0x4444444444444444UL);
+      Expected = GENTYPE_CREATE(0x4444444444444444U);
     }
   } else if (GENTYPE_CHECK_SIGNED) {
     if (GENTYPE_CHECK_BASE(cl_char)) {

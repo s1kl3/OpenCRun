@@ -841,6 +841,7 @@ public:
   #define cl_khr_int64_extended_atomics
   typedef uint64_t SizeType;
   #elif defined(__i386__)
+  #define cl_khr_fp64
   typedef uint32_t SizeType;
   #else
   #error "architecture not supported"

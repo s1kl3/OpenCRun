@@ -13,14 +13,13 @@ class RelationalFunctions_TestCase_1 : public LibraryGenTypeFixture<typename TyT
                                                                     typename TyTy::Type> { };
 
 #ifdef cl_khr_fp64
-#define LAST_SCALAR_TYPES_1(D) \
-  DeviceTypePair<D, std::tuple<cl_int, cl_float, cl_float>>,    \
+#define LAST_SCALAR_TYPES_1(D)                                \
+  DeviceTypePair<D, std::tuple<cl_int, cl_float, cl_float>>,  \
   DeviceTypePair<D, std::tuple<cl_int, cl_double, cl_double>>
 
-#define LAST_VECTOR_TYPES_1(D, S) \
-  DeviceTypePair<D, std::tuple<cl_int ## S, cl_float ## S, cl_float ## S>>,     \
-  DeviceTypePair<D, std::tuple<cl_long ## S, cl_double ## S, cl_double ## S>>   \
-
+#define LAST_VECTOR_TYPES_1(D, S)                                             \
+  DeviceTypePair<D, std::tuple<cl_int ## S, cl_float ## S, cl_float ## S>>,   \
+  DeviceTypePair<D, std::tuple<cl_long ## S, cl_double ## S, cl_double ## S>>
 #else
 #define LAST_SCALAR_TYPES_1(D) \
   DeviceTypePair<D, std::tuple<cl_int, cl_float, cl_float>>
@@ -286,14 +285,14 @@ INSTANTIATE_TYPED_TEST_CASE_P(OCLDev, RelationalFunctions_TestCase_1, OCLDevices
 
 template <typename TyTy>
 class RelationalFunctions_TestCase_2 : public LibraryGenTypeFixture<typename TyTy::Dev,
-                                                                 typename TyTy::Type> { };
+                                                                    typename TyTy::Type> { };
 
 #ifdef cl_khr_fp64
-#define LAST_SCALAR_TYPES_2(D) \
+#define LAST_SCALAR_TYPES_2(D)                      \
   DeviceTypePair<D, std::tuple<cl_int, cl_float>>,  \
   DeviceTypePair<D, std::tuple<cl_int, cl_double>>
 
-#define LAST_VECTOR_TYPES_2(D, S) \
+#define LAST_VECTOR_TYPES_2(D, S)                               \
   DeviceTypePair<D, std::tuple<cl_int ## S, cl_float ## S>>,    \
   DeviceTypePair<D, std::tuple<cl_long ## S, cl_double ## S>>
 #else
@@ -301,7 +300,7 @@ class RelationalFunctions_TestCase_2 : public LibraryGenTypeFixture<typename TyT
   DeviceTypePair<D, std::tuple<cl_int, cl_float>>
 
 #define LAST_VECTOR_TYPES_2(D, S) \
-  DeviceTypePair<D, std::tuple<cl_int ## S, cl_float ## S>>,
+  DeviceTypePair<D, std::tuple<cl_int ## S, cl_float ## S>>
 #endif
 
 #define LAST_ALL_TYPES_2(D)     \
@@ -587,10 +586,10 @@ TYPED_TEST_P(RelationalFunctions_TestCase_4, bitselect) {
   GENTYPE_DECLARE(Output);
   GENTYPE_DECLARE(Expected);
 
-  Input_a = GENTYPE_CREATE(0x5555555555555555UL);
-  Input_b = GENTYPE_CREATE(0xAAAAAAAAAAAAAAAAUL);
-  Input_c = GENTYPE_CREATE(0xAAAAAAAAAAAAAAAAUL);
-  Expected =  GENTYPE_CREATE(0xFFFFFFFFFFFFFFFFUL);
+  Input_a = GENTYPE_CREATE(0x5555555555555555U);
+  Input_b = GENTYPE_CREATE(0xAAAAAAAAAAAAAAAAU);
+  Input_c = GENTYPE_CREATE(0xAAAAAAAAAAAAAAAAU);
+  Expected =  GENTYPE_CREATE(0xFFFFFFFFFFFFFFFFU);
   this->Invoke("bitselect", Output, Input_a, Input_b, Input_c);
   ASSERT_GENTYPE_EQ(Expected, Output);
 }
@@ -953,7 +952,7 @@ TYPED_TEST_P(RelationalFunctions_TestCase_ ## Ty, select) {             \
       Expected = GENTYPE_CREATE_TUPLE_ELEMENT(0, 1);                    \
     }                                                                   \
   } else if (GENTYPE_CHECK_TUPLE_ELEMENT_UNSIGNED(3)) {                 \
-    Input_c = GENTYPE_CREATE_TUPLE_ELEMENT(3, 0xFFFFFFFFFFFFFFF8UL);    \
+    Input_c = GENTYPE_CREATE_TUPLE_ELEMENT(3, 0xFFFFFFFFFFFFFFF8U);    \
     Expected =  GENTYPE_CREATE_TUPLE_ELEMENT(0, 1);                     \
   }                                                                     \
                                                                         \
