@@ -128,8 +128,14 @@ unsigned Kernel::GetArgCount() const {
 }
 
 bool Kernel::AreAllArgsSpecified() const {
-  // FIXME: effectively check if all arguments have been assigned.
-  return true;
+  llvm::Function *Kern = Desc->getKernelInfo().getFunction();
+  llvm::FunctionType *FTy = Kern->getFunctionType();
+
+  llvm::Argument &LastArg = *--(Kern->arg_end());
+  if (LastArg.getName().equals(Kern->getName().str() + ".locals"))
+    return GetArgCount() == (FTy->getNumParams() - 1) ? true : false;
+
+  return GetArgCount() == FTy->getNumParams() ? true : false;
 }
 
 cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const {
@@ -339,7 +345,19 @@ cl_int Kernel::SetSamplerArg(unsigned I, size_t Size, const void *Arg) {
 }
 
 cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
-  // TODO: compute argument type size in order to match the parameter.
+  // The expected data type for the parameter is extracted from the
+  // FunctionType of the kernel function. All required error checking
+  // has been already performed by the SetArg function.
+  llvm::Function *Kern = Desc->getKernelInfo().getFunction();
+  llvm::FunctionType *FTy = Kern->getFunctionType();
+  llvm::Module *M = Kern->getParent();
+  const llvm::DataLayout *DL = M->getDataLayout();
+  uint64_t ArgSz = DL->getTypeStoreSize(FTy->getParamType(I));
+
+  if (Size != ArgSz)
+    RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
+                      "kernel argument size does not match");
+
   ThisLock.acquire();
   Arguments[I] = new ByValueKernelArg(I, Arg, Size);
   ThisLock.release();
