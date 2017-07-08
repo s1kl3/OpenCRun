@@ -1,9 +1,16 @@
 
-namespace {
+namespace { // Anonymous namespace.
 
 // Very architecture-dependent code. Use __thread instead of
 // llvm::sys::ThreadLocal in order to generate more compact code.
-__thread uint64_t SavedRBP, SavedRSP;
+// Here we force the local-dynamic TLS access model. However,
+// declaring these variables as static should be enough to lead
+// to the same optimization.
+//
+// See <https://www.akkadia.org/drepper/tls.pdf>
+static __thread uint64_t SavedRBP   __attribute__((tls_model("local-dynamic"))),
+                         SavedRSP   __attribute__((tls_model("local-dynamic"))),
+                         WIStack    __attribute__((tls_model("local-dynamic"))); 
 
 } // End anonymous namespace.
 
@@ -14,6 +21,11 @@ typedef void (*EntryPoint)(void **);
 
 void SwitchWorkItem();
 void WorkItemLauncher();
+
+static void NotReachable() __attribute__((used));
+
+static void SetCurrentWorkItemStack(uintptr_t Stack) __attribute__((used));
+static uintptr_t GetCurrentWorkItemStack() __attribute__((used));
 
 // Stack offsets in bytes.
 #define STACK_CONTEXT_OFFSET   (                         0)
@@ -52,10 +64,10 @@ void WorkItemLauncher();
 //
 // Context contains next stack pointer and rbx, r12, r13, r14, r15, rbp, rsp.
 
-void InitWorkItemStack(void *Stack,
-                       size_t Size,
-                       EntryPoint Entry,
-                       void **Args) {
+static void InitWorkItemStack(void *Stack,
+                              size_t Size,
+                              EntryPoint Entry,
+                              void **Args) {
   uintptr_t StackAddr = (uintptr_t) Stack;
 
   // Stack grows downward.
@@ -76,7 +88,7 @@ void InitWorkItemStack(void *Stack,
   *(uint64_t *) (StackAddr + STACK_KERN_ARGS_OFFSET) = (uint64_t) Args;
 }
 
-void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
+static void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
   uintptr_t StackAddr = (uintptr_t) Stack,
             PrevStackAddr = (uintptr_t) PrevStack;
 
@@ -88,7 +100,7 @@ void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
   *(uint64_t *) (PrevStackAddr + STACK_NEXT_OFFSET) = (uint64_t) StackAddr;
 }
 
-void RunWorkItems(void *Stack, size_t Size) {
+static void RunWorkItems(void *Stack, size_t Size) {
   uintptr_t StackAddr = (uintptr_t) Stack;
   
   // Stack grows downward.
@@ -96,39 +108,52 @@ void RunWorkItems(void *Stack, size_t Size) {
 
   // Save current stack addresses.
   __asm__ __volatile__(
-  "movq %%rbp, %0\n"
-  "movq %%rsp, %1\n"
-  : "=r" (SavedRBP), "=r" (SavedRSP)
+  "movq %%rbp, %[SavedRBP]\n"
+  "movq %%rsp, %[SavedRSP]\n"
+  : [SavedRBP] "=m" (SavedRBP),
+    [SavedRSP] "=m" (SavedRSP)
   :
   :
   );
 
-  SetCurrentWorkItemStack((void *) StackAddr);
+  SetCurrentWorkItemStack(StackAddr);
+
+  __asm__ __volatile__(
+  // Store the values of the TLS variables into callee-saved registers in order to
+  // avoid push/pop of registers before kernel call to prevent their corruption.
+  "movq %[SavedRBP], %%r12\n"
+  "movq %[SavedRSP], %%r13\n"
 
   // Switch to the work-item stack and directly call the kernel.
-  __asm__ __volatile__(
-  "movq %0, %%rbp\n"
-  "movq %1, %%rsp\n"
-  "movq -8(%%rbp), %%rdi\n"
-  "callq *(%%rbp)\n"
+  "movq  %[StackBase], %%rbp\n"
+  "movq  %[StackPtr],  %%rsp\n"
+  "movq  -8(%%rbp),    %%rdi\n"
+  "callq  *(%%rbp)\n"
+
+  // Switch back to main thread stack recovering their values from the previously
+  // callee-saved registers.
+  "movq %%r12, %%rbp\n"
+  "movq %%r13, %%rsp\n"
   :
-  : "r" (StackAddr + STACK_BASE_OFFSET),
-    "r" (StackAddr + STACK_PTR_OFFSET)
-  :
+  : [StackBase] "r" (StackAddr + STACK_BASE_OFFSET),
+    [StackPtr]  "r" (StackAddr + STACK_PTR_OFFSET),
+    [SavedRBP]  "m" (SavedRBP),
+    [SavedRSP]  "m" (SavedRSP)
+  : "memory", "cc"
   );
 
-  // Switch back to main thread stack.
-  __asm__ __volatile__(
-  "movq %0, %%rbp\n"
-  "movq %1, %%rsp\n"
-  :
-  : "r" (SavedRBP), "r" (SavedRSP)
-  :
-  );
 }
 
-void NotReachable() {
+static void NotReachable() {
   llvm_unreachable("Work-items cannot reach here");
+}
+
+static void SetCurrentWorkItemStack(uintptr_t Stack) {
+  WIStack = (uint64_t) Stack; 
+}
+
+static uintptr_t GetCurrentWorkItemStack() {
+  return (uintptr_t) WIStack;
 }
 
 }
@@ -151,8 +176,7 @@ __asm__ (
 // return from this function using a ret, so we have to manually popping the
 // return address from the stack.
 "  movq %rbp, -48(%rax)\n"
-"  movq %rsp, %rbx\n"
-"  addq $8, %rbx\n"
+"  leaq 8(%rsp), %rbx\n"
 "  movq %rbx, -56(%rax)\n"
 
 // Save return address.

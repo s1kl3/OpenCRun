@@ -1,9 +1,16 @@
 
-namespace {
+namespace { // Anonymous namespace.
 
 // Very architecture-dependent code. Use __thread instead of
 // llvm::sys::ThreadLocal in order to generate more compact code.
-__thread uint64_t SavedEBP, SavedESP;
+// Here we force the local-dynamic TLS access model. However,
+// declaring these variables as static should be enough to lead
+// to the same optimization.
+//
+// See <https://www.akkadia.org/drepper/tls.pdf>
+static __thread uint32_t SavedEBP __attribute__((tls_model("local-dynamic"))),
+                         SavedESP __attribute__((tls_model("local-dynamic"))),
+                         WIStack  __attribute__((tls_model("local-dynamic")));
 
 } // End anonymous namespace.
 
@@ -14,6 +21,11 @@ typedef void (*EntryPoint)(void **);
 
 void SwitchWorkItem();
 void WorkItemLauncher();
+
+static void NotReachable() __attribute__((used));
+
+static void SetCurrentWorkItemStack(uintptr_t Stack) __attribute__((used));
+static uintptr_t GetCurrentWorkItemStack() __attribute__((used));
 
 // Stack offsets in bytes.
 #define STACK_CONTEXT_OFFSET   (                         0)
@@ -35,7 +47,7 @@ void WorkItemLauncher();
 
 // Layout notes:
 //
-// 0
+// 0                 31
 // +------------------+
 // | Context          |
 // | ...              |
@@ -50,10 +62,10 @@ void WorkItemLauncher();
 //
 // Context contains next stack pointer and ebx, esi, edi, ebp, esp.
 
-void InitWorkItemStack(void *Stack,
-                       size_t Size,
-                       EntryPoint Entry,
-                       void **Args) {
+static void InitWorkItemStack(void *Stack,
+                              size_t Size,
+                              EntryPoint Entry,
+                              void **Args) {
   uintptr_t StackAddr = (uintptr_t) Stack;
 
   // Stack grows downward.
@@ -74,7 +86,7 @@ void InitWorkItemStack(void *Stack,
   *(uint32_t *) (StackAddr + STACK_KERN_ARGS_OFFSET) = (uint32_t) Args;
 }
 
-void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
+static void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
   uintptr_t StackAddr = (uintptr_t) Stack,
             PrevStackAddr = (uintptr_t) PrevStack;
 
@@ -86,7 +98,7 @@ void SetWorkItemStackLink(void *Stack, void *PrevStack, size_t Size) {
   *(uint32_t *) (PrevStackAddr + STACK_NEXT_OFFSET) = (uint32_t) StackAddr;
 }
 
-void RunWorkItems(void *Stack, size_t Size) {
+static void RunWorkItems(void *Stack, size_t Size) {
   uintptr_t StackAddr = (uintptr_t) Stack;
 
   // Stack grows downward.
@@ -94,42 +106,55 @@ void RunWorkItems(void *Stack, size_t Size) {
 
   // Save current stack address.
   __asm__ __volatile__(
-  "movl %%ebp, %0\n"
-  "movl %%esp, %1\n"
-  : "=r" (SavedEBP), "=r" (SavedESP)
+  "movl %%ebp, %[SavedEBP]\n"
+  "movl %%esp, %[SavedESP]\n"
+  : [SavedEBP] "=c" (SavedEBP),
+    [SavedESP] "=d" (SavedESP)
   :
   :
   );
 
-  SetCurrentWorkItemStack((void *) StackAddr);
+  SetCurrentWorkItemStack(StackAddr);
+
+  __asm__ __volatile__(
+  // Store the values of the TLS variables into callee-saved registers in order to
+  // avoid push/pop of registers before/after the kernel call.
+  "movl %[SavedEBP], %%esi\n"
+  "movl %[SavedESP], %%edi\n"
 
   // Switch to the work-item stack and directly call the kernel.
-  __asm__ __volatile__(
-  "movl %0, %%ebp\n"
-  "movl %1, %%esp\n"
+  "movl %[StackBase], %%ebp\n"
+  "movl %[StackPtr], %%esp\n"
   "subl $12, %%esp\n"
   "movl -4(%%ebp), %%eax\n"
   "movl %%eax, (%%esp)\n"
   "calll *(%%ebp)\n"
   "addl $12, %%esp\n"
+
+  // Switch back to main thread stack recovering their values from the previously
+  // callee-saved registers.
+  "movl %%esi, %%ebp\n"
+  "movl %%edi, %%esp\n"
   :
-  : "r" (StackAddr + STACK_BASE_OFFSET),
-    "r" (StackAddr + STACK_PTR_OFFSET)
-  :
+  : [StackBase] "c" (StackAddr + STACK_BASE_OFFSET),
+    [StackPtr]  "d" (StackAddr + STACK_PTR_OFFSET),
+    [SavedEBP]  "m" (SavedEBP),
+    [SavedESP]  "m" (SavedESP)
+  : "memory", "cc"
   );
 
-  // Switch back to main thread stack.
-  __asm__ __volatile__(
-  "movl %0, %%ebp\n"
-  "movl %1, %%esp\n"
-  :
-  : "r" (SavedEBP), "r" (SavedESP)
-  :
-  );
 }
 
-void NotReachable() {
+static void NotReachable() {
   llvm_unreachable("Work-items cannot reach here");
+}
+
+static void SetCurrentWorkItemStack(uintptr_t Stack) {
+  WIStack = (uint32_t) Stack; 
+}
+
+static uintptr_t GetCurrentWorkItemStack() {
+  return (uintptr_t) WIStack;
 }
 
 }

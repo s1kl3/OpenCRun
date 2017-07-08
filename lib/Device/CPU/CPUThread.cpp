@@ -5,30 +5,6 @@
 #include "opencrun/System/OS.h"
 
 #include "llvm/Support/Format.h"
-#include "llvm/Support/ThreadLocal.h"
-
-using namespace opencrun;
-using namespace opencrun::cpu;
-
-namespace {
-
-//
-// Routines to manage current work-item stack pointer in the TLS.
-//
-
-extern "C" {
-
-void SetCurrentWorkItemStack(void *Stack);
-void *GetCurrentWorkItemStack();
-
-}
-
-//
-// Routines to manage current thread pointer in the TLS.
-//
-
-void SetCurrentThread(CPUThread &Thr);
-void ResetCurrentThread();
 
 //
 // Include low-level routines for current architecture related to stack
@@ -42,6 +18,18 @@ void ResetCurrentThread();
 #else
 #error "architecture not supported"
 #endif
+
+using namespace opencrun;
+using namespace opencrun::cpu;
+
+namespace { // Anonymous namespace.
+
+//
+// Routines to manage current thread pointer in the TLS.
+//
+
+static void SetCurrentThread(CPUThread *Thr);
+static void ResetCurrentThread();
 
 } // End anonymous namespace.
 
@@ -185,27 +173,6 @@ void ExecutionStack::Dump(void *StartAddr, void *EndAddr) const {
   }
 }
 
-//
-// CurrentWorkItemStack implementation.
-//
-
-namespace {
-
-extern "C" {
-
-llvm::sys::ThreadLocal<const void> CurrentWorkItemStack;
-
-void SetCurrentWorkItemStack(void *Stack) {
-  CurrentWorkItemStack.set(Stack);
-}
-
-void *GetCurrentWorkItemStack() {
-  return const_cast<void *>(CurrentWorkItemStack.get());
-}
-
-}
-
-} // End anonymous namespace.
 
 //
 // CPUThread implementation.
@@ -253,7 +220,7 @@ bool CPUThread::Submit(CPUCommand *Cmd) {
 }
 
 void CPUThread::Run() {
-  SetCurrentThread(*this);
+  SetCurrentThread(this);
 
   while(Mode & ExecJobs) {
     ThisMnt.Enter();
@@ -1030,15 +997,22 @@ cl_float CPUThread::HalfToFloat(cl_half h) {
 // GetCurrentThread implementation.
 //
 
-namespace {
+namespace { // Anonymous namespace.
 
-llvm::sys::ThreadLocal<const CPUThread> CurThread;
+// Very architecture-dependent code. Use __thread instead of
+// llvm::sys::ThreadLocal in order to generate more compact code.
+// This thread-local variable is declared as static, thus it's
+// used within this module only and the compiler generated code
+// should use the local-dynamic TLS access model.
+// 
+// See <https://www.akkadia.org/drepper/tls.pdf>
+static __thread const CPUThread *CurThread;
 
-void SetCurrentThread(CPUThread &Thr) { CurThread.set(&Thr); }
-void ResetCurrentThread() { CurThread.erase(); }
+static void SetCurrentThread(CPUThread *Thr) { CurThread = Thr; }
+static void ResetCurrentThread() { CurThread = nullptr; }
 
 } // End anonymous namespace.
 
 CPUThread &opencrun::cpu::GetCurrentThread() {
-  return *const_cast<CPUThread *>(CurThread.get());
+  return *const_cast<CPUThread *>(CurThread);
 }
