@@ -416,46 +416,32 @@ let Predicates = [ocl_ext_cl_khr_int64_extended_atomics] in {
 //===----------------------------------------------------------------------===//
 
 def : OCLBuiltinImpl<blt_atomic_add, TemplateStrategy<[{
-  return __sync_fetch_and_add_4(param1, param2);
+  return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_sub, TemplateStrategy<[{
-  return __sync_fetch_and_sub_4(param1, param2);
+  return __atomic_fetch_sub(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>, "nP1nn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>, "UnP1UnUn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(
-        (volatile uint __global*)param1, 
-        (uint) param2
-        );
-}]>, "fP1ff">;
-
-def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>, "nP2nn">;
 
 def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>, "UnP2UnUn">;
-
-def : OCLBuiltinImpl<blt_atomic_xchg, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(
-        (volatile uint __local *) param1, 
-        (uint) param2
-        );
-}]>, "fP2ff">;
 
 //----------------------------------------------------------------------------//
 
@@ -472,43 +458,48 @@ def : OCLBuiltinImpl<blt_atomic_dec, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_cmpxchg, TemplateStrategy<[{
-  return __sync_val_compare_and_swap_4(param1, param2, param3);
+  __atomic_compare_exchange_n(
+      param1, &param2, param3,
+      false, __ATOMIC_RELAXED, __ATOMIC_RELAXED
+  );
+
+  return param2;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_and, TemplateStrategy<[{
-  return __sync_fetch_and_and_4(param1, param2);
+  return __atomic_fetch_and(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_or, TemplateStrategy<[{
-  return __sync_fetch_and_or_4(param1, param2);
+  return __atomic_fetch_or(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atomic_xor, TemplateStrategy<[{
-  return __sync_fetch_and_xor_4(param1, param2);
+  return __atomic_fetch_xor(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_add_32_local, TemplateStrategy<[{
-  return __sync_fetch_and_add_4(param1, param2);
+  return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_sub_32_local, TemplateStrategy<[{
-  return __sync_fetch_and_sub_4(param1, param2);
+  return __atomic_fetch_sub(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_xchg_32_local, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
@@ -526,25 +517,30 @@ def : OCLBuiltinImpl<blt_atom_dec_32_local, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_cmpxchg_32_local, TemplateStrategy<[{
-  return __sync_val_compare_and_swap_4(param1, param2, param3);
+  __atomic_compare_exchange_n(
+      param1, &param2, param3,
+      false, __ATOMIC_RELAXED, __ATOMIC_RELAXED
+  );
+
+  return param2;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_add_32_global, TemplateStrategy<[{
-  return __sync_fetch_and_add_4(param1, param2);
+  return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_sub_32_global, TemplateStrategy<[{
-  return __sync_fetch_and_sub_4(param1, param2);
+  return __atomic_fetch_sub(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_xchg_32_global, TemplateStrategy<[{
-  return __sync_lock_test_and_set_4(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
@@ -562,24 +558,29 @@ def : OCLBuiltinImpl<blt_atom_dec_32_global, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_cmpxchg_32_global, TemplateStrategy<[{
-  return __sync_val_compare_and_swap_4(param1, param2, param3);
+   __atomic_compare_exchange_n(
+      param1, &param2, param3,
+      false, __ATOMIC_RELAXED, __ATOMIC_RELAXED
+  );
+
+  return param2;
 }]>>;
 
 //----------------------------------------------------------------------------//
 def : OCLBuiltinImpl<blt_atom_add_64, TemplateStrategy<[{
-  return __sync_fetch_and_add_8(param1, param2);
+  return __atomic_fetch_add(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_sub_64, TemplateStrategy<[{
-  return __sync_fetch_and_sub_8(param1, param2);
+  return __atomic_fetch_sub(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_xchg_64, TemplateStrategy<[{
-  return __sync_lock_test_and_set_8(param1, param2);
+  return __atomic_exchange_n(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
@@ -597,23 +598,28 @@ def : OCLBuiltinImpl<blt_atom_dec_64, TemplateStrategy<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_cmpxchg_64, TemplateStrategy<[{
-  return __sync_val_compare_and_swap_8(param1, param2, param3);
+   __atomic_compare_exchange_n(
+      param1, &param2, param3,
+      false, __ATOMIC_RELAXED, __ATOMIC_RELAXED
+  );
+
+  return param2;
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_xor_64, TemplateStrategy<[{
-  return __sync_fetch_and_xor_8(param1, param2);
+  return __atomic_fetch_xor(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_and_64, TemplateStrategy<[{
-  return __sync_fetch_and_and_8(param1, param2);
+  return __atomic_fetch_and(param1, param2, __ATOMIC_RELAXED);
 }]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_atom_or_64, TemplateStrategy<[{
-  return __sync_fetch_and_or_8(param1, param2);
+  return __atomic_fetch_or(param1, param2, __ATOMIC_RELAXED);
 }]>>;
