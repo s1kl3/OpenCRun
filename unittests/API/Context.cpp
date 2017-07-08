@@ -85,22 +85,22 @@ TEST_F(ContextTest, FromDeviceType) {
 
   // 1) Workaround for silence a googletest warning.
   // 2) The CPU device is the default device in OpenCRun.
-  cl_device_type ExpectedDevTy = CL_DEVICE_TYPE_CPU | CL_DEVICE_TYPE_DEFAULT;
+  cl_device_type ExpectedDevTy = CL_DEVICE_TYPE_CPU;
 
   EXPECT_EQ(1u, Ctx.getInfo<CL_CONTEXT_NUM_DEVICES>());
   EXPECT_EQ(1u, Devs.size());
   EXPECT_EQ(ExpectedDevTy, Devs[0].getInfo<CL_DEVICE_TYPE>());
 }
 
-TEST_F(ContextTest, NullPropertiesNotSupported) {
+TEST_F(ContextTest, NullPropertiesSupported) {
   std::vector<cl::Device> Devs(1, GetDevice());
   cl_int ErrCodeA, ErrCodeB;
 
   cl::Context CtxA(Devs, NULL, NULL, NULL, &ErrCodeA);
   cl::Context CtxB(CL_DEVICE_TYPE_CPU, NULL, NULL, NULL, &ErrCodeB);
 
-  EXPECT_EQ(CL_INVALID_PLATFORM, ErrCodeA);
-  EXPECT_EQ(CL_INVALID_PLATFORM, ErrCodeB);
+  EXPECT_EQ(CL_SUCCESS, ErrCodeA);
+  EXPECT_EQ(CL_SUCCESS, ErrCodeB);
 }
 
 TEST_F(ContextTest, NullPlatformSupported) {

@@ -84,7 +84,7 @@ TEST_F(KernelTest, VoidKernel) {
 }
 
 TEST_F(KernelTest, ArgsKernel) {
-  const char *Src = "kernel void foo(uint *out, uint *in, uint size) { }";
+  const char *Src = "kernel void foo(global uint *out, global uint *in, uint size) { }";
   cl::Program Prog = BuildProgram(Src);
 
   cl::Kernel Kern(Prog, "foo");
