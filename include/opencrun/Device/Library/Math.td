@@ -466,7 +466,7 @@ def : OCLBuiltinImpl<blt_cosh, RecursiveSplit<[{
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_cospi, RecursiveSplit<[{
-  return __libm(cos)(param1) / __libm_CONST_(M_PI);
+  return __libm(cos)(param1 * __libm_CONST_(M_PI));
 }], [LibM<Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
@@ -663,17 +663,25 @@ def : OCLBuiltinImpl<blt_hypot, RecursiveSplit<[{
 
 //----------------------------------------------------------------------------//
 
-def : OCLBuiltinImpl<blt_maxmag, TemplateStrategy<[{
-  return __builtin_ocl_fmax(__builtin_ocl_fabs(param1),
-                            __builtin_ocl_fabs(param2));
-}]>>;
+def : OCLBuiltinImpl<blt_maxmag, RecursiveSplit<[{
+  TYPE abs1 = __libm(fabs)(param1);
+  TYPE abs2 = __libm(fabs)(param2);
+
+  if (abs1 > abs2) return param1;
+  else if (abs2 > abs1) return param2;
+  else return __libm(fmax)(param1, param2);
+}], [LibM<Id<0>>, TypedefId<"TYPE", Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_minmag, RecursiveSplit<[{
-  return __builtin_ocl_fmin(__builtin_ocl_fabs(param1),
-                            __builtin_ocl_fabs(param2));
-}]>>;
+  TYPE abs1 = __libm(fabs)(param1);
+  TYPE abs2 = __libm(fabs)(param2);
+
+  if (abs1 < abs2) return param1;
+  else if (abs2 < abs1) return param2;
+  else return __libm(fmin)(param1, param2);
+}], [LibM<Id<0>>, TypedefId<"TYPE", Id<0>>]>>;
 
 //----------------------------------------------------------------------------//
 
