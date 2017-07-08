@@ -543,7 +543,7 @@ Hardware::Hardware() {
       HardwareComponent *HWComp =
         BuildHardwareComponent(HWObj);
       
-      // TODO: Handle NULL HWComp (unknown hardware component
+      // TODO: Handle NULL HWComp (unknown hardware component).
       
       HWMap[HWObj] = HWComp;
       HWComps.insert(HWComp);
