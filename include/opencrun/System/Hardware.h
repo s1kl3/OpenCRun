@@ -606,6 +606,27 @@ private:
 
 Hardware &GetHardware();
 
+template <typename Ty>
+void HardwareComponent::ConstFilteredIterator<Ty>::Advance() {
+  Hardware &HW = GetHardware();
+
+  // The following doesn't work if objects at the given depth do not have CPU sets
+  // or if the topology is made of different machines.
+  HardwareObject HWObj = hwloc_get_next_obj_inside_cpuset_by_depth(HW.GetHardwareTopology(),
+                                                                   HWCompRoot->GetCPUSet(),
+                                                                   HWComp->GetDepth(),
+                                                                   HWComp->GetHardwareObject());
+  if(!HWObj) {
+    HWComp = NULL;
+    return;
+  }
+    
+  HardwareComponent *HWNext = HW.GetHardwareComponent(HWObj);
+  assert(HWNext && "Lacking hardware component!");
+
+  HWComp = static_cast<Ty *>(HWNext);
+}
+
 } // End namespace sys.
 } // End namespace opencrun.
 
