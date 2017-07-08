@@ -112,6 +112,49 @@ dnl===
 dnl=== SECTION 9: Additional checks, variables, etc.
 dnl===
 dnl===-----------------------------------------------------------------------===
+AC_CHECK_TOOL([GCC_AR], [gcc-ar], [])
+AC_CHECK_TOOL([GCC_RANLIB], [gcc-ranlib], [])
+
+AC_MSG_CHECKING(for LTO build request)
+AC_ARG_ENABLE([lto],
+              [AS_HELP_STRING([--enable-lto], [enable link time optimization])],
+              [case "${enableval}" in
+                 yes)   enable_lto=yes ;;
+                 no)    enable_lto=no  ;;
+                 *)     AC_MSG_ERROR([wrong value "${enableval}" for --enable-lto]) ;;
+               esac], [enable_lto=no])
+AC_MSG_RESULT(${enable_lto})
+
+AS_IF([test "x${enable_lto}" = "xyes"],
+      [
+
+       AS_IF([test "${GCC_AR}" = ""],
+             [
+              AC_MSG_WARN([
+                           ------------------------------------------
+                           Unable to find gcc-ar on this system.
+                           Building without LTO.
+                           ------------------------------------------
+                           ])
+              enable_lto=no
+             ]
+            )
+
+       AS_IF([test "${GCC_RANLIB}" = ""],
+             [
+              AC_MSG_WARN([
+                           ------------------------------------------
+                           Unable to find gcc-ranlib on this system.
+                           Building without LTO.
+                           ------------------------------------------
+                           ])
+              enable_lto=no
+             ]
+            )
+       ]
+      )
+
+AC_SUBST([ENABLE_LTO], [${enable_lto}])
 
 dnl===-----------------------------------------------------------------------===
 dnl===

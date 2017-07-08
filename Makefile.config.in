@@ -26,4 +26,20 @@ CLANGPATH := clang
 
 # Add hwloc headers and library to preprocessor and linker search paths.
 CPPFLAGS += @HWLOC_CFLAGS@
-LDFLAGS += @HWLOC_LIBS@
+LDFLAGS	+= @HWLOC_LIBS@
+
+# Force all processor extensions (otherwise they would not be activated by 
+# default for i386 builds) 
+CFLAGS += -march=native
+CXXFLAGS += -march=native
+
+# Link Time Optimizations (LTO)
+ENABLE_LTO := @ENABLE_LTO@
+ifeq (${ENABLE_LTO}, yes)
+  GCCPATH	:= $(shell gcc -print-search-dirs | awk '/install/{print $$2}')
+  AR		:= @GCC_AR@
+  RANLIB	:= @GCC_RANLIB@
+  CFLAGS	:= $(CFLAGS) -flto
+  CXXFLAGS	:= $(CXXFLAGS) -flto
+  LDFLAGS	:= $(LDFLAGS) -flto=`nproc` -march=native -Ofast
+endif
