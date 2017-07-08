@@ -665,33 +665,43 @@ int CPUThread::Execute(FillBufferCPUCommand &Cmd) {
 int CPUThread::Execute(FillImageCPUCommand &Cmd) {
   // Maximum fill data size is 4 channels with 4 bytes
   // per channel.
-  cl_uchar fill_data[16];
+  union {
+    cl_uchar    uc[16];
+    cl_char     c[16];
+    cl_ushort   us[8];
+    cl_short    s[8];
+    cl_uint     ui[4];
+    cl_int      i[4];
+    cl_half     h[8];
+    cl_float    f[4];
+    void*       v;
+  } fill_data;
 
   cl_image_format ImgFmt = Cmd.GetTargetImageFormat();
   const size_t *Region = Cmd.GetTargetRegion(); 
 
-  std::memset(fill_data, 0, 16 * sizeof(cl_uchar));
+  std::memset(fill_data.uc, 0, 16 * sizeof(cl_uchar));
 
   float r, g, b;
 
   switch(ImgFmt.image_channel_order) {
   case CL_R:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 0, ImgFmt);
     break;
   case CL_A:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 3, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 3, ImgFmt);
     break;
   case CL_Rx:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 0, ImgFmt);
     break;
   case CL_RG:
   case CL_RGx:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 1, 1, ImgFmt);
     break;
   case CL_RA:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 1, 3, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 1, 3, ImgFmt);
     break;
   case CL_RGB:
   case CL_RGBx:
@@ -701,36 +711,36 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
 
     switch(ImgFmt.image_channel_data_type) {
     case CL_UNORM_SHORT_565:
-      *((cl_ushort *)fill_data) =
+      *(fill_data.us) =
         ((cl_uint)(r * 31.0f) << 11) | ((cl_uint)(g * 63.0f) << 5) | (cl_uint)(b * 31.0f);
       break;
     case CL_UNORM_SHORT_555:
-      *((cl_ushort *)fill_data) =
+      *(fill_data.us) =
         ((cl_uint)(r * 31.0f) << 10) | ((cl_uint)(g * 31.0f) << 5) | (cl_uint)(b * 31.0f);
       break;
     case CL_UNORM_INT_101010:
-      *((cl_uint *)fill_data) =
+      *(fill_data.ui) =
         ((cl_uint)(r * 1023.0f) << 20) | ((cl_uint)(g * 1023.0f) << 10) | (cl_uint)(b * 1023.0f);
       break;
     }
     break;
   case CL_RGBA:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 0, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 2, 2, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 3, 3, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 1, 1, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 2, 2, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 3, 3, ImgFmt);
     break;
   case CL_ARGB:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 3, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 1, 0, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 2, 1, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 3, 2, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 3, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 1, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 2, 1, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 3, 2, ImgFmt);
     break;
   case CL_BGRA:
-    WriteChannel(fill_data, Cmd.GetSource(), 0, 2, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 1, 1, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 2, 0, ImgFmt);
-    WriteChannel(fill_data, Cmd.GetSource(), 3, 3, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 0, 2, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 1, 1, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 2, 0, ImgFmt);
+    WriteChannel(fill_data.v, Cmd.GetSource(), 3, 3, ImgFmt);
     break;
   case CL_INTENSITY:
   case CL_LUMINANCE:
@@ -743,22 +753,22 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
 
     switch(ImgFmt.image_channel_data_type) {
     case CL_UNORM_INT8:
-      *((cl_uchar *)fill_data) = (cl_uchar)(Y * 255.0f);
+      *(fill_data.uc) = (cl_uchar)(Y * 255.0f);
       break;
     case CL_UNORM_INT16:
-      *((cl_ushort *)fill_data) = (cl_ushort)(Y * 65535.0f);
+      *(fill_data.us) = (cl_ushort)(Y * 65535.0f);
       break;
     case CL_SNORM_INT8:
-      *((cl_char *)fill_data) = (cl_char)(Y * 127.0f);
+      *(fill_data.c) = (cl_char)(Y * 127.0f);
       break;
     case CL_SNORM_INT16:
-      *((cl_short *)fill_data) = (cl_short)(Y * 32767.0f);
+      *(fill_data.s) = (cl_short)(Y * 32767.0f);
       break;
     case CL_HALF_FLOAT:
-      *((cl_half *)fill_data) = FloatToHalf(Y);
+      *(fill_data.h) = FloatToHalf(Y);
       break;
     case CL_FLOAT:
-      *((cl_float *)fill_data) = Y;
+      *(fill_data.f) = Y;
       break;
     }
 
@@ -768,35 +778,35 @@ int CPUThread::Execute(FillImageCPUCommand &Cmd) {
   switch(Cmd.GetTargetElementSize()) {
   case 1:
     MemRectFill<cl_uchar>(Cmd.GetTarget(),
-                          fill_data,
+                          fill_data.v,
                           Region,
                           Cmd.GetTargetRowPitch(),
                           Cmd.GetTargetSlicePitch());
     break;
   case 2:
      MemRectFill<cl_ushort>(Cmd.GetTarget(),
-                            fill_data,
+                            fill_data.v,
                             Region,
                             Cmd.GetTargetRowPitch(),
                             Cmd.GetTargetSlicePitch());
      break;
   case 4:
      MemRectFill<cl_uint>(Cmd.GetTarget(),
-                          fill_data,
+                          fill_data.v,
                           Region,
                           Cmd.GetTargetRowPitch(),
                           Cmd.GetTargetSlicePitch());
      break;
   case 8:
      MemRectFill<cl_ulong>(Cmd.GetTarget(),
-                           fill_data,
+                           fill_data.v,
                            Region,
                            Cmd.GetTargetRowPitch(),
                            Cmd.GetTargetSlicePitch());
      break;
   case 16:
      MemRectFill<cl_uint4>(Cmd.GetTarget(),
-                           fill_data,
+                           fill_data.v,
                            Region,
                            Cmd.GetTargetRowPitch(),
                            Cmd.GetTargetSlicePitch());
