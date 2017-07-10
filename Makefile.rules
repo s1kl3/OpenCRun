@@ -258,7 +258,7 @@ else
 
 $(ObjDir)/%.ll: %.cl $(ObjDir)/.dir $(BUILT_SOURCES) $(LLVMCXX) $(TargetRequire)
 	$(Echo) "Compiling $*.cl for $(BuildMode) build (bytecode)"
-	$(Verb) $(BCCompile.OCL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
+	$(Verb) $(BCCompile.CL) $< -o $@ -S $(LLVMCC_EMITIR_FLAG)
 
 endif
 
