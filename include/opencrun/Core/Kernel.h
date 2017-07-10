@@ -134,19 +134,10 @@ public:
   bool getMinLocalMemoryUsage(size_t &Size, const Device *Dev) const;
   bool getMinPrivateMemoryUsage(size_t &Size, const Device *Dev) const;
 
-  void addLocalArgsSize(size_t Size) {
-    LocalArgsSz += Size;
-  }
-
-  size_t getLocalArgsSize() const {
-    return LocalArgsSz;
-  }
-
 private:
   llvm::SmallString<64> Name;
   KernelInfoContainer Infos;
   llvm::IntrusiveRefCntPtr<Program> Prog;
-  size_t LocalArgsSz; 
 };
 
 class Kernel : public _cl_kernel, public MTRefCountedBase<Kernel> {
