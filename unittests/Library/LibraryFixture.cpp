@@ -136,8 +136,7 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
                                                         \
   template <> template <>                               \
   T OCLTypeTraits<T>::Create(std::valarray<V> Val) {    \
-    size_t ValSz = Val.size();                          \
-    assert(ValSz > 0);                                  \
+    assert(Val.size() > 0);                             \
                                                         \
     return static_cast<T>(Val[0]);                      \
   }
