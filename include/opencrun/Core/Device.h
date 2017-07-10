@@ -108,6 +108,9 @@ public:
   DeviceInfo(const DeviceInfo &DI);
 
 public:
+  virtual ~DeviceInfo() { };
+
+public:
   // OpenCL properties.
   DeviceType GetType() const { return Type; }
   unsigned GetVendorID() const { return VendorID; }
