@@ -52,7 +52,7 @@ KernelArg::KernelArg(const KernelArg &Arg)
   }
 }
 
-KernelArg::KernelArg(KernelArg &&Arg)
+KernelArg::KernelArg(KernelArg &&Arg) noexcept
  : Kind(Arg.Kind), Index(Arg.Index) {
   switch (Kind) {
   default: break;
@@ -76,7 +76,7 @@ KernelArg::KernelArg(KernelArg &&Arg)
   Arg.Kind = NoArg;
 }
 
-KernelArg &KernelArg::operator=(KernelArg &&Arg) {
+KernelArg &KernelArg::operator=(KernelArg &&Arg) noexcept {
   this->~KernelArg();
   return *new (this) KernelArg(std::move(Arg));
 }
@@ -107,7 +107,7 @@ KernelArg::~KernelArg() {
 
 KernelDescriptor::KernelDescriptor(llvm::StringRef N, Program &P,
                                    KernelInfoContainer &&I)
- : Name(N), Infos(std::move(I)), Prog(&P), LocalArgsSz(0) {
+ : Name(N), Infos(std::move(I)), Prog(&P) {
   for (const auto &V : Infos)
     V.first->RegisterKernel(*this);
 }
@@ -122,7 +122,7 @@ bool KernelDescriptor::hasRequiredWorkGroupSizes(const Device *Dev) const {
   // Retrive kernel metadata and check if the "reqd_work_group_size"
   // node is present.
   ModuleInfo Info(*getFunction(Dev)->getParent());
-  return Info.getKernelInfo(Name).hasRequiredWorkGroupSizes() ?
+  return Info.get(Name).hasRequiredWorkGroupSizes() ?
     true : false;
 }
 
@@ -135,7 +135,7 @@ getRequiredWorkGroupSizes(llvm::SmallVectorImpl<size_t> &Sizes,
   // Retrive kernel metadata and extract values from the "reqd_work_group_size"
   // node.
   ModuleInfo Info(*getFunction(Dev)->getParent());
-  KernelArgInfo WGSzInfo = Info.getKernelInfo(Name).getRequiredWorkGroupSizes();
+  KernelArgInfo WGSzInfo = Info.get(Name).getRequiredWorkGroupSizes();
   unsigned NumWGSz = WGSzInfo.getNumArguments();
 
   Sizes.clear();
@@ -197,11 +197,7 @@ bool Kernel::AreAllArgsSpecified() const {
   llvm::Function *Kern = Desc->getKernelInfo().getFunction();
   llvm::FunctionType *FTy = Kern->getFunctionType();
 
-  llvm::Argument &LastArg = *--(Kern->arg_end());
-  if (LastArg.getName().equals(Kern->getName().str() + ".locals"))
-    return GetArgCount() == (FTy->getNumParams() - 1) ? true : false;
-
-  return GetArgCount() == FTy->getNumParams() ? true : false;
+  return GetArgCount() == FTy->getNumParams()? true : false;
 }
 
 cl_kernel_arg_address_qualifier Kernel::GetArgAddressQualifier(unsigned I) const {
@@ -404,9 +400,8 @@ cl_int Kernel::SetByValueArg(unsigned I, size_t Size, const void *Arg) {
 
   if (Size != ArgSz)
     RETURN_WITH_ERROR(CL_INVALID_ARG_SIZE,
-                      "kernel argument size does not match");
+        "kernel argument size does not match");
 
-  // TODO: compute argument type size in order to match the parameter.
   {
     llvm::sys::ScopedLock Lock(ThisLock);
     Arguments[I] = KernelArg(I, Arg, Size);

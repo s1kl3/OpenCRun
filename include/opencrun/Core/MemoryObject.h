@@ -13,6 +13,7 @@
 #include "llvm/Support/Mutex.h"
 
 #include <unordered_map>
+#include <vector>
 
 struct _cl_mem {};
 
