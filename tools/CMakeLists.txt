@@ -1,0 +1,4 @@
+add_subdirectory(libOpenCRun)
+add_subdirectory(OpenCRunPasses)
+add_subdirectory(OpenCRunCPUPasses)
+add_subdirectory(platform-query)

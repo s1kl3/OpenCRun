@@ -14,6 +14,9 @@ config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.lto_is_enabled = "@LTO_IS_ENABLED@"
 config.host_os = "@HOST_OS@"
 config.host_arch = "@HOST_ARCH@"
+config.host_cc = "@HOST_CC@"
+config.host_cxx = "@HOST_CXX@"
+config.host_ldflags = "@HOST_LDFLAGS@"
 
 config.debug = True
 
