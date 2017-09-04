@@ -98,9 +98,6 @@ replace_substring(CMAKE_CXX_FLAGS "-std=c++11" "-std=gnu++11")
 replace_substring(CMAKE_CXX_FLAGS "-Wignored-attributes" "-Wno-ignored-attributes")
 replace_substring(CMAKE_CXX_FLAGS "-Wstrict-aliasing" "-Wno-strict-aliasing")
 
-message(STATUS "C++ compiler flags: ${CMAKE_CXX_FLAGS}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
 # Binaries, headers and libraries to be installed are collected all together
 # in a seprated tree under the build directory.
 set(PROJECT_TREE "${PROJECT_BINARY_DIR}/${CMAKE_BUILD_TYPE}")
@@ -155,6 +152,27 @@ else()
 endif()
 
 ################################################################################
+# OpenCRun specific settings
+################################################################################
+
+# OpenCRun (and OpenCL) header files.
+set(OPENCRUN_HEADERS "${PROJECT_SOURCE_DIR}/include")
+
+# In order to set the bitcode library search path within the JIT compiler source
+# code.
+set(OPENCRUN_PREFIX "${CMAKE_INSTALL_PREFIX}")
+add_definitions(-DOPENCRUN_PREFIX="${CMAKE_INSTALL_PREFIX}")
+message(STATUS "OpenCRun install prefix: ${OPENCRUN_PREFIX}")
+
+# In order to set the Clang headers search path within for the DeviceCompiler.
+set(OPENCRUN_PREFIX_LLVM "${LLVM_INSTALL_PREFIX}")
+add_definitions(-DOPENCRUN_PREFIX_LLVM="${LLVM_INSTALL_PREFIX}")
+message(STATUS "LLVM install prefix: ${OPENCRUN_PREFIX_LLVM}")
+
+# Project headers first.
+set(CMAKE_CXX_FLAGS "-I${OPENCRUN_HEADERS} ${CMAKE_CXX_FLAGS}")
+
+################################################################################
 
 add_subdirectory(include)
 add_subdirectory(utils)
@@ -163,3 +181,6 @@ add_subdirectory(tools)
 add_subdirectory(test)
 add_subdirectory(unittests)
 add_subdirectory(bench)
+
+message(STATUS "C++ compiler flags: ${CMAKE_CXX_FLAGS}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
