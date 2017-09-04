@@ -4,9 +4,9 @@
 
 let Group = "WORKITEM" in {
 
-class WorkItemBuiltin_CUn<string name> : OCLGenericBuiltinSimple<
+class WorkItemBuiltin_CUnv<string name> : OCLGenericBuiltinSimple<
   name,
-  [ocl_uint],
+  [ocl_uint, ocl_void],
   []
 >;
 
@@ -22,7 +22,7 @@ class WorkItemBuiltin_zCUn<string name> : OCLGenericBuiltinSimple<
 // Work-Item builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_get_work_dim        : WorkItemBuiltin_CUn<"get_work_dim">; 
+def blt_get_work_dim        : WorkItemBuiltin_CUnv<"get_work_dim">; 
 
 def blt_get_global_size     : WorkItemBuiltin_zCUn<"get_global_size">; 
 def blt_get_global_id       : WorkItemBuiltin_zCUn<"get_global_id">; 

@@ -1,5 +1,5 @@
 def wi_internal : OCLCodeBlock<[{
-uint __internal_get_work_dim();
+uint __internal_get_work_dim(void);
 size_t __internal_get_global_size(uint);
 size_t __internal_get_global_id(uint);
 size_t __internal_get_local_size(uint);

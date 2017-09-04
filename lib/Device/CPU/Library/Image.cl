@@ -8,8 +8,8 @@
 
 __opencrun_overload
 float4 read_imagef(image1d_t image, sampler_t sampler, float coord) {
-  device_image_t *dev_image = *((device_image_t**)&image);
-  device_sampler_t dev_sampler = *((device_sampler_t *)&sampler);
+  device_image_t *dev_image = __builtin_astype(image, device_image_t *);
+  device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
   if(dev_sampler & CLK_FILTER_LINEAR)
     return apply_filter_linear(dev_image, dev_sampler, map_to_float4(coord), 1);
@@ -21,8 +21,8 @@ float4 read_imagef(image1d_t image, sampler_t sampler, float coord) {
 
 __opencrun_overload
 float4 read_imagef(image1d_array_t image, sampler_t sampler, float2 coord) {
-  device_image_t *dev_image = *((device_image_t**)&image);
-  device_sampler_t dev_sampler = *((device_sampler_t *)&sampler);
+  device_image_t *dev_image = __builtin_astype(image, device_image_t *);
+  device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
   if(dev_sampler & CLK_FILTER_LINEAR)
     return apply_filter_linear(dev_image, dev_sampler, map_to_float4(coord), 2);
@@ -34,8 +34,8 @@ float4 read_imagef(image1d_array_t image, sampler_t sampler, float2 coord) {
 
 __opencrun_overload
 float4 read_imagef(image2d_t image, sampler_t sampler, float2 coord) {
-  device_image_t *dev_image = *((device_image_t**)&image);
-  device_sampler_t dev_sampler = *((device_sampler_t *)&sampler);
+  device_image_t *dev_image = __builtin_astype(image, device_image_t *);
+  device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
   if(dev_sampler & CLK_FILTER_LINEAR)
     return apply_filter_linear(dev_image, dev_sampler, map_to_float4(coord), 2);
@@ -47,8 +47,8 @@ float4 read_imagef(image2d_t image, sampler_t sampler, float2 coord) {
 
 __opencrun_overload
 float4 read_imagef(image2d_array_t image, sampler_t sampler, float4 coord) {
-  device_image_t *dev_image = *((device_image_t**)&image);
-  device_sampler_t dev_sampler = *((device_sampler_t *)&sampler);
+  device_image_t *dev_image = __builtin_astype(image, device_image_t *);
+  device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
   if(dev_sampler & CLK_FILTER_LINEAR)
     return apply_filter_linear(dev_image, dev_sampler, map_to_float4(coord), 3);
@@ -60,8 +60,8 @@ float4 read_imagef(image2d_array_t image, sampler_t sampler, float4 coord) {
 
 __opencrun_overload
 float4 read_imagef(image3d_t image, sampler_t sampler, float4 coord) {
-  device_image_t *dev_image = *((device_image_t**)&image);
-  device_sampler_t dev_sampler = *((device_sampler_t *)&sampler);
+  device_image_t *dev_image = __builtin_astype(image, device_image_t *);
+  device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
   if(dev_sampler & CLK_FILTER_LINEAR)
     return apply_filter_linear(dev_image, dev_sampler, map_to_float4(coord), 3);
