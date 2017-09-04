@@ -10,7 +10,7 @@ add_library(opencrunCPUDevice
   CPUThread.cpp
   ImageSupport.cpp
   Memory.cpp
-  Mfence.cpp
+  MfenceInternalCalls.cpp
   SynchronizationInternalCalls.cpp
   ThreadPool.cpp
   WorkItemInternalCalls.cpp
