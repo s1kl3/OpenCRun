@@ -410,19 +410,19 @@ SPECIALIZE_OCL_TYPE_TRAITS_FLOAT_BUFFER_CREATE(double)
 namespace testing {
 namespace internal {
 
-#define SPECIALIZE_TYPE_NAME(T) \
-  template <>                   \
-  String GetTypeName<T>() {     \
-    return #T;                  \
+#define SPECIALIZE_TYPE_NAME(T)     \
+  template <>                       \
+  std::string GetTypeName<T>() {    \
+    return #T;                      \
   }
 
-#define SPECIALIZE_COMPOUND_TYPE(D, T)                                  \
-  template <>                                                           \
-  String GetTypeName< DeviceTypePair<D, T> >() {                        \
-    String DevName = GetTypeName<D>();                                  \
-    String TyName = GetTypeName<T>();                                   \
-                                                                        \
-    return String::Format("(%s, %s)", DevName.c_str(), TyName.c_str()); \
+#define SPECIALIZE_COMPOUND_TYPE(D, T)                  \
+  template <>                                           \
+  std::string GetTypeName< DeviceTypePair<D, T> >() {   \
+    std::string DevName = GetTypeName<D>();             \
+    std::string TyName = GetTypeName<T>();              \
+                                                        \
+    return "(" + DevName + ", " + TyName + ")";         \
   }
 
 #define SPECIALIZE_TYPE(T)              \

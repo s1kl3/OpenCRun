@@ -12,12 +12,13 @@ function(add_opencrun_unittest test_name)
 
   target_include_directories(${test_name}
     PRIVATE "${LLVM_SRC_ROOT}/utils/unittest/googletest/include"
+    PRIVATE "${LLVM_SRC_ROOT}/utils/unittest/googlemock/include"
     )
 
   target_link_libraries(${test_name} PRIVATE
     OpenCRun_Shared
-    gtest
     gtest_main
+    gtest
     LLVMSupport # gtest needs it for raw_ostream.
     )
 

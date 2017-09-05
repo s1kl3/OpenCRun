@@ -19,10 +19,10 @@ SPECIALIZE_DEVICE_TRAITS(CPUDev, "CPU")
 namespace testing {
 namespace internal {
 
-#define SPECIALIZE_TYPE_NAME(T) \
-  template <>                   \
-  String GetTypeName<T>() {     \
-    return #T;                  \
+#define SPECIALIZE_TYPE_NAME(T)     \
+  template <>                       \
+  std::string GetTypeName<T>() {    \
+    return #T;                      \
   }
 
 SPECIALIZE_TYPE_NAME(CPUDev)
