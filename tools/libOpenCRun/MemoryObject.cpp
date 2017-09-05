@@ -274,7 +274,7 @@ clGetMemObjectInfo(cl_mem memobj,
   #undef PROPERTY
   #undef IMG_PROPERTY
 
-  case CL_MEM_TYPE:
+  case CL_MEM_TYPE: {
     if(llvm::isa<opencrun::Buffer>(MemObj))
       return clFillValue<cl_mem_object_type, cl_mem_object_type>(
                static_cast<cl_mem_object_type *>(param_value),
@@ -289,6 +289,9 @@ clGetMemObjectInfo(cl_mem memobj,
                param_value_size,
                param_value_size_ret);
 
+    return CL_INVALID_MEM_OBJECT;
+  }
+
   case CL_MEM_HOST_PTR:
     return clFillValue<void *, void *>(
              static_cast<void **>(param_value),
@@ -296,7 +299,7 @@ clGetMemObjectInfo(cl_mem memobj,
              param_value_size,
              param_value_size_ret);
 
-  case CL_MEM_ASSOCIATED_MEMOBJECT:
+  case CL_MEM_ASSOCIATED_MEMOBJECT: {
     if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
       return clFillValue<cl_mem, opencrun::MemoryObject *>(
                static_cast<cl_mem *>(param_value),
@@ -309,8 +312,9 @@ clGetMemObjectInfo(cl_mem memobj,
              NULL,
              param_value_size,
              param_value_size_ret);
+  }
 
-  case CL_MEM_OFFSET:
+  case CL_MEM_OFFSET: {
     if(opencrun::Buffer *Buf = llvm::dyn_cast<opencrun::Buffer>(&MemObj))
       return clFillValue<size_t, size_t>(
                static_cast<size_t *>(param_value),
@@ -323,6 +327,7 @@ clGetMemObjectInfo(cl_mem memobj,
              0,
              param_value_size,
              param_value_size_ret);
+  }
  
   default:
     return CL_INVALID_VALUE;

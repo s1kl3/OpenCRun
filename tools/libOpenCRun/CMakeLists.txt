@@ -28,7 +28,6 @@ set_target_properties(OpenCRun_Static PROPERTIES
   )
 
 llvm_map_components_to_libnames(LLVM_LIBS
-  x86
   x86codegen
   orcjit
   runtimedyld
