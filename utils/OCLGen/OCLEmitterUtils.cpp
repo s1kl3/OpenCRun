@@ -71,7 +71,7 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
     OS << T;
   }
 
-  if (Name.length())
+  if (Name.length() && (T.getName() != "void"))
     OS << " " << Name;
 }
 

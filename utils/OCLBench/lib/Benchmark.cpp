@@ -45,8 +45,7 @@ BenchClass("bench-class",
                                        "Medium size"),
                             clEnumValN(Benchmark::ClassC,
                                        "c",
-                                       "Bigger size"),
-                            clEnumValEnd));
+                                       "Bigger size")));
 
 //
 // Benchmark implementation.

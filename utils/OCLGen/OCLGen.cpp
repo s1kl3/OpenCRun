@@ -41,8 +41,7 @@ Action(llvm::cl::desc("Action to perform"),
                                    "Generate 'ocldef.TARGET.h' header file"),
                         clEnumValN(GenOCLBuiltinImpls,
                                    "gen-ocl-builtin-impls",
-                                   "Generate OpenCL builtins implementation"),
-                        clEnumValEnd));
+                                   "Generate OpenCL builtins implementation")));
 
 llvm::cl::opt<std::string> TargetName("target",
                                       llvm::cl::desc("Reference target name"), 
@@ -72,7 +71,7 @@ static bool OCLGenMain(llvm::raw_ostream &OS, llvm::RecordKeeper &R) {
 int main(int argc, char *argv[]) {
   llvm::PrettyStackTraceProgram X(argc, argv);
 
-  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   return llvm::TableGenMain(argv[0], OCLGenMain);
