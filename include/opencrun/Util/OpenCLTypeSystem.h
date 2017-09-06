@@ -8,7 +8,7 @@
 #include <set>
 
 namespace clang {
-class OpenCLImageAccessAttr;
+class OpenCLAccessAttr;
 class RecordTypeDecl;
 }
 
@@ -38,7 +38,7 @@ enum ImageAccess {
   IA_Invalid = 0
 };
 
-ImageAccess convertImageAccess(const clang::OpenCLImageAccessAttr *CLIA);
+ImageAccess convertImageAccess(const clang::OpenCLAccessAttr *CLA);
 
 class Qualifiers {
 public:
@@ -206,7 +206,7 @@ public:
   TypeGenerator(llvm::Module &M) : Mod(M) {}
 
   Type get(clang::ASTContext &ASTCtx, clang::QualType Ty,
-           const clang::OpenCLImageAccessAttr *CLIA = 0);
+           const clang::OpenCLAccessAttr *CLA = 0);
 
 private:
   typedef std::map<const clang::RecordDecl*, Type> RecordTypesContainer;
@@ -223,7 +223,7 @@ private:
   Type getQualType(uint32_t Quals, Type Ty);
 
   Type addQualifiers(clang::Qualifiers,
-                     const clang::OpenCLImageAccessAttr *CLIA,
+                     const clang::OpenCLAccessAttr *CLA,
                      Type Ty);
 
 private:

@@ -32,11 +32,11 @@ AddressSpace opencrun::opencl::convertAddressSpace(unsigned AS) {
 }
 
 ImageAccess
-opencrun::opencl::convertImageAccess(const clang::OpenCLImageAccessAttr *CLIA) {
-  if (CLIA->isReadOnly())
+opencrun::opencl::convertImageAccess(const clang::OpenCLAccessAttr *CLA) {
+  if (CLA->isReadOnly())
     return IA_ReadOnly;
 
-  if (CLIA->isWriteOnly())
+  if (CLA->isWriteOnly())
     return IA_WriteOnly;
 
   llvm_unreachable("Illegal image access qualifier!");
@@ -193,7 +193,7 @@ static llvm::Metadata *getIntegerMD(llvm::Type *Ty, uint64_t Value) {
 }
 
 Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
-                        const clang::OpenCLImageAccessAttr *CLIA) {
+                        const clang::OpenCLAccessAttr *CLA) {
   llvm::LLVMContext &Ctx = Mod.getContext();
 
   llvm::StringRef Name;
@@ -244,22 +244,28 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
       RetTy = getPrimitiveType(Type::Event);
       break;
 
-    case clang::BuiltinType::OCLImage1d:
+    case clang::BuiltinType::OCLImage1dRO:
+    case clang::BuiltinType::OCLImage1dWO:
       RetTy = getImageType(Type::Image1d);
       break;
-    case clang::BuiltinType::OCLImage1dArray:
+    case clang::BuiltinType::OCLImage1dArrayRO:
+    case clang::BuiltinType::OCLImage1dArrayWO:
       RetTy = getImageType(Type::Image1dArray);
       break;
-    case clang::BuiltinType::OCLImage1dBuffer:
+    case clang::BuiltinType::OCLImage1dBufferRO:
+    case clang::BuiltinType::OCLImage1dBufferWO:
       RetTy = getImageType(Type::Image1dBuffer);
       break;
-    case clang::BuiltinType::OCLImage2d:
+    case clang::BuiltinType::OCLImage2dRO:
+    case clang::BuiltinType::OCLImage2dWO:
       RetTy = getImageType(Type::Image2d);
       break;
-    case clang::BuiltinType::OCLImage2dArray:
+    case clang::BuiltinType::OCLImage2dArrayRO:
+    case clang::BuiltinType::OCLImage2dArrayWO:
       RetTy = getImageType(Type::Image2dArray);
       break;
-    case clang::BuiltinType::OCLImage3d:
+    case clang::BuiltinType::OCLImage3dRO:
+    case clang::BuiltinType::OCLImage3dWO:
       RetTy = getImageType(Type::Image3d);
       break;
     case clang::BuiltinType::OCLSampler:
@@ -268,7 +274,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
     default:
       llvm_unreachable("Unexpected clang type!");
     }
-    return addQualifiers(Ty.getQualifiers(), CLIA, RetTy);
+    return addQualifiers(Ty.getQualifiers(), CLA, RetTy);
   }
 
   if (Ty->isConstantArrayType()) {
@@ -282,7 +288,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
   if (Ty->isPointerType()) {
     clang::QualType Pointee = Ty->getAs<clang::PointerType>()->getPointeeType();
 
-    return addQualifiers(Ty.getQualifiers(), CLIA,
+    return addQualifiers(Ty.getQualifiers(), CLA,
                          getPointerType(get(ASTCtx, Pointee)));
   }
 
@@ -300,7 +306,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
 
     RecordTypesContainer::const_iterator I = RTCache.find(RD);
     if (I != RTCache.end())
-      return addQualifiers(Ty.getQualifiers(), CLIA, I->second);
+      return addQualifiers(Ty.getQualifiers(), CLA, I->second);
 
     bool IsUnion = RD->isUnion();
     bool IsAnonymous = RD->isAnonymousStructOrUnion();
@@ -351,7 +357,7 @@ Type TypeGenerator::get(clang::ASTContext &ASTCtx, clang::QualType Ty,
       R.getMDNode()->replaceOperandWith(4, Body.getMDNode());
     }
 
-    return addQualifiers(Ty.getQualifiers(), CLIA, R);
+    return addQualifiers(Ty.getQualifiers(), CLA, R);
   }
 
   llvm_unreachable("Unexpected clang type!");
@@ -479,7 +485,7 @@ Type TypeGenerator::getQualType(uint32_t Mask, Type T) {
 }
  
 Type TypeGenerator::addQualifiers(clang::Qualifiers Q,
-                                  const clang::OpenCLImageAccessAttr *CLIA,
+                                  const clang::OpenCLAccessAttr *CLA,
                                   Type T) {
   Qualifiers Quals = T.getQualifiers();
   T = T.getUnqualifiedType();
@@ -488,7 +494,7 @@ Type TypeGenerator::addQualifiers(clang::Qualifiers Q,
   if (Q.hasVolatile()) Quals.addVolatile();
   if (Q.hasRestrict()) Quals.addRestrict();
   Quals.addAddressSpace(convertAddressSpace(Q.getAddressSpace()));
-  if (CLIA) Quals.addImageAccess(convertImageAccess(CLIA));
+  if (CLA) Quals.addImageAccess(convertImageAccess(CLA));
 
   return Quals.empty() ? T : getQualType(Quals.getQualifiersMask(), T);
 }
