@@ -5,7 +5,7 @@
 #include "opencrun/Core/DeviceCompiler.h"
 #include "opencrun/Core/Kernel.h"
 
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "clang/Frontend/ChainedDiagnosticConsumer.h"

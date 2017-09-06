@@ -2882,6 +2882,7 @@ ImgCmdBuilderType &opencrun::CheckDevImgSupport(
     if(Img->getArraySize() > Queue.GetDevice().GetImageMaxArraySize())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
           "image size unsupported by target device associated with queue");  
+    break;
   case Image::Image1D:
     if(Img->getWidth() > Queue.GetDevice().GetImage2DMaxWidth())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
@@ -2896,6 +2897,7 @@ ImgCmdBuilderType &opencrun::CheckDevImgSupport(
     if(Img->getArraySize() > Queue.GetDevice().GetImageMaxArraySize())
       Bld.NotifyError(CL_INVALID_IMAGE_SIZE, 
           "image size unsupported by target device associated with queue");  
+    break;
   case Image::Image2D:
     if((Img->getWidth() > Queue.GetDevice().GetImage2DMaxWidth()) ||
         (Img->getHeight() > Queue.GetDevice().GetImage2DMaxHeight()))

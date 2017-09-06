@@ -5,10 +5,11 @@
 #include "clang/Basic/Version.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
+#include "clang/Lex/PreprocessorOptions.h"
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/Path.h"
@@ -19,6 +20,14 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include <sstream>
+
+#ifndef OPENCRUN_PREFIX_LLVM
+#define OPENCRUN_PREFIX_LLVM "/usr/local"
+#endif
+
+#ifndef OPENCRUN_PREFIX
+#define OPENCRUN_PREFIX OPENCRUN_PREFIX_LLVM
+#endif
 
 using namespace opencrun;
 
@@ -36,7 +45,7 @@ DeviceCompiler::DeviceCompiler(llvm::StringRef Name) : Name(Name) {
   if (sys::HasEnv("OPENCRUN_PREFIX"))
     llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
   else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
+    llvm::sys::path::append(Path, OPENCRUN_PREFIX);
   llvm::sys::path::append(Path, "lib", LibName.str());
 
   if (auto MBOrErr = llvm::MemoryBuffer::getFile(Path.str())) {
@@ -98,7 +107,7 @@ DeviceCompiler::createInvocation(llvm::MemoryBuffer &Src,
   if (sys::HasEnv("OPENCRUN_PREFIX_LLVM"))
     llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX_LLVM"));
   else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
+    llvm::sys::path::append(Path, OPENCRUN_PREFIX_LLVM);
   llvm::sys::path::append(Path, "lib", "clang", CLANG_VERSION_STRING, "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::System, false, false);
   HdrSearchOpts.AddSystemHeaderPrefix(Path.str(), true);
@@ -107,7 +116,7 @@ DeviceCompiler::createInvocation(llvm::MemoryBuffer &Src,
   if (sys::HasEnv("OPENCRUN_PREFIX"))
     llvm::sys::path::append(Path, sys::GetEnv("OPENCRUN_PREFIX"));
   else
-    llvm::sys::path::append(Path, LLVM_PREFIX);
+    llvm::sys::path::append(Path, OPENCRUN_PREFIX);
   llvm::sys::path::append(Path, "lib", "opencrun", "include");
   HdrSearchOpts.AddPath(Path.str(), clang::frontend::System, false, false);
   HdrSearchOpts.AddSystemHeaderPrefix(Path.str(), true);
@@ -145,7 +154,7 @@ DeviceCompiler::compileSource(llvm::MemoryBuffer &Src, llvm::StringRef Opts,
 
   // Configure compiler invocation.
   auto Invocation = createInvocation(Src, Opts, Compiler.getDiagnostics());
-  Compiler.setInvocation(Invocation.release());
+  Compiler.setInvocation(std::move(Invocation));
 
   // Launch compiler.
   LLVMCodeGenAction GenBitCode(Ctx);
@@ -175,7 +184,6 @@ bool DeviceCompiler::optimize(llvm::Module &M) {
   llvm::PassManagerBuilder PMB;
   PMB.OptLevel = 2;
   PMB.SizeLevel = 0;
-  PMB.BBVectorize = true;
   PMB.SLPVectorize = true;
   PMB.LoopVectorize = true;
 
@@ -186,7 +194,7 @@ bool DeviceCompiler::optimize(llvm::Module &M) {
   PMB.RerollLoops = true;
 
   PMB.LibraryInfo = new llvm::TargetLibraryInfoImpl(TargetTriple);
-  PMB.Inliner = llvm::createFunctionInliningPass(2, 0);
+  PMB.Inliner = llvm::createFunctionInliningPass(2, 0, false);
 
   // Set up the per-function pass manager.
   auto FPM = llvm::make_unique<llvm::legacy::FunctionPassManager>(&M);
@@ -221,9 +229,8 @@ bool DeviceCompiler::linkInBuiltins(llvm::Module &M) {
     std::unique_ptr<llvm::Module>{llvm::CloneModule(Builtins.get())};
 
   bool Failed =
-    llvm::Linker::LinkModules(&M, BuiltinsCopy.get(),
-                              llvm::Linker::LinkOnlyNeeded |
-                              llvm::Linker::InternalizeLinkedSymbols);
+    llvm::Linker::linkModules(M, std::move(BuiltinsCopy),
+        llvm::Linker::LinkOnlyNeeded);
 
   llvm::legacy::PassManager PM;
   PM.add(createTTI(*TM));
