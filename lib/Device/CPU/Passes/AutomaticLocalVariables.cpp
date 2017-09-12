@@ -70,7 +70,7 @@ public:
 public:
   AutomaticLocalVariables() : ModulePass(ID) {}
 
-  const char *getPassName() const {
+  llvm::StringRef getPassName() const {
     return "CPU Automatic Locals Transform";
   }
 
@@ -176,6 +176,8 @@ using FunctionTranslationMap = DenseMap<Function*, Function*>;
 
 static void regenerateFunction(Function *Fn, Type *HTy,
                                FunctionTranslationMap &F2FMap) {
+  opencrun::ModuleInfo Info(*Fn->getParent());
+
   // Build the new function type.
   auto *FnTy = Fn->getFunctionType();
   SmallVector<Type *, 8> ParamTypes;
@@ -189,6 +191,15 @@ static void regenerateFunction(Function *Fn, Type *HTy,
   // Create new function.
   auto *NewFn = Function::Create(NewFnTy, Fn->getLinkage());
   NewFn->takeName(Fn);
+
+  // If the IR module is not in SPIR format, metadata are collected by
+  // functions.
+  if (!Info.IRisSPIR()) {
+    NewFn->setCallingConv(CallingConv::SPIR_KERNEL);
+    NewFn->copyAttributesFrom(Fn);
+    NewFn->copyMetadata(Fn, 0);
+  }
+
   Fn->getParent()->getFunctionList().insert(Fn->getIterator(), NewFn);
   F2FMap[Fn] = NewFn;
 
@@ -219,7 +230,7 @@ static void updateCallUsers(Use &U, const FunctionTranslationMap &F2FMap) {
   auto *Call = cast<CallInst>(U.getUser());
   auto *Callee = Call->getCalledFunction();
   auto *NewCallee = F2FMap.lookup(Callee);
-  auto *HiddenArg = &Call->getParent()->getParent()->getArgumentList().back();
+  auto *HiddenArg = Call->getParent()->getParent()->arg_end();
   unsigned HiddenArgPos = NewCallee->getFunctionType()->getNumParams() - 1;
 
   assert(HiddenArg && HiddenArgPos <= Call->getNumArgOperands());
@@ -298,25 +309,29 @@ bool AutomaticLocalVariables::runOnModule(Module &M) {
       auto &U = *Entry.first->use_begin();
       auto *Inst = cast<Instruction>(U.getUser());
       auto *Fn = Inst->getParent()->getParent();
-      auto *HiddenArg = &Fn->getArgumentList().back();
+      auto *HiddenArg = std::prev(Fn->arg_end());
 
       IRBuilder<> B(Inst);
       U.set(B.CreateStructGEP(Locals.getStructType(), HiddenArg,
                               Entry.second, Entry.first->getName()));
     }
 
+  opencrun::ModuleInfo MInfo(M);
+
   // Rewrite kernels metadata.
-  auto *Kernels = M.getNamedMetadata("opencl.kernels");
-  for (unsigned i = 0; i != Kernels->getNumOperands(); ++i) {
-    SmallVector<Metadata*, 8> Info;
-    auto *MD = Kernels->getOperand(i);
-    for (auto &Op : MD->operands())
-      Info.push_back(Op.get());
+  if (MInfo.IRisSPIR()) {
+    auto *Kernels = M.getNamedMetadata("opencl.kernels");
+    for (unsigned i = 0; i != Kernels->getNumOperands(); ++i) {
+      SmallVector<Metadata*, 8> Info;
+      auto *MD = Kernels->getOperand(i);
+      for (auto &Op : MD->operands())
+        Info.push_back(Op.get());
 
-    auto *Fn = mdconst::extract<Function>(Info[0]);
-    Info[0] = (ConstantAsMetadata::get(F2FMap.lookup(Fn)));
+      auto *Fn = mdconst::extract<Function>(Info[0]);
+      Info[0] = (ConstantAsMetadata::get(F2FMap.lookup(Fn)));
 
-    Kernels->setOperand(i, MDNode::get(M.getContext(), Info));
+      Kernels->setOperand(i, MDNode::get(M.getContext(), Info));
+    }
   }
 
   // Remove old dead functions.

@@ -49,7 +49,7 @@ public:
 public:
   bool runOnModule(Module &Mod) override;
 
-  const char *getPassName() const override {
+  llvm::StringRef getPassName() const override {
     return "Group parallel stub builder";
   }
 
