@@ -27,6 +27,8 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Atomic.h"
 
+#include <atomic>
+
 namespace opencrun {
 
 //===----------------------------------------------------------------------===//
@@ -40,18 +42,20 @@ protected:
 
 public:
   void Retain() {
-    llvm::sys::AtomicIncrement(&Refs);
+    llvm::sys::MemoryFence();
+    Refs.fetch_add(1, std::memory_order_relaxed);
   }
 
   void Release() {
-    if(llvm::sys::AtomicDecrement(&Refs) == 0)
+    llvm::sys::MemoryFence();
+    if(Refs.fetch_sub(1, std::memory_order_relaxed) == 0)
       delete static_cast<Derived *>(this);
   }
 
   unsigned GetReferenceCount() const { return Refs; }
 
 private:
-  volatile llvm::sys::cas_flag Refs;
+  volatile std::atomic<llvm::sys::cas_flag> Refs;
 
   friend class llvm::IntrusiveRefCntPtr<Derived>;
 };
@@ -68,18 +72,20 @@ protected:
 
 public:
   void Retain() {
-    llvm::sys::AtomicIncrement(&Refs);
+    llvm::sys::MemoryFence();
+    Refs.fetch_add(1, std::memory_order_relaxed);
   }
 
   void Release() {
-    if(llvm::sys::AtomicDecrement(&Refs) == 0)
+    llvm::sys::MemoryFence();
+    if(Refs.fetch_sub(1, std::memory_order_relaxed) == 0)
       delete this;
   }
 
   unsigned GetReferenceCount() const { return Refs; }
 
 private:
-  volatile llvm::sys::cas_flag Refs;
+  volatile std::atomic<llvm::sys::cas_flag> Refs;
 
   friend class llvm::IntrusiveRefCntPtr<Derived>;
 };
