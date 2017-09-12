@@ -1,5 +1,7 @@
 #include "opencrun/Util/LLVMCodeGenAction.h"
 #include "opencrun/Util/OpenCLTypeSystem.h"
+#include "opencrun/Util/ModuleInfo.h"
+
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -8,6 +10,7 @@
 #include "clang/Basic/AddressSpaces.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Frontend/CompilerInstance.h"
+
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LLVMContext.h"
@@ -79,19 +82,6 @@ public:
     Gen->HandleVTable(RD);
   }
 
-  void HandleLinkerOptionPragma(llvm::StringRef Opts) override {
-    Gen->HandleLinkerOptionPragma(Opts);
-  }
-
-  void HandleDetectMismatch(llvm::StringRef Name,
-                            llvm::StringRef Value) override {
-    Gen->HandleDetectMismatch(Name, Value);
-  }
-
-  void HandleDependentLibrary(llvm::StringRef Opts) override {
-    Gen->HandleDependentLibrary(Opts);
-  }
-
 private:
   void regenerateKernelInfo(const clang::FunctionDecl *FD);
 
@@ -104,7 +94,7 @@ private:
 }
 
 static bool isKernelMetadata(llvm::Metadata *MD, llvm::StringRef Name) {
-  if (llvm::MDNode *MDN = llvm::dyn_cast<llvm::MDNode>(MD))
+  if (auto *MDN = llvm::dyn_cast<llvm::MDNode>(MD))
     if (auto *S = llvm::dyn_cast<llvm::MDString>(MDN->getOperand(0).get()))
       return S->getString() == Name;
 
@@ -141,19 +131,25 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
   if (!F)
     return;
 
+  // To check for SPIR version and determine if kernel metadata are generic MDNodes
+  // or if they're function metadata.
+  ModuleInfo Info(*TheModule);
+  bool IRisSPIR = Info.IRisSPIR();
+
   clang::ASTContext &ASTCtx = FD->getASTContext();
   llvm::LLVMContext &Ctx = F->getContext();
   llvm::Type *I32Ty = llvm::Type::getInt32Ty(Ctx);
 
   llvm::SmallVector<llvm::Metadata*, 8> ArgAddrSpace;
-  ArgAddrSpace.push_back(llvm::MDString::get(Ctx, "kernel_arg_addr_space"));
+  if (IRisSPIR)
+    ArgAddrSpace.push_back(llvm::MDString::get(Ctx, "kernel_arg_addr_space"));
 
   llvm::SmallVector<llvm::Metadata*, 8> Sign;
   Sign.push_back(llvm::MDString::get(Ctx, "signature"));
 
   for (unsigned I = 0, E = FD->getNumParams(); I != E; ++I) {
     const clang::ParmVarDecl *ParamDecl = FD->getParamDecl(I);
-    clang::QualType ParamTy = FD->getParamDecl(I)->getType();
+    clang::QualType ParamTy = ParamDecl->getType();
 
     // Recompute address space info
     unsigned LangAS = ParamTy->isPointerType()
@@ -163,36 +159,56 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
                               llvm::ConstantInt::get(I32Ty, AS)));
 
     // Access qualifiers
-    const clang::OpenCLImageAccessAttr *CLIA =
-      ParamDecl->getAttr<clang::OpenCLImageAccessAttr>();
+    const clang::OpenCLAccessAttr *CLA =
+      ParamDecl->getAttr<clang::OpenCLAccessAttr>();
 
     // Generate argument type descriptor
-    Sign.push_back(TyGen.get(ASTCtx, ParamTy, CLIA).getMDNode());
+    Sign.push_back(TyGen.get(ASTCtx, ParamTy, CLA).getMDNode());
   }
 
-  llvm::NamedMDNode *Kernels = TheModule->getNamedMetadata("opencl.kernels");
-  assert(Kernels && "No 'opencl.kernels' metadata!");
+  if (IRisSPIR) {
+    auto *Kernels = TheModule->getNamedMetadata("opencl.kernels");
+    assert(Kernels && "No 'opencl.kernels' metadata!");
 
-  llvm::MDNode *KernMD = getKernelMD(Kernels, F);
-  assert(KernMD && "Missing kernel infos!");
+    auto *KernMD = getKernelMD(Kernels, F);
+    assert(KernMD && "Missing kernel infos!");
 
-  llvm::SmallVector<llvm::Metadata *, 8> MDs;
-  for (unsigned I = 0, E = KernMD->getNumOperands(); I != E; ++I) {
-    auto *Cur = KernMD->getOperand(I).get();
-    if (isKernelMetadata(Cur, "kernel_arg_addr_space"))
-      Cur = llvm::MDNode::get(Ctx, ArgAddrSpace);
+    llvm::SmallVector<llvm::Metadata *, 8> MDs;
+    for (unsigned I = 0, E = KernMD->getNumOperands(); I != E; ++I) {
+      auto *Cur = KernMD->getOperand(I).get();
+      if (isKernelMetadata(Cur, "kernel_arg_addr_space"))
+        Cur = llvm::MDNode::get(Ctx, ArgAddrSpace);
+      MDs.push_back(Cur);
+    }
 
-    MDs.push_back(Cur);
+    // Add custom infos.
+    llvm::SmallVector<llvm::Metadata *, 8> CustomInfo;
+    CustomInfo.push_back(llvm::MDString::get(Ctx, "custom_info"));
+    CustomInfo.push_back(llvm::MDNode::get(Ctx, Sign));
+
+    MDs.push_back(llvm::MDNode::get(Ctx, CustomInfo));
+
+    auto *NewKernMD = llvm::MDNode::get(Ctx, MDs);
+    replaceKernelMD(Kernels, F, NewKernMD);
+
+  } else {
+
+    assert((F->getCallingConv() == llvm::CallingConv::SPIR_KERNEL)
+        && "Not an OpenCL kernel!");
+
+    assert(F->getMetadata("kernel_arg_addr_space")
+        && "Missing kernel arguments address space infos!");
+    
+    // Fixed AS infos.
+    F->setMetadata("kernel_arg_addr_space", llvm::MDNode::get(Ctx, ArgAddrSpace));
+
+    // Add custom infos.
+    llvm::SmallVector<llvm::Metadata *, 8> CustomInfo;
+    CustomInfo.push_back(llvm::MDNode::get(Ctx, Sign));
+    F->setMetadata("custom_info", llvm::MDNode::get(Ctx, CustomInfo));
+
   }
 
-  llvm::SmallVector<llvm::Metadata *, 8> CustomInfo;
-  CustomInfo.push_back(llvm::MDString::get(Ctx, "custom_info"));
-  CustomInfo.push_back(llvm::MDNode::get(Ctx, Sign));
-
-  MDs.push_back(llvm::MDNode::get(Ctx, CustomInfo));
-
-  auto *NewKernMD = llvm::MDNode::get(Ctx, MDs);
-  replaceKernelMD(Kernels, F, NewKernMD);
 }
 
 LLVMCodeGenAction::LLVMCodeGenAction(llvm::LLVMContext &Ctx)
