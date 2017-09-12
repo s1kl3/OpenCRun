@@ -22,7 +22,7 @@ bool AggressiveInliner::runOnSCC(llvm::CallGraphSCC &SCC) {
   if(!AllInlined)
     return false;
 
-  return llvm::Inliner::runOnSCC(SCC);
+  return llvm::LegacyInlinerBase::runOnSCC(SCC);
 }
 
 bool AggressiveInliner::doInitialization(llvm::CallGraph &CG) {

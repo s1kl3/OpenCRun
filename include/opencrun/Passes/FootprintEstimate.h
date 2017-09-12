@@ -22,18 +22,18 @@ public:
     Kernel(GetKernelOption(Kernel)) { }
 
 public:
-  virtual bool runOnFunction(llvm::Function &Fun);
+  virtual bool runOnFunction(llvm::Function &Fun) override;
 
-  virtual const char *getPassName() const {
+  virtual llvm::StringRef getPassName() const override {
     return "Footprint estimate";
   }
 
   virtual void print(llvm::raw_ostream &OS,
-                     const llvm::Module *Mod = NULL) const;
+                     const llvm::Module *Mod = NULL) const override;
 
-  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
 
-  virtual void verifyAnalysis() const {
+  virtual void verifyAnalysis() const override {
     // Now it makes no sense to verify this analysis. If it will becomes more
     // complex, then some verification code should be written.
   }
