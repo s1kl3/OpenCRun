@@ -3,9 +3,10 @@
 
 #include "opencrun/Core/DeviceCompiler.h"
 
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
-#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/LazyEmittingLayer.h"
 
 namespace llvm {
@@ -19,7 +20,9 @@ namespace cpu {
 class JITCompiler {
 public:
   JITCompiler(llvm::TargetMachine &TM)
-   : TM(TM), CompileLayer(ObjLayer, llvm::orc::SimpleCompiler(TM)) {}
+   : TM(TM),
+     ObjLayer([]() { return std::make_shared<llvm::SectionMemoryManager>(); }),
+     CompileLayer(ObjLayer, llvm::orc::SimpleCompiler(TM)) {}
 
   void addKernel(llvm::Function *Kern);
   void removeKernel(llvm::Function *Kern);
@@ -32,19 +35,20 @@ public:
   }
 
 private:
-  using ObjectLayerT = llvm::orc::ObjectLinkingLayer<>;
-  using IRCompileLayerT = llvm::orc::IRCompileLayer<ObjectLayerT>;
+  using ObjectLayerT = llvm::orc::RTDyldObjectLinkingLayer;
+  using CompileFtorT = llvm::orc::SimpleCompiler;
+  using IRCompileLayerT = llvm::orc::IRCompileLayer<ObjectLayerT, CompileFtorT>;
 
-  using ModuleHandleT = IRCompileLayerT::ModuleSetHandleT;
+  using ModuleHandleT = IRCompileLayerT::ModuleHandleT;
 
   struct KernelHandleT {
     ModuleHandleT Handle;
-    std::unique_ptr<llvm::Module> Module;
+    std::shared_ptr<llvm::Module> Module;
   };
 
 private:
-  llvm::orc::JITSymbol findSymbolForKernel(llvm::Function *Kern,
-                                           const std::string &Name);
+  llvm::JITSymbol findSymbolForKernel(llvm::Function *Kern,
+                                      const std::string &Name);
 
 private:
   llvm::TargetMachine &TM;

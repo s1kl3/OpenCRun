@@ -26,6 +26,8 @@ computeReachableFunctions(const std::vector<llvm::Function*> &Roots) {
     auto *Cur = Worklist.back();
     Worklist.pop_back();
 
+    assert(Cur && "Null function!");
+
     if (!Reachable.insert(Cur).second)
       continue;
 
@@ -83,7 +85,7 @@ static std::vector<Ty> makeSingleton(Ty Elem) {
   return Singleton;
 }
 
-static std::unique_ptr<llvm::Module> extractKernelModule(llvm::Function *F) {
+static std::shared_ptr<llvm::Module> extractKernelModule(llvm::Function *F) {
   auto OldM = F->getParent();
   auto NewM = llvm::make_unique<llvm::Module>((F->getName() + ".module").str(),
                                               F->getContext());
@@ -141,14 +143,17 @@ static std::unique_ptr<llvm::Module> extractKernelModule(llvm::Function *F) {
       NewFn->setPersonalityFn(MapValue(OldFn->getPersonalityFn(), VMap));
   }
 
-  // Regenereate opencl.kernels metadata.
-  auto OldKernels = OldM->getNamedMetadata("opencl.kernels");
-  auto NewKernels = NewM->getOrInsertNamedMetadata("opencl.kernels");
+  ModuleInfo Info(*OldM);
+  if (Info.IRisSPIR()) {
+    // Regenereate opencl.kernels metadata.
+    auto OldKernels = OldM->getNamedMetadata("opencl.kernels");
+    auto NewKernels = NewM->getOrInsertNamedMetadata("opencl.kernels");
 
-  for (auto *MD : OldKernels->operands()) {
-    KernelInfo KI(MD);
-    if (std::find(Fns.begin(), Fns.end(), KI.getFunction()) != Fns.end())
-      NewKernels->addOperand(MapMetadata(MD, VMap));
+    for (auto *MD : OldKernels->operands()) {
+      KernelInfo KI(Info.get(F->getName()));
+      if (std::find(Fns.begin(), Fns.end(), KI.getFunction()) != Fns.end())
+        NewKernels->addOperand(MapMetadata(MD, VMap));
+    }
   }
 
   return NewM;
@@ -167,8 +172,7 @@ void JITCompiler::addKernel(llvm::Function *Kern) {
 
   auto Resolver = llvm::orc::createLambdaResolver(
     [this, Kern](const std::string &Name) {
-      auto Sym = findSymbolForKernel(Kern, Name);
-      return llvm::RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
+      return findSymbolForKernel(Kern, Name);
     },
     [](const std::string &Name) {
       return nullptr;
@@ -178,25 +182,21 @@ void JITCompiler::addKernel(llvm::Function *Kern) {
   // The target machine is shared between the optimizer and the jit-compiler,
   // thus we need to reset some critical options.
   TM.setOptLevel(llvm::CodeGenOpt::Default);
-  TM.Options.Reciprocals = llvm::TargetRecip();
   TM.Options.AllowFPOpFusion = llvm::FPOpFusion::Strict;
-  TM.Options.LessPreciseFPMADOption = false;
   TM.Options.NoInfsFPMath = false;
   TM.Options.NoNaNsFPMath = false;
   TM.Options.UnsafeFPMath = false;
 
   Kernels[Kern] = KernelHandleT {
-    CompileLayer.addModuleSet(makeSingleton(M.get()),
-                              llvm::make_unique<llvm::SectionMemoryManager>(),
-                              std::move(Resolver)),
-    std::move(M)
+    llvm::cantFail(CompileLayer.addModule(M, std::move(Resolver))),
+    M
   };
 }
 
 void JITCompiler::removeKernel(llvm::Function *Kern) {
   auto I = Kernels.find(Kern);
   if (I != Kernels.end()) {
-    CompileLayer.removeModuleSet(I->second.Handle);
+    CompileLayer.removeModule(I->second.Handle);
     Kernels.erase(I);
   }
 }
@@ -206,7 +206,11 @@ void *JITCompiler::getEntryPoint(llvm::Function *Kern) {
   ModuleInfo Info(*Kernels[Kern].Module);
   CPUKernelInfo KI(Info.get(Kern->getName()));
   auto StubName = KI.getStub()->getName().str();
-  return (void*)findSymbolForKernel(Kern, StubName).getAddress();
+  if (auto EntryPointOrError = findSymbolForKernel(Kern, StubName).getAddress()) {
+    uintptr_t EntryPoint = *EntryPointOrError;
+    return reinterpret_cast<void *>(EntryPoint);
+  } else
+    return nullptr;
 }
 
 size_t JITCompiler::getAutomaticLocalsSize(llvm::Function *Kern) {
@@ -215,18 +219,18 @@ size_t JITCompiler::getAutomaticLocalsSize(llvm::Function *Kern) {
   return Info.getAutomaticLocalsSize();
 }
 
-llvm::orc::JITSymbol
+llvm::JITSymbol
 JITCompiler::findSymbolForKernel(llvm::Function *Kern,
                                  const std::string &Name) {
   auto I = Kernels.find(Kern);
   if (I == Kernels.end())
-    return llvm::orc::JITSymbol(nullptr);
+    return llvm::JITSymbol(nullptr);
 
-  if (auto Addr = (llvm::orc::TargetAddress)Symbols.lookup(Name))
-    return llvm::orc::JITSymbol(Addr, llvm::JITSymbolFlags::Exported);
+  if (auto Addr = (llvm::JITTargetAddress)Symbols.lookup(Name))
+    return llvm::JITSymbol(Addr, llvm::JITSymbolFlags::Exported);
 
-  if (auto Addr = (llvm::orc::TargetAddress)dlsym(nullptr, Name.c_str()))
-    return llvm::orc::JITSymbol(Addr, llvm::JITSymbolFlags::Exported);
+  if (auto Addr = (llvm::JITTargetAddress)dlsym(nullptr, Name.c_str()))
+    return llvm::JITSymbol(Addr, llvm::JITSymbolFlags::Exported);
 
   return CompileLayer.findSymbolIn(I->second.Handle, Name, false);
 }
@@ -251,8 +255,8 @@ CPUCompiler::CPUCompiler() : DeviceCompiler("CPU") {
   llvm::TargetOptions Options;
   auto TargetFeatures = llvm::join(Features.begin(), Features.end(), ",");
   TM.reset(TheTarget->createTargetMachine(Triple, TargetCPU, TargetFeatures,
-                                          Options, llvm::Reloc::Model::Default,
-                                          llvm::CodeModel::JITDefault,
+                                          Options, llvm::Reloc::Model::PIC_,
+                                          llvm::CodeModel::Kernel,
                                           llvm::CodeGenOpt::None));
 
   JIT = llvm::make_unique<JITCompiler>(*TM);
