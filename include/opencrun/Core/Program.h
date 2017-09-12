@@ -100,12 +100,12 @@ public:
 
   KernelInfo GetKernel(llvm::StringRef KernName) {
     if (!BitCode)
-      return NULL;
+      return KernelInfo{};
 
     ModuleInfo Info(*BitCode); 
     auto I = Info.find(KernName);
 
-    return I != Info.end() ? *I : NULL;
+    return I != Info.end() ? *I : KernelInfo{};
   }
 
   KernelSignature GetKernelSignature(llvm::StringRef KernName) {

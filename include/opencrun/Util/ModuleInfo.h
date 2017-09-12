@@ -7,21 +7,27 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 
-namespace opencrun {
+#include <algorithm>
 
+namespace opencrun {
+  
 class KernelArgInfo {
 public:
-  KernelArgInfo(llvm::MDNode *InfoMD) : MD(InfoMD) {
-    assert(checkValidity());
-  }
+  KernelArgInfo(llvm::MDNode *InfoMD) : MD(InfoMD) { }
 
   unsigned getNumArguments() const {
-    return MD->getNumOperands() - 1;
+    if (IsGenericMD())
+      return MD->getNumOperands() - 1;
+
+    return MD->getNumOperands();
   }
 
   llvm::Metadata *getArgument(unsigned I) const {
     assert(I < getNumArguments());
-    return MD->getOperand(I + 1).get();
+    if (IsGenericMD())
+      return MD->getOperand(I + 1).get();
+
+    return MD->getOperand(I).get();
   }
 
   template<typename Ty>
@@ -34,7 +40,7 @@ public:
   }
 
 private:
-  bool checkValidity() const;
+  bool IsGenericMD() const;
 
 private:
   llvm::MDNode *MD;
@@ -67,16 +73,31 @@ private:
 
 class KernelInfo {
 public:
-  KernelInfo(llvm::MDNode *KernMD = 0) : MD(KernMD) {
+  KernelInfo() : Kernel(nullptr), MD(nullptr) {}
+
+  KernelInfo(llvm::MDNode *KernMD) : Kernel(nullptr), MD(KernMD) {
+    assert(checkValidity());
+    CustomInfoMD = retrieveCustomInfo();
+    Kernel = llvm::mdconst::extract<llvm::Function>(MD->getOperand(0));
+  }
+
+  KernelInfo(llvm::Function *Kernel) : Kernel(Kernel), MD(nullptr) {
     assert(checkValidity());
     CustomInfoMD = retrieveCustomInfo();
   }
-  KernelInfo(const KernelInfo &I) : MD(I.MD), CustomInfoMD(I.CustomInfoMD) {}
-  KernelInfo &operator=(const KernelInfo &I) {
-    MD = I.MD;
-    CustomInfoMD = I.CustomInfoMD;
+
+  KernelInfo(const KernelInfo &KI)
+    : Kernel(KI.Kernel),
+      MD(KI.MD),
+      CustomInfoMD(KI.CustomInfoMD) {}
+
+  KernelInfo &operator=(const KernelInfo &KI) {
+    MD = KI.MD;
+    Kernel = KI.Kernel;
+    CustomInfoMD = KI.CustomInfoMD;
     return *this;
   }
+
   KernelInfo &operator=(llvm::MDNode *KernMD) {
     MD = KernMD;
     assert(checkValidity());
@@ -84,23 +105,54 @@ public:
     return *this;
   }
 
-  llvm::Function *getFunction() const {
-    assert(MD);
-    return llvm::mdconst::extract<llvm::Function>(MD->getOperand(0));
+  KernelInfo &operator=(llvm::Function *Kernel) {
+    this->Kernel = Kernel;
+    assert(checkValidity());
+    CustomInfoMD = retrieveCustomInfo();
+    return *this;
   }
 
-  llvm::StringRef getName() const {
-    return getFunction()->getName();
+  llvm::MDNode *getKernelInfo() const { return MD; }
+
+  llvm::Function *getFunction() const { return Kernel; }
+
+  llvm::MDNode *getCustomInfo() const { return CustomInfoMD; }
+
+  llvm::StringRef getName() const { return Kernel->getName(); }
+
+  bool hasVectorTypeHint() const {
+    // This metadata is added to the module only if its corresponding
+    // __attribute_((vec_type_hint(<typen>))) has been specified for
+    // the kernel.
+    return getKernelArgInfo("vector_type_hint") ? true : false;
+  }
+
+  bool hasWorkGroupSizesHint() const {
+    // This metadata is added to the module only if its corresponding
+    // __attribute_((work_group_size_hint(X, Y, Z))) has been specified
+    // for the kernel.
+    return getKernelArgInfo("work_group_size_hint") ? true : false;
   }
 
   bool hasRequiredWorkGroupSizes() const {
     // This metadata is added to the module only if its corresponding
-    // __attribute_ has been specified for the kernel.
+    // __attribute_((reqd_work_group_size(X, Y, Z))) has been specified
+    // for the kernel.
     return getKernelArgInfo("reqd_work_group_size") ? true : false;
   }
 
   KernelSignature getSignature() const {
     return getCustomInfo("signature");
+  }
+
+  KernelArgInfo getVectorTypeHint() const {
+    assert(hasVectorTypeHint());
+    return getKernelArgInfo("vector_type_hint");
+  }
+
+  KernelArgInfo getWorkGroupSizesHint() const {
+    assert(hasWorkGroupSizesHint());
+    return getKernelArgInfo("work_group_size_hint");
   }
 
   KernelArgInfo getRequiredWorkGroupSizes() const {
@@ -128,9 +180,6 @@ public:
     return getKernelArgInfo("kernel_arg_name");
   }
 
-  llvm::MDNode *getKernelInfo() const { return MD; }
-  llvm::MDNode *getCustomInfo() const { return CustomInfoMD; }
-
   void updateCustomInfo(llvm::MDNode *CMD);
 
 protected:
@@ -138,12 +187,18 @@ protected:
 
 private:
   bool checkValidity() const;
+  
   llvm::MDNode *retrieveCustomInfo() const;
 
   llvm::MDNode *getKernelArgInfo(llvm::StringRef Name) const;
 
 private:
+  // New SPIR format that uses kernel metaata.
+  llvm::Function *Kernel;
+
+  // Old SPIR format that uses generic metadata for kernels.
   llvm::MDNode *MD;
+
   llvm::MDNode *CustomInfoMD;
 };
 
@@ -158,14 +213,43 @@ public:
     typedef std::forward_iterator_tag iterator_category;
   
   public:
-    iterator(llvm::NamedMDNode *Kernels, bool Sentinel = false)
-     : KernelsMD(Kernels),
-       CurIdx(Kernels && Sentinel ? Kernels->getNumOperands() : 0) {
+    iterator(llvm::Module *Mod, bool Sentinel = false)
+      : Mod(Mod),
+        HasKernelsMD(Mod->getTargetTriple().find("spir") == 0),
+        KernelsMD(nullptr) {
+      assert(Mod && "No llvm::Module");
+     
+      if (HasKernelsMD) {
+        KernelsMD = Mod->getNamedMetadata("opencl.kernels");
+        assert(KernelsMD && "No opencl.kernels MDNode");
+
+        CurIdx = KernelsMD && Sentinel ? KernelsMD->getNumOperands() : 0;
+      } else {
+        StartIt = Mod->begin();
+        EndIt = Mod->end();
+
+        if (Sentinel)
+          CurIt = Mod->end();
+        else
+          CurIt = std::find_if(StartIt, EndIt, [](const llvm::Function &F) {
+              return !F.isDeclaration() &&
+                  (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL);
+                });
+      }
+
       updateKernelInfo();
     }
 
-    bool operator==(const iterator &I) const {
-      return KernelsMD == I.KernelsMD && CurIdx == I.CurIdx;
+    bool operator==(const iterator &I) const { 
+      if (HasKernelsMD) {
+        return I.HasKernelsMD && Mod == I.Mod &&
+          KernelsMD == I.KernelsMD && CurIdx == I.CurIdx;
+      } else {
+        return !I.HasKernelsMD && Mod == I.Mod && 
+          StartIt == I.StartIt &&
+          CurIt == I.CurIt &&
+          EndIt == I.EndIt;
+      }
     }
 
     bool operator!=(const iterator &I) const {
@@ -193,32 +277,63 @@ public:
 
   private:
     void updateKernelInfo() {
-      if (KernelsMD && CurIdx < KernelsMD->getNumOperands())
-        CurInfo = KernelsMD->getOperand(CurIdx);
+      if (HasKernelsMD) {
+        if (KernelsMD && CurIdx < KernelsMD->getNumOperands())
+          CurInfo = KernelsMD->getOperand(CurIdx);
+      } else {
+        if (Mod && CurIt != EndIt)
+          CurInfo = &*CurIt;
+      }
     }
 
     void advance() {
-      if (KernelsMD && CurIdx < KernelsMD->getNumOperands())
-        ++CurIdx;
+      if (HasKernelsMD) {
+        if (KernelsMD && CurIdx < KernelsMD->getNumOperands())
+          ++CurIdx;
+      } else {
+        if (Mod && CurIt != EndIt)
+          CurIt = std::find_if(++CurIt, EndIt, [](const llvm::Function &F) {
+              return !F.isDeclaration() &&
+              (F.getCallingConv() == llvm::CallingConv::SPIR_KERNEL);
+              });
+      }
+
       updateKernelInfo();
     }
 
   private:
+    llvm::Module *Mod;
+    KernelInfo CurInfo;
+    bool HasKernelsMD;
+
+    // For old SPIR format with "opencl.kernels" MDNode listing all
+    // kernel functions.
     llvm::NamedMDNode *KernelsMD;
     unsigned CurIdx;
-    KernelInfo CurInfo;
+
+    // For new SPIR format using kernel function metadata.
+    llvm::Module::iterator StartIt, CurIt, EndIt;
   };
 
 public:
-  ModuleInfo(llvm::Module &M) : Mod(M) {}
+  ModuleInfo(llvm::Module &M)
+    : Mod(M), Has_SPIR_MDs(M.getTargetTriple().find("spir") == 0) {}
+
+  // Check if the LLVM module is in the old SPIR format that uses generic
+  // metadata instead of function metadata for kernels.
+  bool IRisSPIR() const {
+    return Has_SPIR_MDs;
+  }
 
   iterator begin() const {
-    return iterator(Mod.getNamedMetadata("opencl.kernels"));
+    return iterator(&Mod);
   }
 
   iterator end() const {
-    return iterator(Mod.getNamedMetadata("opencl.kernels"), true);
+    return iterator(&Mod, true);
   }
+
+  unsigned getNumKernels() const;
 
   iterator find(llvm::StringRef Name) const;
 
@@ -233,6 +348,9 @@ public:
 
 protected:
   llvm::Module &Mod;
+
+private:
+  bool Has_SPIR_MDs;
 };
 
 }
