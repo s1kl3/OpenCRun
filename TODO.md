@@ -2,7 +2,12 @@
 OpenCRun -- Todo list
 =====================
 
-* Align OpenCRun with the latest LLVM/Clang release.
+* Complete support for the following function qualifiers:
+  
+    - __attribute__((vec_type_hint(<typen>)))
+    - __attribute__((work_group_size_hint(X, Y, Z)))
+
+* Complete unit tests for image objects and APIs.
 
 * Implement a better **scheduling policy** for enqueued task. For example, task
   assignment to active worker threads could take advantage of dynamic load
