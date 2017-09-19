@@ -1,7 +1,11 @@
 add_custom_target(OpenCRunUnitTests)
 set_target_properties(OpenCRunUnitTests PROPERTIES FOLDER "OpenCRun tests")
 
-string(REPLACE "-Wcast-qual" "-Wno-cast-qual" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-rtti" "-frtti")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-exceptions" "-fexceptions")
+replace_substring(OPENCRUN_CXXFLAGS "-Wcast-qual" "-Wno-cast-qual")
+
+set_dir_compile_options(OPENCRUN_CXXFLAGS)
 
 ################################################################################
 # Custom function for adding unit tests

@@ -4,12 +4,14 @@ add_library(OCLBench
  DataTypes.cpp
  )
 
-set_target_properties(OCLBench PROPERTIES
-  ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SHLIB_DIR}
-  )
+replace_substring(OPENCRUN_CXXFLAGS "-fno-rtti" "-frtti")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-exceptions" "-fexceptions")
+replace_substring(OPENCRUN_CXXFLAGS "-Wcast-qual" "-Wno-cast-qual")
+
+set_target_compile_options(OCLBench OPENCRUN_CXXFLAGS)
 
 include_directories(../include)
 
-replace_substring(CMAKE_CXX_FLAGS "-fno-rtti" "-frtti")
-replace_substring(CMAKE_CXX_FLAGS "-fno-exceptions" "-fexceptions")
-replace_substring(CMAKE_CXX_FLAGS "-Wcast-qual" "-Wno-cast-qual")
+set_target_properties(OCLBench PROPERTIES
+  ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SHLIB_DIR}
+  )

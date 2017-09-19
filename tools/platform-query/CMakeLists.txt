@@ -1,12 +1,12 @@
-string(REGEX REPLACE "-fno-rtti|-fno-exceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-
 add_executable(platform_query
   platform-query.cpp
   )
 
-replace_substring(CMAKE_CXX_FLAGS "-fno-rtti" "-frtti")
-replace_substring(CMAKE_CXX_FLAGS "-fno-exceptions" "-fexceptions")
-replace_substring(CMAKE_CXX_FLAGS "-Wcast-qual" "-Wno-cast-qual")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-rtti" "-frtti")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-exceptions" "-fexceptions")
+replace_substring(OPENCRUN_CXXFLAGS "-Wcast-qual" "-Wno-cast-qual")
+
+set_target_compile_options(platform_query OPENCRUN_CXXFLAGS)
 
 target_link_libraries(platform_query PRIVATE OpenCRun_Shared)
 

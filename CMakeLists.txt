@@ -50,6 +50,25 @@ macro(replace_substring variable substr repstr)
   endif()
 endmacro()
 
+# Convert a string variable to a list.
+macro(str_to_list var_str var_list)
+  string(REPLACE " " ";" ${var_list} "${${var_str}}")
+endmacro()
+
+# Replace COMPILE_OPTIONS directory property.
+macro(set_dir_compile_options var_str)
+  set_property(DIRECTORY PROPERTY COMPILE_OPTIONS "")
+  str_to_list(${var_str} var_list)
+  add_compile_options(${var_list})
+endmacro()
+
+# Replace COMPILE_OPTIONS target property.
+macro(set_target_compile_options target var_str)
+  set_property(TARGET ${target} PROPERTY COMPILE_OPTIONS "")
+  str_to_list(${var_str} var_list)
+  target_compile_options(${target} PUBLIC ${var_list})
+endmacro()
+
 ################################################################################
 # Main settings for C++ compiler and static linker
 ################################################################################
@@ -81,22 +100,29 @@ llvm_config(LLVM_ASSERTION_MODE --assertion-mode)
 llvm_config(LLVM_HAS_RTTI --has-rtti)
 
 set(LLVM_CXXFLAGS "${LLVM_CXXFLAGS}")
-set(CMAKE_CXX_FLAGS "${LLVM_CXXFLAGS}")
+set(OPENCRUN_CXXFLAGS "${LLVM_CXXFLAGS}")
 set(CMAKE_BUILD_TYPE "${LLVM_BUILD_MODE}")
 
 # Auto-detect the target architecture (Warning! Resulting binaries may not
 # work on different targets).
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -march=native")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--as-needed")
+set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -Wl,--as-needed")
 
 # Instead of C++11 standard, the GNU C++11 standard is required to avoid
 # errors when building unit tests.
-replace_substring(CMAKE_CXX_FLAGS "-std=c++11" "-std=gnu++11")
+replace_substring(OPENCRUN_CXXFLAGS "-std=c++11" "-std=gnu++11")
 
 # Suppress some warnings. These warnings should be checked carefully later.
-replace_substring(CMAKE_CXX_FLAGS "-Wignored-attributes" "-Wno-ignored-attributes")
-replace_substring(CMAKE_CXX_FLAGS "-Wstrict-aliasing" "-Wno-strict-aliasing")
+replace_substring(OPENCRUN_CXXFLAGS "-Wignored-attributes" "-Wno-ignored-attributes")
+replace_substring(OPENCRUN_CXXFLAGS "-Wstrict-aliasing" "-Wno-strict-aliasing")
+
+# Remove unnecessary spaces and include flags (they're defined by the
+# INCLUDE_DIRECTORIES property).
+string(REGEX REPLACE "-I[^ ]+" "" OPENCRUN_CXXFLAGS ${OPENCRUN_CXXFLAGS})
+string(STRIP ${OPENCRUN_CXXFLAGS} OPENCRUN_CXXFLAGS)
+
+set_dir_compile_options(OPENCRUN_CXXFLAGS)
 
 # Binaries, headers and libraries to be installed are collected all together
 # in a seprated tree under the build directory.
@@ -156,7 +182,8 @@ endif()
 ################################################################################
 
 # OpenCRun (and OpenCL) header files.
-set(OPENCRUN_HEADERS "${PROJECT_SOURCE_DIR}/include")
+set(OPENCRUN_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/include")
+include_directories(BEFORE ${OPENCRUN_INCLUDE_DIRS})
 
 # In order to set the bitcode library search path within the JIT compiler source
 # code.
@@ -169,9 +196,6 @@ set(OPENCRUN_PREFIX_LLVM "${LLVM_INSTALL_PREFIX}")
 add_definitions(-DOPENCRUN_PREFIX_LLVM="${LLVM_INSTALL_PREFIX}")
 message(STATUS "LLVM install prefix: ${OPENCRUN_PREFIX_LLVM}")
 
-# Project headers first.
-set(CMAKE_CXX_FLAGS "-I${OPENCRUN_HEADERS} ${CMAKE_CXX_FLAGS}")
-
 ################################################################################
 
 add_subdirectory(include)
@@ -181,6 +205,3 @@ add_subdirectory(tools)
 add_subdirectory(test)
 add_subdirectory(unittests)
 add_subdirectory(bench)
-
-message(STATUS "C++ compiler flags: ${CMAKE_CXX_FLAGS}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")

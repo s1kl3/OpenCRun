@@ -18,9 +18,11 @@ function(add_opencrun_bench bench_dirname)
     )
 endfunction()
 
-replace_substring(CMAKE_CXX_FLAGS "-fno-rtti" "-frtti")
-replace_substring(CMAKE_CXX_FLAGS "-fno-exceptions" "-fexceptions")
-replace_substring(CMAKE_CXX_FLAGS "-Wcast-qual" "-Wno-cast-qual")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-rtti" "-frtti")
+replace_substring(OPENCRUN_CXXFLAGS "-fno-exceptions" "-fexceptions")
+replace_substring(OPENCRUN_CXXFLAGS "-Wcast-qual" "-Wno-cast-qual")
+
+set_dir_compile_options(OPENCRUN_CXXFLAGS)
 
 ################################################################################
 
