@@ -8,7 +8,8 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using ClangConfig.cmake in: ${Clang_DIR}")
 
-list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}" "${Clang_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" "${LLVM_DIR}" "${Clang_DIR}")
+message(STATUS "CMake module path: ${CMAKE_MODULE_PATH}")
 
 if((NOT LLVM_SRC_ROOT) OR (NOT LLVM_OBJ_ROOT))
   message(FATAL_ERROR "LLVM_SRC_ROOT and LLVM_OBJ_ROOT variables not set!")
@@ -195,6 +196,15 @@ message(STATUS "OpenCRun install prefix: ${OPENCRUN_PREFIX}")
 set(OPENCRUN_PREFIX_LLVM "${LLVM_INSTALL_PREFIX}")
 add_definitions(-DOPENCRUN_PREFIX_LLVM="${LLVM_INSTALL_PREFIX}")
 message(STATUS "LLVM install prefix: ${OPENCRUN_PREFIX_LLVM}")
+
+################################################################################
+# Uninstall custom target
+################################################################################
+
+add_custom_target(
+  uninstall
+  "${CMAKE_COMMAND}" -P "${PROJECT_SOURCE_DIR}/cmake/opencrun-uninstall.cmake"
+) 
 
 ################################################################################
 
