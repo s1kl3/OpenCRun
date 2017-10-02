@@ -118,6 +118,39 @@ replace_substring(OPENCRUN_CXXFLAGS "-std=c++11" "-std=gnu++11")
 replace_substring(OPENCRUN_CXXFLAGS "-Wignored-attributes" "-Wno-ignored-attributes")
 replace_substring(OPENCRUN_CXXFLAGS "-Wstrict-aliasing" "-Wno-strict-aliasing")
 
+# Code sanitization definitions.
+option(SANITIZE_ADDR "Enable AddressSanitizer, a fast memory error detector.")
+option(SANITIZE_LEAK "Enable LeakSanitizer, a memory leak detector.")
+option(SANITIZE_THRD "Enable ThreadSanitizer, a fast data race detector.")
+option(SANITIZE_UNDF "Enable UndefinedBehaviorSanitizer, a fast undefined behavior detector.")
+
+if(SANITIZE_ADDR)
+  set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -g -fno-omit-frame-pointer -fsanitize=address")
+  set_dir_compile_options(OPENCRUN_CXXFLAGS)
+  link_libraries("-fno-omit-frame-pointer -fsanitize=address")
+elseif(SANITIZE_LEAK)
+  set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -g -fno-omit-frame-pointer -fsanitize=leak")
+  set_dir_compile_options(OPENCRUN_CXXFLAGS)
+  link_libraries("-fno-omit-frame-pointer -fsanitize=leak")
+elseif(SANITIZE_THRD)
+  set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -g -fno-omit-frame-pointer -fsanitize=thread")
+  set_dir_compile_options(OPENCRUN_CXXFLAGS)
+  link_libraries("-fno-omit-frame-pointer -fsanitize=thread")
+elseif(SANITIZE_UNDF)
+  set(OPENCRUN_CXXFLAGS "${OPENCRUN_CXXFLAGS} -g -fno-omit-frame-pointer -fsanitize=undefined")
+  set_dir_compile_options(OPENCRUN_CXXFLAGS)
+  link_libraries("-fno-omit-frame-pointer -fsanitize=undefined")
+endif()
+
+if (SANITIZE_ADDRESS AND SANITIZE_THREAD)
+  message(FATAL_ERROR "The AddressSanitizer cannot be combined with the ThreadSanitizer.")
+endif()
+
+if (SANITIZE_LEAD AND SANITIZE_THREAD)
+  message(FATAL_ERROR "The LeakSanitizer cannot be combined with the ThreadSanitizer.")
+endif()
+
+
 # Remove unnecessary spaces and include flags (they're defined by the
 # INCLUDE_DIRECTORIES property).
 string(REGEX REPLACE "-I[^ ]+" "" OPENCRUN_CXXFLAGS ${OPENCRUN_CXXFLAGS})
