@@ -128,6 +128,7 @@ public:
   ~OCLTypesTableImpl() {
     llvm::DeleteContainerSeconds(Types);
     llvm::DeleteContainerSeconds(Ptrs);
+    llvm::DeleteContainerSeconds(OpaqueTypeDefs);
   }
 
 public:

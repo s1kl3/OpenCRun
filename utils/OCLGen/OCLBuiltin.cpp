@@ -258,6 +258,7 @@ public:
     llvm::DeleteContainerSeconds(RoundingModes);
 
     llvm::DeleteContainerSeconds(BuiltinImpls);
+    llvm::DeleteContainerSeconds(Requirements);
     llvm::DeleteContainerSeconds(Strategies);
     llvm::DeleteContainerSeconds(Reductions);
     llvm::DeleteContainerSeconds(Decls);

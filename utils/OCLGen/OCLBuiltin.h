@@ -619,6 +619,9 @@ protected:
    : Kind(kind), Decls(decls) {}
 
 public:
+  virtual ~OCLStrategy() = default;
+
+public:
   StrategyKind getKind() const { return Kind; }
 
 private:
@@ -687,6 +690,9 @@ public:
 
 protected:
   OCLRequirement(RequirementKind K) : Kind(K) {}
+
+public:
+  virtual ~OCLRequirement() = default;
 
 public:
   RequirementKind getKind() const { return Kind; }

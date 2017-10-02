@@ -74,5 +74,5 @@ int main(int argc, char *argv[]) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
-  return llvm::TableGenMain(argv[0], OCLGenMain);
+  return llvm::TableGenMain(argv[0], &OCLGenMain);
 }
