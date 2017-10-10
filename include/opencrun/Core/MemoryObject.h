@@ -312,9 +312,9 @@ public:
   virtual bool aliasWithHostPtr() const = 0;
 
   /// Map the device storage and return the host-accessible pointer.
-  /// It must be paired with \c unmap to properly release the mapping if
+  /// It must be paired with unmap to properly release the mapping if
   /// necessary. The implementation may cache the pointer value to avoid
-  /// multiple mapping of the same storage.
+  /// multiple mappings of the same storage.
   virtual void *map() = 0;
 
   /// Unmap the device storage.

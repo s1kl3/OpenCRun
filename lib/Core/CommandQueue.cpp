@@ -167,6 +167,8 @@ bool CommandQueue::ensureMemoryCoherency(Command &Cmd) {
       Mode |= SM::SyncRead;
     if (TheCmd.GetMapFlags() & CL_MAP_WRITE)
       Mode |= SM::SyncWrite;
+    if (TheCmd.GetMapFlags() & CL_MAP_WRITE_INVALIDATE_REGION)
+      Mode |= SM::SyncWrite;
     TheCmd.GetSource().synchronizeFor(GetDevice(), Mode);
     break;
   }
@@ -176,6 +178,8 @@ bool CommandQueue::ensureMemoryCoherency(Command &Cmd) {
     if (TheCmd.GetMapFlags() & CL_MAP_READ)
       Mode |= SM::SyncRead;
     if (TheCmd.GetMapFlags() & CL_MAP_WRITE)
+      Mode |= SM::SyncWrite;
+    if (TheCmd.GetMapFlags() & CL_MAP_WRITE_INVALIDATE_REGION)
       Mode |= SM::SyncWrite;
     TheCmd.GetSource().synchronizeFor(GetDevice(), Mode);
     break;

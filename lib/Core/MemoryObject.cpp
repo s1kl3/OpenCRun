@@ -405,7 +405,7 @@ void MemoryCoherencyTracker::transferToHost(const Device &D,
 void MemoryCoherencyTracker::updateHostValidity(MemoryChunk &C) {
   C.Validity.set(getHostIndex());
 
-  // If we set the host to valide we need to update the validity for all
+  // If we set the host to valid we need to update the validity for all
   // the devices aliasing with the host.
   for (unsigned Idx = 0; Idx != getHostIndex(); ++Idx) {
     auto &Desc = Obj.getDescriptorFor(getDeviceFromIndex(Idx));
@@ -463,7 +463,7 @@ void MemoryCoherencyTracker::updateRegion(size_t Offset, size_t Size,
   //
   // It is correct and safe to perform step 1 and 3 in two different atomic
   // transactions since a reader-writer or writer-writer on the same region may
-  // leads to undefined behavior by standard. Thus, a writer that invalidates
+  // lead to undefined behavior by standard. Thus, a writer that invalidates
   // all the caches is assumed to be exclusive.
   // This allow to perform the actual memory transfer *outside* the critical
   // section.
