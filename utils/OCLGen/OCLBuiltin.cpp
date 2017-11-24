@@ -160,6 +160,12 @@ apply(const BuiltinSign &Ops) const {
     T = T_S;
   else if (const OCLType *T_V = llvm::dyn_cast<OCLVectorType>(P1))
     T = T_V;
+  else if (const OCLQualifiedType *T_QI = llvm::dyn_cast<OCLQualifiedType>(P1)) {
+    if (!llvm::isa<OCLOpaqueType>(&(T_QI->getUnQualType())))
+      llvm::PrintFatalError("Qualified image type expected!");
+
+    I = llvm::cast<OCLOpaqueType>(&(T_QI->getUnQualType()));
+  }
 
   if (const OCLOpaqueType *T_I = llvm::dyn_cast<OCLOpaqueType>(P2))
     I = T_I;
@@ -167,6 +173,12 @@ apply(const BuiltinSign &Ops) const {
     T = T_S;
   else if (const OCLType *T_V = llvm::dyn_cast<OCLVectorType>(P2))
     T = T_V;
+  else if (const OCLQualifiedType *T_QI = llvm::dyn_cast<OCLQualifiedType>(P2)) {
+    if (!llvm::isa<OCLOpaqueType>(&(T_QI->getUnQualType())))
+      llvm::PrintFatalError("Qualified image type expected!");
+
+    I = llvm::cast<OCLOpaqueType>(&(T_QI->getUnQualType()));
+  }
 
   if(!llvm::isa<OCLOpaqueType>(I) || !llvm::isa<OCLType>(T))
     return false;
@@ -640,6 +652,16 @@ static void EnumerateSigns(const OCLBuiltinVariant &B, unsigned Index,
     for (OCLGroupType::const_iterator I = GT->begin(), E = GT->end();
          I != E; ++I) {
       Tmp.push_back(*I);
+      if (IsConsistent(CMap, Tmp))
+        EnumerateSigns(B, Index + 1, CMap, Tmp, R);
+      Tmp.pop_back();
+    }
+  } else if (const OCLQualifiedType *QT = llvm::dyn_cast<OCLQualifiedType>(&Cur)) {
+    OCLQualifiedGroupIterator I(*QT);
+    OCLQualifiedGroupIterator E(*QT, true);
+
+    for (; I != E; ++I) {
+      Tmp.push_back(&*I);
       if (IsConsistent(CMap, Tmp))
         EnumerateSigns(B, Index + 1, CMap, Tmp, R);
       Tmp.pop_back();

@@ -7,7 +7,7 @@
 #include "Builtins.CPU.inc"
 
 __opencrun_overload
-float4 read_imagef(image1d_t image, sampler_t sampler, float coord) {
+float4 read_imagef(read_only image1d_t image, sampler_t sampler, float coord) {
   device_image_t *dev_image = __builtin_astype(image, device_image_t *);
   device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
@@ -20,7 +20,7 @@ float4 read_imagef(image1d_t image, sampler_t sampler, float coord) {
 }
 
 __opencrun_overload
-float4 read_imagef(image1d_array_t image, sampler_t sampler, float2 coord) {
+float4 read_imagef(read_only image1d_array_t image, sampler_t sampler, float2 coord) {
   device_image_t *dev_image = __builtin_astype(image, device_image_t *);
   device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
@@ -33,7 +33,7 @@ float4 read_imagef(image1d_array_t image, sampler_t sampler, float2 coord) {
 }
 
 __opencrun_overload
-float4 read_imagef(image2d_t image, sampler_t sampler, float2 coord) {
+float4 read_imagef(read_only image2d_t image, sampler_t sampler, float2 coord) {
   device_image_t *dev_image = __builtin_astype(image, device_image_t *);
   device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
@@ -46,7 +46,7 @@ float4 read_imagef(image2d_t image, sampler_t sampler, float2 coord) {
 }
 
 __opencrun_overload
-float4 read_imagef(image2d_array_t image, sampler_t sampler, float4 coord) {
+float4 read_imagef(read_only image2d_array_t image, sampler_t sampler, float4 coord) {
   device_image_t *dev_image = __builtin_astype(image, device_image_t *);
   device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 
@@ -59,7 +59,7 @@ float4 read_imagef(image2d_array_t image, sampler_t sampler, float4 coord) {
 }
 
 __opencrun_overload
-float4 read_imagef(image3d_t image, sampler_t sampler, float4 coord) {
+float4 read_imagef(read_only image3d_t image, sampler_t sampler, float4 coord) {
   device_image_t *dev_image = __builtin_astype(image, device_image_t *);
   device_sampler_t dev_sampler = *(__builtin_astype(sampler, device_sampler_t *));
 

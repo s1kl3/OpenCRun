@@ -1092,7 +1092,7 @@ def : OCLBuiltinImpl<blt_read_imagei, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param3));
 
   return read_pixeli(dev_image, coord_4);
-}]>, "VnIMg">;
+}]>, "VnQrIMg">;
 
 def : OCLBuiltinImpl<blt_read_imagei, TemplateStrategy<[{
   sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
@@ -1100,7 +1100,7 @@ def : OCLBuiltinImpl<blt_read_imagei, TemplateStrategy<[{
           param1,
           sampler, 
           param2);
-}]>, "VnIn">;
+}]>, "VnQrIn">;
 
 def : OCLBuiltinImpl<blt_read_imagei, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
@@ -1108,7 +1108,7 @@ def : OCLBuiltinImpl<blt_read_imagei, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param2));
 
   return read_pixeli(dev_image, coord_4);
-}]>, "VnDbICn">;
+}]>, "VnQrDbICn">;
 
 //----------------------------------------------------------------------------//
 
@@ -1118,7 +1118,7 @@ def : OCLBuiltinImpl<blt_read_imageui, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param3));
 
   return read_pixelui(dev_image, coord_4);
-}]>, "VUnIMg">;
+}]>, "VUnQrIMg">;
 
 def : OCLBuiltinImpl<blt_read_imageui, TemplateStrategy<[{
   sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
@@ -1126,7 +1126,7 @@ def : OCLBuiltinImpl<blt_read_imageui, TemplateStrategy<[{
           param1,
           sampler,
           param2);
-}]>, "VUnIn">;
+}]>, "VUnQrIn">;
 
 def : OCLBuiltinImpl<blt_read_imageui, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
@@ -1134,7 +1134,7 @@ def : OCLBuiltinImpl<blt_read_imageui, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param2));
 
   return read_pixelui(dev_image, coord_4);
-}]>, "VUnDbICn">;
+}]>, "VUnQrDbICn">;
 
 //----------------------------------------------------------------------------//
 
@@ -1144,7 +1144,7 @@ def : OCLBuiltinImpl<blt_read_imagef, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param3));
 
   return read_pixelf(dev_image, coord_4);
-}]>, "VfIMn">;
+}]>, "VfQrIMn">;
 
 def : OCLBuiltinImpl<blt_read_imagef, TemplateStrategy<[{
   sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
@@ -1152,7 +1152,7 @@ def : OCLBuiltinImpl<blt_read_imagef, TemplateStrategy<[{
           param1,
           sampler,
           param2);
-}]>, "VfIn">;
+}]>, "VfQrIn">;
 
 def : OCLBuiltinImpl<blt_read_imagef, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
@@ -1160,7 +1160,7 @@ def : OCLBuiltinImpl<blt_read_imagef, TemplateStrategy<[{
   int4 coord_4 = apply_filter_nearest(dev_image, dev_sampler, map_to_float4(param2));
 
   return read_pixelf(dev_image, coord_4);
-}]>, "VfDbICn">;
+}]>, "VfQrDbICn">;
 
 }
 
@@ -1174,14 +1174,14 @@ def : OCLBuiltinImpl<blt_write_imagei, TemplateStrategy<[{
   int4 color_out = map_channels_write(dev_image, param3);
 
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD12InVn">;
+}]>, "vQwD12InVn">;
 
 def : OCLBuiltinImpl<blt_write_imagei, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
   int4 color_out = map_channels_write(dev_image, param3);
   
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD3IVnVn">;
+}]>, "vQwD3IVnVn">;
 
 //----------------------------------------------------------------------------//
 
@@ -1190,14 +1190,14 @@ def : OCLBuiltinImpl<blt_write_imageui, TemplateStrategy<[{
   uint4 color_out = map_channels_write(dev_image, param3);
 
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD12InVUn">;
+}]>, "vQwD12InVUn">;
 
 def : OCLBuiltinImpl<blt_write_imageui, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
   uint4 color_out = map_channels_write(dev_image, param3);
 
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD3IVnVUn">;
+}]>, "vQwD3IVnVUn">;
 
 //----------------------------------------------------------------------------//
 
@@ -1206,14 +1206,14 @@ def : OCLBuiltinImpl<blt_write_imagef, TemplateStrategy<[{
   float4 color_out = map_channels_write(dev_image, param3);
 
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD12InVf">;
+}]>, "vQwD12InVf">;
 
 def : OCLBuiltinImpl<blt_write_imagef, TemplateStrategy<[{
   device_image_t *dev_image = __builtin_astype(param1, device_image_t *);
   float4 color_out = map_channels_write(dev_image, param3);
 
   write_pixel(dev_image, map_to_int4(param2), color_out);
-}]>, "vD3IVnVf">;
+}]>, "vQwD3IVnVf">;
 
 }
 
@@ -1221,30 +1221,83 @@ let Requirements = [device_image] in {
 
 def : OCLBuiltinImpl<blt_get_image_width, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->width;
-}]>>;
+}]>, "nQrI">;
+
+def : OCLBuiltinImpl<blt_get_image_width, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->width;
+}]>, "nQwD12I">;
+
+def : OCLBuiltinImpl<blt_get_image_width, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->width;
+}]>, "nQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_height, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->height;
-}]>>;
+}]>, "nQrD23I">;
+
+def : OCLBuiltinImpl<blt_get_image_height, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->height;
+}]>, "nQwD2I">;
+
+def : OCLBuiltinImpl<blt_get_image_height, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->height;
+}]>, "nQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_depth, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->depth;
-}]>>;
+}]>, "nQrD3I">;
+
+def : OCLBuiltinImpl<blt_get_image_depth, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->depth;
+}]>, "nQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_channel_data_type, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->image_channel_data_type;
-}]>>;
+}]>, "nQrI">;
+
+def : OCLBuiltinImpl<blt_get_image_channel_data_type, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->image_channel_data_type;
+}]>, "nQwD12I">;
+
+def : OCLBuiltinImpl<blt_get_image_channel_data_type, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->image_channel_data_type;
+}]>, "nQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_channel_order, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->image_channel_order;
-}]>>;
+}]>, "nQrI">;
+
+def : OCLBuiltinImpl<blt_get_image_channel_order, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->image_channel_order;
+}]>, "nQwD12I">;
+
+def : OCLBuiltinImpl<blt_get_image_channel_order, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->image_channel_order;
+}]>, "nQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_dim, TemplateStrategy<[{
   return (int2)(
       __builtin_astype(param1, device_image_t *)->width,
       __builtin_astype(param1, device_image_t *)->height
   );  
-}]>, "VnD2I">;
+}]>, "VnQrD2I">;
+
+def : OCLBuiltinImpl<blt_get_image_dim, TemplateStrategy<[{
+  return (int2)(
+      __builtin_astype(param1, device_image_t *)->width,
+      __builtin_astype(param1, device_image_t *)->height
+  );  
+}]>, "VnQwD2I">;
 
 def : OCLBuiltinImpl<blt_get_image_dim, TemplateStrategy<[{
   return (int4)(
@@ -1253,10 +1306,25 @@ def : OCLBuiltinImpl<blt_get_image_dim, TemplateStrategy<[{
       __builtin_astype(param1, device_image_t *)->depth,
     0
   );
-}]>, "VnD3I">;
+}]>, "VnQrD3I">;
+
+def : OCLBuiltinImpl<blt_get_image_dim, TemplateStrategy<[{
+  return (int4)(
+      __builtin_astype(param1, device_image_t *)->width,
+      __builtin_astype(param1, device_image_t *)->height,
+      __builtin_astype(param1, device_image_t *)->depth,
+    0
+  );
+}]>, "VnQwD3I">;
+
+//----------------------------------------------------------------------------//
 
 def : OCLBuiltinImpl<blt_get_image_array_size, TemplateStrategy<[{
   return __builtin_astype(param1, device_image_t *)->array_size;
-}]>>;
+}]>, "zQrDaI">;
+
+def : OCLBuiltinImpl<blt_get_image_array_size, TemplateStrategy<[{
+  return __builtin_astype(param1, device_image_t *)->array_size;
+}]>, "zQwDaI">;
 
 }

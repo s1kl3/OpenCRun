@@ -55,6 +55,18 @@ def ocl_as_global : OCLAddressSpace<"global">;
 def ocl_as_local : OCLAddressSpace<"local">;
 def ocl_as_constant : OCLAddressSpace<"constant">;
 
+class OCLQualifier;
+
+def ocl_qual_readonly : OCLQualifier;
+def ocl_qual_writeonly : OCLQualifier;
+
+class OCLQualifiedType<OCLType unqual,
+                       OCLQualifier qual>
+ : OCLBasicType {
+  OCLType UnQualType = unqual;
+  OCLQualifier Qualifier = qual;
+}
+
 class OCLModifier;
 
 def ocl_mod_const : OCLModifier;

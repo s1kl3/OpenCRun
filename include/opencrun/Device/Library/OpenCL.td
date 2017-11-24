@@ -33,6 +33,7 @@ include "opencrun/Device/Library/Builtin.td"
 //      Px      pointer (x = 1|2|3|4 => AS = global|local|constant|private)
 //      Dx      image type (x = 1 | 2 | 3 | 12 | 23 | a | b 
 //                          => 1D | 2D | 1&2D | 2&3D | array | buffer)
+//      Qx      access-qualified type (x = r | w)
 //
 //===----------------------------------------------------------------------===//
 

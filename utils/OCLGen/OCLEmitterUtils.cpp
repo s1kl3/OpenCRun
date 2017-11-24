@@ -25,10 +25,14 @@ PredicateSet opencrun::ComputePredicates(const BuiltinSign &Sign, bool IgnoreAS)
   for (unsigned i = 0, e = Sign.size(); i != e; ++i) {
     const OCLBasicType *B = Sign[i];
 
-    while (llvm::isa<OCLPointerType>(B)) {
-      const OCLPointerType *P = llvm::cast<OCLPointerType>(B);
-      Preds.insert(P->getPredicates().begin(), P->getPredicates().end());
-      B = llvm::cast<OCLBasicType>(&P->getBaseType());
+    while (llvm::isa<OCLPointerType>(B) || llvm::isa<OCLQualifiedType>(B)) {
+      if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(B)) {
+        Preds.insert(P->getPredicates().begin(), P->getPredicates().end());
+        B = llvm::cast<OCLBasicType>(&P->getBaseType());
+      } else if (const OCLQualifiedType *Q = llvm::dyn_cast<OCLQualifiedType>(B)) {
+        Preds.insert(Q->getPredicates().begin(), Q->getPredicates().end());
+        B = llvm::cast<OCLBasicType>(&Q->getUnQualType());
+      }
     }
 
     if (const OCLVectorType *V = llvm::dyn_cast<OCLVectorType>(B))
@@ -44,18 +48,29 @@ PredicateSet opencrun::ComputePredicates(const BuiltinSign &Sign, bool IgnoreAS)
 }
 
 void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
-                                    std::string Name) {
+    std::string Name) {
   if (llvm::isa<OCLGroupType>(&T)) 
     llvm_unreachable("Illegal basic type!");
 
-  if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(&T)) {
+  if (const OCLQualifiedType *Q = llvm::dyn_cast<OCLQualifiedType>(&T)) {
+    // Access qualifiers (they're mutually exclusive)
+    if (Q->hasQualifier(OCLQualifiedType::Q_ReadOnly))
+      OS << "read_only ";
+    else if (Q->hasQualifier(OCLQualifiedType::Q_WriteOnly))
+      OS << "write_only ";
+    else if (Q->hasQualifier(OCLQualifiedType::Q_ReadWrite))
+      OS << "read_write ";
+
+    // Unqualified type
+    EmitOCLTypeSignature(OS, Q->getUnQualType());
+  } else if (const OCLPointerType *P = llvm::dyn_cast<OCLPointerType>(&T)) {
     // Modifiers
     if (P->hasModifier(OCLPointerType::M_Const))
       OS << "const ";
-	if (P->hasModifier(OCLPointerType::M_Restrict))
-	  OS << "restrict ";
-	if (P->hasModifier(OCLPointerType::M_Volatile))
-	  OS << "volatile ";
+    if (P->hasModifier(OCLPointerType::M_Restrict))
+      OS << "restrict ";
+    if (P->hasModifier(OCLPointerType::M_Volatile))
+      OS << "volatile ";
 
     // Base type
     EmitOCLTypeSignature(OS, P->getBaseType());
@@ -77,7 +92,7 @@ void opencrun::EmitOCLTypeSignature(llvm::raw_ostream &OS, const OCLType &T,
 
 std::string OCLBuiltinDecorator::
 getExternalName(const BuiltinSign *S, bool NoRound) const {
-  if (const OCLCastBuiltin *CB =llvm::dyn_cast<OCLCastBuiltin>(&Builtin)) {
+  if (const OCLCastBuiltin *CB = llvm::dyn_cast<OCLCastBuiltin>(&Builtin)) {
     assert(S);
     std::string buf;
     llvm::raw_string_ostream OS(buf);

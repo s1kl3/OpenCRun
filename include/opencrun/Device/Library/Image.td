@@ -4,186 +4,250 @@
 
 let Group = "IMAGE" in {
 
-class ImageBuiltin_VnIMg_VnIn_VnDbICn<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_VnQrIMg_VnQrIn_VnQrDbICn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_int_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_sampler_t,
     ocl_coord
   ],
   [isCompatibleWithImageDim<Id<1>, Id<3>>],
-  "VnIMg">,
+  "VnQrIMg">,
   OCLBuiltinVariant<[
     ocl_int_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_coord_int
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "VnIn">,
+  "VnQrIn">,
   OCLBuiltinVariant<[
     ocl_int_4,
-    ocl_image1d_buffer_t,
+    OCLQualifiedType<ocl_image1d_buffer_t, ocl_qual_readonly>,
     ocl_int
   ],
   [],
-  "VnDbICn">
+  "VnQrDbICn">
 ]>;
 
-class ImageBuiltin_VUnIMg_VUnIn_VUnDbICn<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_VUnQrIMg_VUnQrIn_VUnQrDbICn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_uint_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_sampler_t,
     ocl_coord
   ],
   [isCompatibleWithImageDim<Id<1>, Id<3>>],
-  "VUnIMg">,
+  "VUnQrIMg">,
   OCLBuiltinVariant<[
     ocl_uint_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_coord_int
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "VUnIn">,
+  "VUnQrIn">,
   OCLBuiltinVariant<[
     ocl_uint_4,
-    ocl_image1d_buffer_t,
+    OCLQualifiedType<ocl_image1d_buffer_t, ocl_qual_readonly>,
     ocl_int
   ],
   [],
-  "VUnDbICn">
+  "VUnQrDbICn">
 ]>;
 
-class ImageBuiltin_VfIMn_VfIMf_VfIn_VfDbICn<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_VfQrIMn_VfQrIMf_VfQrIn_VfQrDbICn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_float_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_sampler_t,
     ocl_coord_int
   ],
   [isCompatibleWithImageDim<Id<1>, Id<3>>],
-  "VfIMn">,
+  "VfQrIMn">,
   OCLBuiltinVariant<[
     ocl_float_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_sampler_t,
     ocl_coord_float
   ],
   [isCompatibleWithImageDim<Id<1>, Id<3>>],
-  "VfIMf">,
+  "VfQrIMf">,
   OCLBuiltinVariant<[
     ocl_float_4,
-    ocl_image_no_buff,
+    OCLQualifiedType<ocl_image_no_buff, ocl_qual_readonly>,
     ocl_coord_int
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "VfIn">,
+  "VfQrIn">,
   OCLBuiltinVariant<[
     ocl_float_4,
-    ocl_image1d_buffer_t,
+    OCLQualifiedType<ocl_image1d_buffer_t, ocl_qual_readonly>,
     ocl_int
   ],
   [],
-  "VfDbICn">
+  "VfQrDbICn">
 ]>;
 
-class ImageBuiltin_vD12InVn_vD3IVnVn<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_vQwD12InVn_vQwD3IVnVn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image_1d_2d,
+    OCLQualifiedType<ocl_image_1d_2d, ocl_qual_writeonly>,
     ocl_coord_int,
     ocl_int_4
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "vD12InVn">,
+  "vQwD12InVn">,
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image3d_t,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>,
     ocl_int_4,
     ocl_int_4
   ],
   [],
-  "vD3IVnVn",
+  "vQwD3IVnVn",
   [ocl_ext_cl_khr_3d_image_writes]>
 ]>;
 
-class ImageBuiltin_vD12InVUn_vD3IVnVUn<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_vQwD12InVUn_vQwD3IVnVUn<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image_1d_2d,
+    OCLQualifiedType<ocl_image_1d_2d, ocl_qual_writeonly>,
     ocl_coord_int,
     ocl_uint_4
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "vD12InVUn">,
+  "vQwD12InVUn">,
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image3d_t,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>,
     ocl_int_4,
     ocl_uint_4
   ],
   [],
-  "vD3IVnVUn",
+  "vQwD3IVnVUn",
   [ocl_ext_cl_khr_3d_image_writes]>
 ]>;
 
-class ImageBuiltin_vD12InVf_vD3IVnVf<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_vQwD12InVf_vQwD3IVnVf<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image_1d_2d,
+    OCLQualifiedType<ocl_image_1d_2d, ocl_qual_writeonly>,
     ocl_coord_int,
     ocl_float_4
   ],
   [isCompatibleWithImageDim<Id<1>, Id<2>>],
-  "vD12InVf">,
+  "vQwD12InVf">,
   OCLBuiltinVariant<[
     ocl_void,
-    ocl_image3d_t,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>,
     ocl_int_4,
     ocl_float_4
   ],
   [],
-  "vD3IVnVf",
+  "vQwD3IVnVf",
   [ocl_ext_cl_khr_3d_image_writes]>
 ]>;
 
-class ImageBuiltin_nI<string name> : OCLGenericBuiltinSimple<
-  name,
-  [ocl_int, ocl_image],
-  []
->;
+class ImageBuiltin_nQrI_nQwD12I_nQwD3I<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image, ocl_qual_readonly>
+  ],
+  [],
+  "nQrI">,
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image_1d_2d, ocl_qual_writeonly>
+  ],
+  [],
+  "nQwD12I">,
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>
+  ],
+  [],
+  "nQwD3I",
+  [ocl_ext_cl_khr_3d_image_writes]>
+]>;
 
-class ImageBuiltin_nD23I<string name> : OCLGenericBuiltinSimple<
-  name,
-  [ocl_int, ocl_image_2d_3d],
-  []
->;
+class ImageBuiltin_nQrD23I_nQwD2I_nQwD3I<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image_2d_3d, ocl_qual_readonly>
+  ],
+  [],
+  "nQrD23I">,
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image_2d, ocl_qual_writeonly>
+  ],
+  [],
+  "nQwD2I">,
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>
+  ],
+  [],
+  "nQwD3I",
+  [ocl_ext_cl_khr_3d_image_writes]>
+]>;
 
-class ImageBuiltin_nD3I<string name> : OCLGenericBuiltinSimple<
-  name,
-  [ocl_int, ocl_image3d_t],
-  []
->;
+class ImageBuiltin_nQrD3I_nQwD3I<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_readonly>
+  ],
+  [],
+  "nQrD3I">,
+  OCLBuiltinVariant<[
+    ocl_int,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>
+  ],
+  [],
+  "nQwD3I",
+  [ocl_ext_cl_khr_3d_image_writes]>
+]>;
 
-class ImageBuiltin_zDaI<string name> : OCLGenericBuiltinSimple<
-  name,
-  [ocl_size_t, ocl_image_array],
-  []
->;
+class ImageBuiltin_zQrDaI_zQwDaI<string name> : OCLGenericBuiltin<name, [
+  OCLBuiltinVariant<[
+    ocl_size_t,
+    OCLQualifiedType<ocl_image_array, ocl_qual_readonly>
+  ],
+  [],
+  "zQrDaI">,
+  OCLBuiltinVariant<[
+    ocl_size_t,
+    OCLQualifiedType<ocl_image_array, ocl_qual_writeonly>
+  ],
+  [],
+  "zQwDaI">
+]>;
 
-class ImageBuiltin_VnD2I_VnD3I<string name> : OCLGenericBuiltin<name, [
+class ImageBuiltin_VnQrD2I_VnQwD2I_VnQrD3I_VnQwD3I<string name> : OCLGenericBuiltin<name, [
   OCLBuiltinVariant<[
     ocl_int_2,
-    ocl_image_2d
+    OCLQualifiedType<ocl_image_2d, ocl_qual_readonly>
   ],
   [],
-  "VnD2I">,
+  "VnQrD2I">,
+  OCLBuiltinVariant<[
+    ocl_int_2,
+    OCLQualifiedType<ocl_image_2d, ocl_qual_writeonly>
+  ],
+  [],
+  "VnQwD2I">,
   OCLBuiltinVariant<[
     ocl_int_4,
-    ocl_image3d_t
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_readonly>
   ],
   [],
-  "VnD3I">
+  "VnQrD3I">,
+  OCLBuiltinVariant<[
+    ocl_int_4,
+    OCLQualifiedType<ocl_image3d_t, ocl_qual_writeonly>
+  ],
+  [],
+  "VnQwD3I",
+  [ocl_ext_cl_khr_3d_image_writes]>
 ]>;
 
 }
@@ -192,18 +256,18 @@ class ImageBuiltin_VnD2I_VnD3I<string name> : OCLGenericBuiltin<name, [
 // Image builtin declarations
 //===----------------------------------------------------------------------===//
 
-def blt_read_imagei                 : ImageBuiltin_VnIMg_VnIn_VnDbICn<"read_imagei">;
-def blt_read_imageui                : ImageBuiltin_VUnIMg_VUnIn_VUnDbICn<"read_imageui">;
-def blt_read_imagef                 : ImageBuiltin_VfIMn_VfIMf_VfIn_VfDbICn<"read_imagef">;
+def blt_read_imagei                 : ImageBuiltin_VnQrIMg_VnQrIn_VnQrDbICn<"read_imagei">;
+def blt_read_imageui                : ImageBuiltin_VUnQrIMg_VUnQrIn_VUnQrDbICn<"read_imageui">;
+def blt_read_imagef                 : ImageBuiltin_VfQrIMn_VfQrIMf_VfQrIn_VfQrDbICn<"read_imagef">;
 
-def blt_write_imagei                : ImageBuiltin_vD12InVn_vD3IVnVn<"write_imagei">;
-def blt_write_imageui               : ImageBuiltin_vD12InVUn_vD3IVnVUn<"write_imageui">;
-def blt_write_imagef                : ImageBuiltin_vD12InVf_vD3IVnVf<"write_imagef">;
+def blt_write_imagei                : ImageBuiltin_vQwD12InVn_vQwD3IVnVn<"write_imagei">;
+def blt_write_imageui               : ImageBuiltin_vQwD12InVUn_vQwD3IVnVUn<"write_imageui">;
+def blt_write_imagef                : ImageBuiltin_vQwD12InVf_vQwD3IVnVf<"write_imagef">;
 
-def blt_get_image_width             : ImageBuiltin_nI<"get_image_width">;
-def blt_get_image_height            : ImageBuiltin_nD23I<"get_image_height">;
-def blt_get_image_depth             : ImageBuiltin_nD3I<"get_image_depth">;
-def blt_get_image_channel_data_type : ImageBuiltin_nI<"get_image_channel_data_type">;
-def blt_get_image_channel_order     : ImageBuiltin_nI<"get_image_channel_order">;
-def blt_get_image_dim               : ImageBuiltin_VnD2I_VnD3I<"get_image_dim">;
-def blt_get_image_array_size        : ImageBuiltin_zDaI<"get_image_array_size">;
+def blt_get_image_width             : ImageBuiltin_nQrI_nQwD12I_nQwD3I<"get_image_width">;
+def blt_get_image_height            : ImageBuiltin_nQrD23I_nQwD2I_nQwD3I<"get_image_height">;
+def blt_get_image_depth             : ImageBuiltin_nQrD3I_nQwD3I<"get_image_depth">;
+def blt_get_image_channel_data_type : ImageBuiltin_nQrI_nQwD12I_nQwD3I<"get_image_channel_data_type">;
+def blt_get_image_channel_order     : ImageBuiltin_nQrI_nQwD12I_nQwD3I<"get_image_channel_order">;
+def blt_get_image_dim               : ImageBuiltin_VnQrD2I_VnQwD2I_VnQrD3I_VnQwD3I<"get_image_dim">;
+def blt_get_image_array_size        : ImageBuiltin_zQrDaI_zQwDaI<"get_image_array_size">;

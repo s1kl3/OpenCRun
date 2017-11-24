@@ -35,6 +35,10 @@ std::string OCLVectorType::BuildName(const OCLScalarType &Base,
   return (Base.getName() + llvm::Twine(Width)).str();
 }
 
+std::string OCLQualifiedType::BuildName(const OCLType &UnQualTy, Qualifier Qual) {
+  return ("@qual<q:" + llvm::Twine(Qual) + ">{" + UnQualTy.getName() + "}").str();
+}
+
 std::string OCLPointerType::BuildName(const OCLType &Base, 
                                       AddressSpaceKind AS,
                                       unsigned Modifiers) {
@@ -88,6 +92,18 @@ bool OCLOpaqueType::compareLess(const OCLType *T) const {
   return true;
 }
 
+bool OCLQualifiedType::compareLess(const OCLType *T) const {
+  if (llvm::isa<OCLScalarType>(T) ||
+      llvm::isa<OCLOpaqueType>(T) ||
+      llvm::isa<OCLVectorType>(T)) return false;
+  if (const OCLQualifiedType *Q = llvm::dyn_cast<OCLQualifiedType>(T))
+    return getUnQualType().compareLess(&(Q->getUnQualType())) ||
+           (getQualifier() < Q->getQualifier());
+
+  // Qualified < !Scalar && !Opaque && !Vector && !Qualified
+  return true;
+}
+
 bool OCLPointerType::compareLess(const OCLType *T) const {
   if (llvm::isa<OCLScalarType>(T) ||
       llvm::isa<OCLOpaqueType>(T) ||
@@ -115,11 +131,16 @@ bool OCLGroupType::compareLess(const OCLType *T) const {
 class opencrun::OCLTypesTableImpl {
 public:
   typedef std::map<llvm::Record *, const OCLType *> OCLTypesMap;
+  typedef std::map<const OCLQualifiedType *,
+                   std::map<OCLGroupType::const_iterator,
+                            const OCLQualifiedType *> > OCLGroupQualifiedsMap;
   typedef std::map<const OCLPointerType *, 
                    std::map<OCLGroupType::const_iterator, 
                             const OCLPointerType *> > OCLGroupPointersMap;
   typedef std::pair<const OCLScalarType *, unsigned> OCLVectorId;
   typedef std::map<OCLVectorId, const OCLVectorType *> OCLVectorsMap;
+  typedef std::pair<const OCLBasicType *, const OCLQualifiedType::Qualifier> OCLQualifiedId;
+  typedef std::map<OCLQualifiedId, const OCLQualifiedType *> OCLQualifiedsMap;
   typedef std::pair<const OCLBasicType *, OCLPtrStructure> OCLPointerId;
   typedef std::map<OCLPointerId, const OCLPointerType *> OCLPointersMap;
   typedef std::map<llvm::Record*, const OCLOpaqueTypeDef*> OCLOpaqueTypeDefsMap;
@@ -127,6 +148,7 @@ public:
 public:
   ~OCLTypesTableImpl() {
     llvm::DeleteContainerSeconds(Types);
+    llvm::DeleteContainerSeconds(Quals);
     llvm::DeleteContainerSeconds(Ptrs);
     llvm::DeleteContainerSeconds(OpaqueTypeDefs);
   }
@@ -137,6 +159,13 @@ public:
       BuildType(R);
 
     return *Types[&R];
+  }
+
+  const OCLQualifiedType &get(const OCLQualifiedGroupIterator &I) {
+    if (!GroupQuals.count(&I.Qual) || !GroupQuals[&I.Qual].count(I.Iter))  
+      ExpandQualifiedType(I);
+
+    return *GroupQuals[&I.Qual][I.Iter];
   }
 
   const OCLPointerType &get(const OCLPointerGroupIterator &I) {
@@ -151,6 +180,14 @@ public:
     OCLVectorsMap::const_iterator I = Vects.find(OCLVectorId(&Base, Width));
     if (I != Vects.end()) return I->second;
     return 0;
+  }
+
+  const OCLQualifiedType &getQualifiedType(const OCLBasicType &Base,
+                                           const OCLQualifiedType::Qualifier Qual) {
+    if (!Quals.count(OCLQualifiedId(&Base, Qual)))
+      BuildQualifiedType(Base, Qual);
+
+    return *Quals[OCLQualifiedId(&Base, Qual)];
   }
 
   const OCLPointerType &getPointerType(const OCLBasicType &Base,
@@ -211,6 +248,24 @@ private:
 
       Type = V;
     }
+    else if (R.isSubClassOf("OCLQualifiedType")) {
+      const OCLType &UnQualTy = get(*R.getValueAsDef("UnQualType"));
+
+      llvm::Record *QualRecord = R.getValueAsDef("Qualifier");
+      OCLQualifiedType::Qualifier qual;
+
+      llvm::StringRef QualName = QualRecord->getName();
+      qual = llvm::StringSwitch<OCLQualifiedType::Qualifier>(QualName)
+        .Case("ocl_qual_readonly", OCLQualifiedType::Q_ReadOnly)
+        .Case("ocl_qual_writeonly", OCLQualifiedType::Q_WriteOnly)
+        .Case("ocl_qual_readwrite", OCLQualifiedType::Q_ReadWrite)
+        .Default(OCLQualifiedType::Q_Unknown);
+
+      if (qual == OCLQualifiedType::Q_Unknown)
+        llvm::PrintFatalError("Illegal qualifier!");
+
+      Type = new OCLQualifiedType(UnQualTy, qual);
+    }
     else if (R.isSubClassOf("OCLPointerType")) {
       llvm::Record *ASRecord = R.getValueAsDef("AddressSpace");
 
@@ -259,6 +314,24 @@ private:
       B->setPredicates(FetchPredicates(R));
 
     Types[&R] = Type;
+  }
+
+  void BuildQualifiedType(const OCLBasicType &Base, const OCLQualifiedType::Qualifier Qual) {
+    OCLQualifiedType *Q = new OCLQualifiedType(Base, Qual);
+    Quals[OCLQualifiedId(&Base, Qual)] = Q; 
+  }
+
+  void ExpandQualifiedType(const OCLQualifiedGroupIterator &I) {
+    const OCLQualifiedType *Q = &I.Qual;
+    const OCLType *T = &Q->getUnQualType();
+
+    assert(llvm::isa<OCLGroupType>(T) && "Bad qualified group iterator!");
+
+    T = *I.Iter;
+
+    OCLQualifiedType::Qualifier Qual = Q->getQualifier();
+    T = &getQualifiedType(*llvm::cast<OCLBasicType>(T), Qual);
+    GroupQuals[&I.Qual][I.Iter] = llvm::cast<OCLQualifiedType>(T);
   }
 
   void BuildPointerType(const OCLBasicType &Base, const OCLPtrStructure &PtrS) {
@@ -319,7 +392,9 @@ private:
 private:
   OCLTypesMap Types;
   OCLVectorsMap Vects;
+  OCLQualifiedsMap Quals;
   OCLPointersMap Ptrs;
+  OCLGroupQualifiedsMap GroupQuals;
   OCLGroupPointersMap GroupPtrs;
   OCLOpaqueTypeDefsMap OpaqueTypeDefs;
 };
@@ -340,6 +415,13 @@ const OCLVectorType *OCLTypesTable::getVectorType(const OCLScalarType &Base,
                                                   unsigned Width) {
   if (!Impl) Impl.reset(new OCLTypesTableImpl());
   return Impl->getVectorType(Base, Width);
+}
+
+const OCLQualifiedType &
+OCLTypesTable::getQualifiedType(const OCLBasicType &Base,
+                                const OCLQualifiedType::Qualifier Qual) {
+  if (!Impl) Impl.reset(new OCLTypesTableImpl());
+  return Impl->getQualifiedType(Base, Qual);
 }
 
 const OCLPointerType &
@@ -373,6 +455,43 @@ void opencrun::LoadOCLOpaqueTypeDefs(const llvm::RecordKeeper &R,
 
   for(unsigned I = 0, E = RawVects.size(); I < E; ++I)
     T.push_back(&OCLTypesTable::getOpaqueTypeDef(*RawVects[I]));
+}
+
+//===----------------------------------------------------------------------===//
+// QualifiedGroup iterator implementation
+//===----------------------------------------------------------------------===//
+
+const OCLQualifiedType &OCLQualifiedGroupIterator::operator*() const {
+  assert(!End && "Cannot derefence 'end' iterator!");
+
+  if (Singleton) return Qual;
+  return OCLTypesTable::Impl->get(*this);
+}
+
+const OCLQualifiedType *OCLQualifiedGroupIterator::operator->() const {
+  assert(!End && "Cannot derefence 'end' iterator!");
+
+  if (Singleton) return &Qual;
+  return &OCLTypesTable::Impl->get(*this);
+}
+
+void OCLQualifiedGroupIterator::FindInnerGroup() {
+  const OCLType *T = &Qual;
+  do {
+    T = &llvm::cast<OCLQualifiedType>(T)->getUnQualType();
+  } while (llvm::isa<OCLQualifiedType>(T));
+
+  Singleton = false;
+
+  if (!llvm::isa<OCLGroupType>(T)) {
+    Singleton = true;
+  } else {
+    const OCLGroupType *GT = llvm::cast<OCLGroupType>(T);
+    
+    Iter = End ? GT->end() : GT->begin();
+    IterEnd = GT->end();
+    End = Iter == IterEnd;
+  }
 }
 
 //===----------------------------------------------------------------------===//

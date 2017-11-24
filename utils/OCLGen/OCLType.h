@@ -25,6 +25,7 @@ public:
     TK_Integer,
     TK_Real,
     TK_Vector,
+    TK_Qualified,
     TK_Pointer,
     TK_Group
   };
@@ -54,6 +55,7 @@ public:
     case TK_Opaque:
     case TK_Scalar: case TK_Integer: case TK_Real: 
     case TK_Vector: 
+    case TK_Qualified:
     case TK_Pointer: 
       return true;
     default: 
@@ -168,6 +170,38 @@ private:
   unsigned Width;
 };
 
+class OCLQualifiedType : public OCLBasicType {
+public:
+  enum Qualifier {
+    Q_ReadOnly = 1 << 0,
+    Q_WriteOnly = 1 << 1,
+    Q_ReadWrite = 1 << 2, // Only for OpenCL > 2.0
+    Q_Unknown
+  };
+
+public:
+  static bool classof(const OCLType *Ty) {
+    return Ty->getKind() == TK_Qualified;
+  }
+
+public:
+  OCLQualifiedType(const OCLType &unqual, const Qualifier qual)
+    : OCLBasicType(TK_Qualified, BuildName(unqual, qual)),
+      UnQualType(unqual), Qual(qual) {}
+
+  virtual bool compareLess(const OCLType *T) const;
+  const OCLType &getUnQualType() const { return UnQualType; }
+  Qualifier getQualifier() const { return Qual; }
+  bool hasQualifier(Qualifier q) const { return Qual == q; }
+
+private:
+  std::string BuildName(const OCLType &UnQualTy, Qualifier Qual);
+
+private:
+  const OCLType &UnQualType;
+  const Qualifier Qual;
+};
+
 class OCLPointerType : public OCLBasicType {
 public:
   enum Modifier {
@@ -178,7 +212,7 @@ public:
   };
 
 public:
-  static bool classof(const  OCLType *Ty) {
+  static bool classof(const OCLType *Ty) {
     return Ty->getKind() == TK_Pointer;
   }
 
@@ -283,6 +317,8 @@ public:
 
   static const OCLVectorType *getVectorType(const OCLScalarType &Base, 
                                             unsigned Width);
+  static const OCLQualifiedType &getQualifiedType(const OCLBasicType &Base,
+                                                  const OCLQualifiedType::Qualifier Qual);
   static const OCLPointerType &getPointerType(const OCLBasicType &Base,
                                               const OCLPtrStructure &PtrS);
 
@@ -290,9 +326,54 @@ private:
   static std::unique_ptr<OCLTypesTableImpl> Impl;
 
   friend class OCLPointerGroupIterator;
+  friend class OCLQualifiedGroupIterator;
   friend void LoadOCLTypes(const llvm::RecordKeeper &R, OCLTypesContainer &T);
   friend void LoadOCLOpaqueTypeDefs(const llvm::RecordKeeper &R, 
                                     OCLOpaqueTypeDefsContainer &T);
+};
+
+//===----------------------------------------------------------------------===//
+// QualifiedGroup iterator
+//===----------------------------------------------------------------------===//
+
+class OCLQualifiedGroupIterator {
+public:
+  OCLQualifiedGroupIterator(const OCLQualifiedType &q, bool end = false)
+    : Qual(q), End(end) {
+      FindInnerGroup();
+    }
+
+  bool operator==(const OCLQualifiedGroupIterator &J) const {
+    if (&Qual != &J.Qual) return false;
+    if (!End && !J.End) return Iter == J.Iter;
+    return End == J.End;
+  }
+
+  bool operator!=(const OCLQualifiedGroupIterator &J) const {
+    return !(*this == J);
+  }
+
+  const OCLQualifiedType &operator*() const;
+  const OCLQualifiedType *operator->() const;
+
+  OCLQualifiedGroupIterator &operator++() {
+    assert(!End && "Cannot increment 'end' iterator!");
+    if (Singleton) End = true;
+    else End = ++Iter == IterEnd;
+    return *this;
+  }
+
+private:
+  void FindInnerGroup();
+
+private:
+  const OCLQualifiedType &Qual;
+  OCLGroupType::const_iterator Iter;
+  OCLGroupType::const_iterator IterEnd;
+  bool End;
+  bool Singleton;
+
+  friend class OCLTypesTableImpl;
 };
 
 //===----------------------------------------------------------------------===//
