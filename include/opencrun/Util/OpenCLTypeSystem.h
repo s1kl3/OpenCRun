@@ -29,7 +29,7 @@ enum AddressSpace {
   AS_Invalid
 };
 
-AddressSpace convertAddressSpace(unsigned AS);
+AddressSpace convertAddressSpace(clang::LangAS AS);
 
 enum ImageAccess {
   IA_ReadOnly = 1,

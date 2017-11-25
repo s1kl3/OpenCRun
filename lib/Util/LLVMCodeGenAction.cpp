@@ -152,8 +152,8 @@ void LLVMCodeGenConsumer::regenerateKernelInfo(const clang::FunctionDecl *FD) {
     clang::QualType ParamTy = ParamDecl->getType();
 
     // Recompute address space info
-    unsigned LangAS = ParamTy->isPointerType()
-                       ? ParamTy->getPointeeType().getAddressSpace() : 0;
+    clang::LangAS LangAS = ParamTy->isPointerType() ?
+      ParamTy->getPointeeType().getAddressSpace() : clang::LangAS::Default;
     unsigned AS = opencl::convertAddressSpace(LangAS);
     ArgAddrSpace.push_back(llvm::ConstantAsMetadata::get(
                               llvm::ConstantInt::get(I32Ty, AS)));

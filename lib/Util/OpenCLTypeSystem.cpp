@@ -20,9 +20,9 @@ enum MDNodeID {
 
 }
 
-AddressSpace opencrun::opencl::convertAddressSpace(unsigned AS) {
+AddressSpace opencrun::opencl::convertAddressSpace(clang::LangAS AS) {
   switch (AS) {
-  case 0: return AS_Private;
+  case clang::LangAS::Default: case clang::LangAS::opencl_private: return AS_Private;
   case clang::LangAS::opencl_global: return AS_Global;
   case clang::LangAS::opencl_constant: return AS_Constant;
   case clang::LangAS::opencl_local: return AS_Local;
