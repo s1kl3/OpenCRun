@@ -20,9 +20,15 @@ enum MDNodeID {
 
 }
 
+#ifdef LLVM_GT_5
 AddressSpace opencrun::opencl::convertAddressSpace(clang::LangAS AS) {
   switch (AS) {
   case clang::LangAS::Default: case clang::LangAS::opencl_private: return AS_Private;
+#else
+AddressSpace opencrun::opencl::convertAddressSpace(unsigned AS) {
+  switch (AS) {
+  case 0: return AS_Private;
+#endif
   case clang::LangAS::opencl_global: return AS_Global;
   case clang::LangAS::opencl_constant: return AS_Constant;
   case clang::LangAS::opencl_local: return AS_Local;

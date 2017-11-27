@@ -29,7 +29,11 @@ enum AddressSpace {
   AS_Invalid
 };
 
+#ifdef LLVM_GT_5
 AddressSpace convertAddressSpace(clang::LangAS AS);
+#else
+AddressSpace convertAddressSpace(unsigned AS);
+#endif
 
 enum ImageAccess {
   IA_ReadOnly = 1,

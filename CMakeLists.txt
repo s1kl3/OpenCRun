@@ -89,6 +89,19 @@ endif()
 
 message(STATUS "Found llvm-config: ${LLVM_CONFIG_CMD}")
 
+message(STATUS "LLVM version: ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}")
+
+# Preprocessor definitions for source code specialization.
+add_definitions(
+  -DLLVM_${LLVM_VERSION_MAJOR}_${LLVM_VERSION_MINOR}_${LLVM_VERSION_PATCH}
+  -DLLVM_${LLVM_VERSION_MAJOR}_${LLVM_VERSION_MINOR}
+  -DLLVM_${LLVM_VERSION_MAJOR}
+  )
+if(LLVM_VERSION_MAJOR GREATER 5)
+  add_definitions(-DLLVM_GT_5)
+endif()
+
+# Some useful variables.
 llvm_config(LLVM_CPPFLAGS --cppflags)
 llvm_config(LLVM_CFLAGS --cflags)
 llvm_config(LLVM_CXXFLAGS --cxxflags)
