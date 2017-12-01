@@ -501,6 +501,18 @@ void CPUDevice::InitCompiler() {
     getCompilerAs<CPUCompiler>().addSymbolMapping("__internal_" #N, Addr);
   #include "InternalCalls.def"
   #undef INTERNAL_CALL
+
+#ifdef CLANG_GT_4
+  // For each program-scope sampler variable usage and function-scope sampler
+  // variable initialization, Clang generates a call to the following function:
+  //
+  //    constant opencl.sampler_t *__attribute__((always_inline)) 
+  //    __translate_sampler_initializer(unsigned);
+  //
+  // This function is provided internally by the runtime.
+  Addr = reinterpret_cast<void *>(opencrun::cpu::TranslateSamplerInitializer);
+  getCompilerAs<CPUCompiler>().addSymbolMapping("__translate_sampler_initializer", Addr);
+#endif
 }
 
 CPUMemoryDescriptor &CPUDevice::getMemoryDescriptor(const MemoryObject &Obj) {

@@ -99,6 +99,12 @@ add_definitions(
   )
 if(LLVM_VERSION_MAJOR GREATER 5)
   add_definitions(-DLLVM_GT_5)
+  add_definitions(-DCLANG_GT_5)
+  add_definitions(-DLLVM_GT_4)
+  add_definitions(-DCLANG_GT_4)
+elseif(LLVM_VERSION_MAJOR GREATER 4)
+  add_definitions(-DLLVM_GT_4)
+  add_definitions(-DCLANG_GT_4)
 endif()
 
 # Some useful variables.
