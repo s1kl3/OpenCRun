@@ -2,29 +2,50 @@
 OpenCRun -- Yet another OpenCL runtime
 ======================================
 
-OpenCRun is an OpenCL runtime developed for research purpose at
-[Politecnico di Milano][1]. It used [LLVM][2] and [CLANG][3] to compile OpenCL
-kernels into executable code.
+OpenCRun is an OpenCL runtime developed for research purpose at [Politecnico di
+Milano][1]. It used [LLVM][2] and [Clang][3] to compile OpenCL kernels into
+executable code.
 
 It can support different devices. Right now, only CPU devices (i386 and X86_64)
 are supported.
 
-Integration with LLVM/CLANG
+Integration with LLVM/Clang
 ---------------------------
 
-The whole runtime heavily exploit LLVM/CLANG libraries and build system.
-LLVM/CLANG must be installed before building OpenCRun.
+The whole runtime heavily exploit LLVM/Clang libraries and build system.
+LLVM/Clang must be installed before building OpenCRun.
 
-Currently OpenCRun is going to be realigned with LLVM/CLANG trunk, so there may
-be impossible building it -- sorry.
+Currently OpenCRun has been built and tested with LLVM/Clang up to release 6.
+Tags are also available in the OpenCRun repository to revert back its source
+code to versinons compatible with LLVM/Clang 3.5 and 3.7 (Note: v.3.5 requires
+GCC < 4.9). 
 
 Current quality status
 ----------------------
 
-The runtime is in prototype phase. No extensive tests have been conducted, nor
-the full OpenCL API has been implemented. In the `unittests` directory contains
-automated tests using OpenCRun through the OpenCL C++ API. Moreover, in the
-`bench` directory there are some more complex examples.
+Most of the OpenCL API and the OpenCL C library functions are supported. The
+`unittests` directory contains automated tests using OpenCRun through the OpenCL
+C++ API. Moreover, in the `bench` directory there are some more complex
+examples.
+
+Installing
+----------
+
+OpenCRun requires that LLVM is built with run-time type information enabled.
+If building from a sub-directory of the LLVM source tree:
+
+```
+cmake .. -DCMAKE_INSTALL_PREFIX=${HOME}/local -DLLVM_ENABLE_RTTI:BOOL=1
+```
+
+Then, the LLVM/Clang source and build directories must be specified when
+building OpenCRun:
+
+```
+cmake .. -DCMAKE_INSTALL_PREFIX=${HOME}/local 
+  -DLLVM_SRC_ROOT=<LLVM source dir>
+  -DLLVM_OBJ_ROOT=<LLVM build dir>
+```
 
 Authors
 -------
