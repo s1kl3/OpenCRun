@@ -737,7 +737,7 @@ CPUDevice::getKernelFootprint(const KernelDescriptor &Kern) const {
   if (I != KernelFootprints.end())
     return I->second;
 
-  FootprintEstimate *Pass = CreateFootprintEstimatePass(GetName());
+  FootprintEstimate *Pass = CreateFootprintEstimatePass(Kern.getName());
   llvm::Function *Fun = Kern.getFunction(this);
 
   llvm::legacy::PassManager PM;

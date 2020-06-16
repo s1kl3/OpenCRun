@@ -193,7 +193,7 @@ private:
   llvm::MDNode *getKernelArgInfo(llvm::StringRef Name) const;
 
 private:
-  // New SPIR format that uses kernel metaata.
+  // New SPIR format that uses kernel metadata.
   llvm::Function *Kernel;
 
   // Old SPIR format that uses generic metadata for kernels.

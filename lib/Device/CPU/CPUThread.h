@@ -45,7 +45,6 @@ private:
 class CPUThread : public sys::Thread {
 public:
   typedef std::deque<std::unique_ptr<CPUCommand>> CPUCommands;
-  typedef llvm::SmallVector<void *, 8> StaticLocalPointers;
 
   enum WorkingMode {
     FullyOperational = 1 << 0,

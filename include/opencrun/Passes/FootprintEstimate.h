@@ -34,7 +34,7 @@ public:
   virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
 
   virtual void verifyAnalysis() const override {
-    // Now it makes no sense to verify this analysis. If it will becomes more
+    // Now it makes no sense to verify this analysis. If it will become more
     // complex, then some verification code should be written.
   }
 
